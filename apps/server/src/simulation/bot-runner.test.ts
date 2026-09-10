@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_PLAYERS } from '@ice-water/shared';
 import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { LobbyController } from '../rooms/lobby-controller.js';
 import { GameplayController } from '../gameplay/gameplay-controller.js';
