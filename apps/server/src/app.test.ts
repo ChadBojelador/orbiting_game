@@ -20,6 +20,7 @@ type TestRoom = Room<unknown, TestState>;
 let app: Awaited<ReturnType<typeof startServer>>;
 let url: string;
 const rooms: TestRoom[] = [];
+let isDatabaseReady = true;
 const config = readConfig({
   GUEST_SESSION_SIGNING_SECRET: 'test-secret-with-at-least-32-characters',
   GAME_SERVER_PORT: '0',
@@ -61,7 +62,7 @@ async function waitFor(predicate: () => boolean) {
 }
 
 beforeAll(async () => {
-  app = await startServer(config, { isReady: async () => true, close: async () => {} });
+  app = await startServer(config, { isReady: async () => isDatabaseReady, close: async () => {} });
   url = `http://127.0.0.1:${app.port}`;
 });
 afterAll(async () => {
@@ -73,6 +74,10 @@ describe('HTTP and real WebSocket room flow', () => {
   it('reports health and readiness, sanitizes guests, and validates requests', async () => {
     expect((await fetch(`${url}/health`)).status).toBe(200);
     expect((await fetch(`${url}/ready`)).status).toBe(200);
+    isDatabaseReady = false;
+    expect((await fetch(`${url}/ready`)).status).toBe(503);
+    expect((await fetch(`${url}/health`)).status).toBe(200);
+    isDatabaseReady = true;
     expect((await guest('  Ｓnow  Guest! ')).displayName).toBe('Snow Guest');
     expect((await post('/api/guest-session', { displayName: '<>' })).status).toBe(400);
     expect((await post('/api/rooms', {})).status).toBe(401);

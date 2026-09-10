@@ -1,3 +1,5 @@
+import type { GameplayEvents, GameplayMessages, PlayerStatus } from './gameplay.js';
+
 export const MIN_PLAYERS = 6;
 export const MAX_PLAYERS = 150;
 export const ROOM_NAME = 'private-game';
@@ -13,6 +15,19 @@ export interface PlayerView {
   displayName: string;
   team: Team;
   isConnected: boolean;
+  x: number;
+  z: number;
+  yaw: number;
+  inputSequence: number;
+  status: PlayerStatus;
+  protectedUntil: number;
+  rescueProgress: number;
+  rescuingTarget: string;
+  tagReadyAt: number;
+  helpPingUntil: number;
+  helpPingReadyAt: number;
+  tags: number;
+  rescues: number;
 }
 
 export interface LobbyView {
@@ -51,10 +66,10 @@ export interface SessionError {
   code: string;
   message: string;
 }
-export interface ClientMessages {
+export interface ClientMessages extends GameplayMessages {
   'room/start': Record<string, never>;
 }
-export interface ServerMessages {
+export interface ServerMessages extends GameplayEvents {
   'session/error': SessionError;
   'match/phase-changed': { phase: MatchPhase; phaseDeadline: number; serverTime: number };
 }

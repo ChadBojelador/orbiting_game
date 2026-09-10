@@ -1,5 +1,5 @@
 import { schema, t, type SchemaType } from '@colyseus/schema';
-import { MIN_PLAYERS, type MatchPhase, type Team } from '@ice-water/shared';
+import { MIN_PLAYERS, type MatchPhase, type Team, type PlayerStatus } from '@ice-water/shared';
 
 export const PlayerState = schema(
   {
@@ -7,6 +7,19 @@ export const PlayerState = schema(
     displayName: t.string().default(''),
     team: t.string<Team>().default('unassigned'),
     isConnected: t.boolean().default(true),
+    x: t.float32().default(0),
+    z: t.float32().default(0),
+    yaw: t.float32().default(0),
+    inputSequence: t.uint32().default(0),
+    status: t.string<PlayerStatus>().default('active'),
+    protectedUntil: t.number().default(0),
+    rescueProgress: t.float32().default(0),
+    rescuingTarget: t.string().default(''),
+    tagReadyAt: t.number().default(0),
+    helpPingUntil: t.number().default(0),
+    helpPingReadyAt: t.number().default(0),
+    tags: t.uint32().default(0),
+    rescues: t.uint32().default(0),
   },
   'PlayerState',
 );
