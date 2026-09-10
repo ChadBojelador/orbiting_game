@@ -82,12 +82,8 @@ export function GameHud({ view, localPlayerId, serverNow }: GameHudProps) {
         <span className="hud-team-role">
           You’re {team === 'ice' ? 'Ice — catch the Water team.' : 'Water — help your teammates.'}
         </span>
-        {isEliminated && (
-          <span className="hud-status-note"> · 👁 Spectating</span>
-        )}
-        {isFrozen && (
-          <span className="hud-status-note"> · 🧊 You're frozen!</span>
-        )}
+        {isEliminated && <span className="hud-status-note"> · 👁 Spectating</span>}
+        {isFrozen && <span className="hud-status-note"> · 🧊 You're frozen!</span>}
       </div>
 
       {/* Rescue-locked banner during deep-freeze */}

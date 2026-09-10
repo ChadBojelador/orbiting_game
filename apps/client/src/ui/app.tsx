@@ -85,6 +85,8 @@ export function App() {
     next.onMessage<MatchResult>('match/result', (result) => {
       setMatchResult(result);
     });
+    next.onMessage('arena/boundary-changed', () => {});
+    next.onMessage('player/permanently-frozen', () => {});
     next.onError((_code, message) => setError(message ?? 'Room connection failed'));
     next.onDrop(() => setConnection('Reconnecting…'));
     next.onReconnect(() => {
