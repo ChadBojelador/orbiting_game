@@ -10,6 +10,8 @@ export interface ServerConfig {
   databaseUrl?: string;
   isProduction: boolean;
   maxPlayers: number;
+  /** Non-zero only in development. Bots fill seats so solo testing is possible. */
+  devBotCount: number;
   countdownSeconds: number;
   reconnectSeconds: number;
   sessionTtlSeconds: number;
@@ -57,6 +59,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     databaseUrl: env.DATABASE_URL || undefined,
     isProduction,
     maxPlayers: integer('ROOM_MAX_PLAYERS', 150, 6, 150),
+    devBotCount: isProduction ? 0 : integer('DEV_BOT_COUNT', 0, 0, 149),
     countdownSeconds: integer('COUNTDOWN_SECONDS', 5, 1, 30),
     reconnectSeconds: integer('RECONNECT_SECONDS', 25, 20, 30),
     sessionTtlSeconds: integer('GUEST_SESSION_TTL_SECONDS', 3600, 60, 86400),
