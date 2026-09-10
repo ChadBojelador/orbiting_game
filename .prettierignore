@@ -1,0 +1,14 @@
+node_modules
+dist
+package-lock.json
+assets
+coverage
+playwright-report
+test-results
+tmp
+PRD.md
+ARCHITECTURE.md
+ART_DIRECTION.md
+AGENTS.md
+TASKS.md
+CONTRIBUTING.md
