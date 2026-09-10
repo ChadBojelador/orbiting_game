@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { MIN_PLAYERS } from '@ice-water/shared';
+import { GAMEPLAY, MIN_PLAYERS } from '@ice-water/shared';
 import { iceCountFor, type IceBracket } from '../config/ice-brackets.js';
 import type { LobbyState } from './lobby-state.js';
 
@@ -44,8 +44,10 @@ export class LobbyController {
     players.forEach((player, index) => {
       player.team = index < this.state.iceCount ? 'ice' : 'water';
     });
+    this.state.round = 0; // MatchController.start() will set this to 1.
+    this.state.maxRounds = GAMEPLAY.maxRounds;
     this.state.phase = 'regular';
-    // The round simulation and its deadlines are implemented by MVP-26/28.
+    // Phase deadline and round tracking are owned by MatchController (MVP-26/28).
     this.state.phaseDeadline = 0;
     return true;
   }

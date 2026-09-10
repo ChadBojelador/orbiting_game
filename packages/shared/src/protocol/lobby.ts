@@ -39,6 +39,9 @@ export interface LobbyView {
   maxPlayers: number;
   minPlayers: number;
   iceCount: number;
+  round: number;
+  maxRounds: number;
+  arenaHalfExtent: number;
   players: PlayerView[];
 }
 
@@ -66,10 +69,20 @@ export interface SessionError {
   code: string;
   message: string;
 }
+export interface MatchResult {
+  winner: 'ice' | 'water';
+  reason: 'all-frozen' | 'rounds-complete';
+}
 export interface ClientMessages extends GameplayMessages {
   'room/start': Record<string, never>;
 }
 export interface ServerMessages extends GameplayEvents {
   'session/error': SessionError;
-  'match/phase-changed': { phase: MatchPhase; phaseDeadline: number; serverTime: number };
+  'match/phase-changed': {
+    phase: MatchPhase;
+    phaseDeadline: number;
+    serverTime: number;
+    round?: number;
+  };
+  'match/result': MatchResult;
 }

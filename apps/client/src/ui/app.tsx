@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
+  canRescueInPhase,
+  isPlayPhase,
   normalizeInviteCode,
   sanitizeDisplayName,
   type GuestSession,
   type LobbyView,
+  type MatchResult,
   type SessionError,
 } from '@ice-water/shared';
 import {
@@ -18,6 +21,9 @@ import {
   type LobbyRoom,
 } from '../network/lobby-client.js';
 import { LobbyPreview } from '../game/lobby-preview.js';
+import { GameHud } from './game-hud.js';
+import { TouchControls } from './touch-controls.js';
+import { ResultsScreen } from './results-screen.js';
 
 export function App() {
   const [guest, setGuest] = useState<GuestSession | null>(readGuest);
@@ -30,14 +36,40 @@ export function App() {
   const [connection, setConnection] = useState('Connected');
   const [copyLabel, setCopyLabel] = useState('Copy invite code');
   const [now, setNow] = useState(0);
+  const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const clock = useRef({ server: 0, received: 0 });
   const roomRef = useRef<LobbyRoom | null>(null);
+  const gameCanvasRef = useRef<HTMLCanvasElement>(null);
+  const gameSceneRef = useRef<import('../game/game-scene.js').GameScene | null>(null);
+
+  // Mount/unmount the 3D game scene when entering/leaving play phases.
+  useEffect(() => {
+    const canvas = gameCanvasRef.current;
+    if (!canvas || !room || !guest || !lobby) return;
+    if (!isPlayPhase(lobby.phase) && lobby.phase !== 'round-result') {
+      if (gameSceneRef.current) {
+        gameSceneRef.current.destroy();
+        gameSceneRef.current = null;
+      }
+      return;
+    }
+    if (gameSceneRef.current) return; // already mounted
+    void import('../game/game-scene.js').then(({ GameScene }) => {
+      if (!canvas || !room || !guest) return;
+      gameSceneRef.current = new GameScene(canvas, room, guest.playerId);
+    });
+    return () => {
+      gameSceneRef.current?.destroy();
+      gameSceneRef.current = null;
+    };
+  }, [lobby?.phase, room, guest]);
 
   function attach(next: LobbyRoom) {
     roomRef.current = next;
     setRoom(next);
     setError('');
     setConnection('Connected');
+    setMatchResult(null);
     const update = () => {
       if (!next.state?.players) return;
       const value = snapshot(next.state);
@@ -49,6 +81,9 @@ export function App() {
     next.onMessage<SessionError>('session/error', (message) => setError(message.message));
     next.onMessage('match/phase-changed', () => {
       setError('');
+    });
+    next.onMessage<MatchResult>('match/result', (result) => {
+      setMatchResult(result);
     });
     next.onError((_code, message) => setError(message ?? 'Room connection failed'));
     next.onDrop(() => setConnection('Reconnecting…'));
@@ -62,6 +97,7 @@ export function App() {
       roomRef.current = null;
       setRoom(null);
       setLobby(null);
+      setMatchResult(null);
       setError('You left the room or the connection expired. You can join again.');
     });
     update();
@@ -125,11 +161,14 @@ export function App() {
 
   async function leave() {
     if (!room) return;
+    gameSceneRef.current?.destroy();
+    gameSceneRef.current = null;
     roomRef.current = null;
     clearReconnect();
     await room.leave();
     setRoom(null);
     setLobby(null);
+    setMatchResult(null);
     setError('');
   }
 
@@ -138,6 +177,71 @@ export function App() {
   const seconds = Math.max(0, Math.ceil(((lobby?.phaseDeadline ?? 0) - now) / 1000));
   const currentPlayer = lobby?.players.find((player) => player.playerId === guest?.playerId);
   const isExpired = guest !== null && guest.expiresAt <= Date.now();
+  const isInGame =
+    lobby &&
+    (isPlayPhase(lobby.phase) || lobby.phase === 'round-result' || lobby.phase === 'match-result');
+  const serverNow = clock.current.server + performance.now() - clock.current.received;
+  const isRescueLocked = !canRescueInPhase(
+    lobby?.phase ?? 'lobby',
+    lobby?.phaseDeadline ?? 0,
+    serverNow,
+  );
+
+  if (isInGame && lobby && guest) {
+    return (
+      <div className="game-shell">
+        {/* Full-screen 3D canvas */}
+        <canvas ref={gameCanvasRef} className="game-canvas" aria-label="3D game arena" />
+
+        {/* HUD overlay */}
+        {lobby.phase !== 'match-result' && (
+          <GameHud view={lobby} localPlayerId={guest.playerId} serverNow={serverNow} />
+        )}
+
+        {/* Touch controls */}
+        {currentPlayer && lobby.phase !== 'match-result' && (
+          <TouchControls
+            input={gameSceneRef.current?.getInput()}
+            team={currentPlayer.team === 'unassigned' ? 'water' : currentPlayer.team}
+            playerStatus={currentPlayer.status}
+            isRescueLocked={isRescueLocked}
+          />
+        )}
+
+        {/* In-game Leave room button */}
+        <button
+          className="text-button game-leave-button"
+          onClick={() => void run(leave)}
+          disabled={isBusy}
+          aria-label="Leave room"
+        >
+          Leave room
+        </button>
+
+        {/* Results overlay */}
+        {matchResult && lobby.phase === 'match-result' && (
+          <ResultsScreen
+            view={lobby}
+            localPlayerId={guest.playerId}
+            result={matchResult}
+            onLeave={() => void run(leave)}
+          />
+        )}
+
+        {/* Connection status */}
+        {connection !== 'Connected' && (
+          <div className="game-reconnecting" role="status">
+            {connection}
+          </div>
+        )}
+        {error && (
+          <p className="game-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <main className="shell">
@@ -154,7 +258,7 @@ export function App() {
             <br />A lot of friends.
           </h1>
           <p className="lede">
-            Gather your crew for a game of freeze tag. Keep moving, stick together, and don’t get
+            Gather your crew for a game of freeze tag. Keep moving, stick together, and don't get
             left on ice.
           </p>
           <LobbyPreview />
@@ -179,7 +283,7 @@ export function App() {
               <span className="panel-icon" aria-hidden="true">
                 ✳
               </span>
-              <h2>First, what’s your name?</h2>
+              <h2>First, what's your name?</h2>
               <p>Your friends will see this in the room.</p>
               <form onSubmit={submitGuest}>
                 <label htmlFor="display-name">Display name</label>
@@ -208,7 +312,7 @@ export function App() {
                 ✳
               </span>
               <h2>Hey, {guest.displayName}.</h2>
-              <p>Start a room or hop into your friend’s.</p>
+              <p>Start a room or hop into your friend's.</p>
               <button
                 className="primary"
                 disabled={isBusy || isExpired}
@@ -319,15 +423,9 @@ export function App() {
                         : 'Your host can start the countdown.'
                     : lobby.phase === 'countdown'
                       ? 'Ice catches. Water helps teammates thaw.'
-                      : `You’re ${currentPlayer?.team === 'ice' ? 'Ice — catch the Water team.' : 'Water — help your teammates.'}`}
+                      : `You're ${currentPlayer?.team === 'ice' ? 'Ice — catch the Water team.' : 'Water — help your teammates.'}`}
                 </p>
               </div>
-              {lobby.phase === 'regular' && (
-                <p className="scope-note">
-                  The lobby and teams are ready. Movement, tagging, and rounds are coming in the
-                  next playtest.
-                </p>
-              )}
               {isHost && lobby.phase === 'lobby' && (
                 <button
                   className="primary"
