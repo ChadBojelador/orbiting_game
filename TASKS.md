@@ -19,34 +19,10 @@ This file is the source of truth for current development work. The PRD defines w
 
 ## To Do
 
-### Core 3D gameplay
-
-| ID | Task | Owner | Priority | Related feature | Dependencies |
-|---|---|---|---|---|---|
-| MVP-15 | Build placeholder arena with static collision and spawn points | Unassigned | P0 | Arena | MVP-04, MVP-51 |
-| MVP-16 | Add shared low-poly placeholder character and basic animations | Unassigned | P0 | Characters | MVP-04, MVP-51 |
-| MVP-17 | Implement keyboard and touch input normalization | Unassigned | P0 | Controls | MVP-04 |
-| MVP-18 | Implement server-authoritative kinematic movement | Unassigned | P0 | Movement | MVP-06, MVP-15, MVP-17 |
-| MVP-19 | Add local prediction and remote-player interpolation | Unassigned | P0 | Networking | MVP-18 |
-| MVP-20 | Render distinct Ice, Water, protected, and frozen states | Unassigned | P0 | Player states | MVP-14, MVP-16, MVP-19 |
-| MVP-21 | Implement spatial-grid nearby-player queries | Unassigned | P0 | Performance | MVP-18 |
-| MVP-22 | Implement validated Ice tag and temporary freeze | Unassigned | P0 | Freezing | MVP-20, MVP-21 |
-| MVP-23 | Implement hold-to-rescue with server-owned progress | Unassigned | P0 | Rescue | MVP-22 |
-| MVP-24 | Add two-second post-rescue protection | Unassigned | P0 | Rescue | MVP-23 |
-| MVP-25 | Add rate-limited frozen-player help ping | Unassigned | P1 | Rescue | MVP-22 |
-
 ### Rounds and results
 
 | ID | Task | Owner | Priority | Related feature | Dependencies |
 |---|---|---|---|---|---|
-| MVP-26 | Implement and unit-test the authoritative match state machine | Unassigned | P0 | Match flow | MVP-14, MVP-22, MVP-23 |
-| MVP-27 | Implement server-derived phase and round HUD timers | Unassigned | P0 | Match flow | MVP-26 |
-| MVP-28 | Add 30-second regular phase, Deep Freeze warning, and 30-second Deep Freeze deadline | Unassigned | P0 | Deep Freeze | MVP-26, MVP-27 |
-| MVP-28A | Disable and reject rescue throughout Deep Freeze | Unassigned | P0 | Deep Freeze | MVP-23, MVP-28 |
-| MVP-29 | Permanently freeze unresolved players atomically at the deadline | Unassigned | P0 | Deep Freeze | MVP-28 |
-| MVP-30 | Add static ice statues and spectator mode | Unassigned | P0 | Elimination | MVP-29 |
-| MVP-31 | Contract arena boundaries between configured rounds | Unassigned | P0 | Arena | MVP-15, MVP-26 |
-| MVP-32 | Implement Ice/Water win evaluation and results screen | Unassigned | P0 | Results | MVP-29, MVP-31 |
 | MVP-33 | Store match summary and contribution totals transactionally | Unassigned | P1 | Persistence | MVP-07, MVP-32 |
 
 ### Reliability, quality, and release
@@ -113,3 +89,35 @@ No tasks currently in progress.
 - Browser build currently has a roughly 186 KiB gzip main bundle and 603 KiB gzip lazy PlayCanvas chunk. Vite flags large chunks. Runtime download/3D optimization remains a measured follow-up.
 - Reconnection coverage here verifies lobby identity/reservation only. MVP-34 still owns freeze/elimination/deadline continuity during actual matches.
 - The first two groups finish at role assignment into `regular`; movement, tag/rescue, round deadlines, and results are deliberately not marked complete.
+
+### Completed core 3D gameplay and multi-round match loop (2026-09-10)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-15 | Build placeholder arena with static collision and spawn points | Unassigned | P0 | Arena | MVP-04, MVP-51 |
+| MVP-16 | Add shared low-poly placeholder character and basic animations | Unassigned | P0 | Characters | MVP-04, MVP-51 |
+| MVP-17 | Implement keyboard and touch input normalization | Unassigned | P0 | Controls | MVP-04 |
+| MVP-18 | Implement server-authoritative kinematic movement | Unassigned | P0 | Movement | MVP-06, MVP-15, MVP-17 |
+| MVP-19 | Add local prediction and remote-player interpolation | Unassigned | P0 | Networking | MVP-18 |
+| MVP-20 | Render distinct Ice, Water, protected, and frozen states | Unassigned | P0 | Player states | MVP-14, MVP-16, MVP-19 |
+| MVP-21 | Implement spatial-grid nearby-player queries | Unassigned | P0 | Performance | MVP-18 |
+| MVP-22 | Implement validated Ice tag and temporary freeze | Unassigned | P0 | Freezing | MVP-20, MVP-21 |
+| MVP-23 | Implement hold-to-rescue with server-owned progress | Unassigned | P0 | Rescue | MVP-22 |
+| MVP-24 | Add two-second post-rescue protection | Unassigned | P0 | Rescue | MVP-23 |
+| MVP-25 | Add rate-limited frozen-player help ping | Unassigned | P1 | Rescue | MVP-22 |
+| MVP-26 | Implement and unit-test the authoritative match state machine | Unassigned | P0 | Match flow | MVP-14, MVP-22, MVP-23 |
+| MVP-27 | Implement server-derived phase and round HUD timers | Unassigned | P0 | Match flow | MVP-26 |
+| MVP-28 | Add 30-second regular phase, Deep Freeze warning, and 30-second Deep Freeze deadline | Unassigned | P0 | Deep Freeze | MVP-26, MVP-27 |
+| MVP-28A | Disable and reject rescue throughout Deep Freeze | Unassigned | P0 | Deep Freeze | MVP-23, MVP-28 |
+| MVP-29 | Permanently freeze unresolved players atomically at the deadline | Unassigned | P0 | Deep Freeze | MVP-28 |
+| MVP-30 | Add static ice statues and spectator mode | Unassigned | P0 | Elimination | MVP-29 |
+| MVP-31 | Contract arena boundaries between configured rounds | Unassigned | P0 | Arena | MVP-15, MVP-26 |
+| MVP-32 | Implement Ice/Water win evaluation and results screen | Unassigned | P0 | Results | MVP-29, MVP-31 |
+
+### Verification and scope (Gameplay loop)
+
+- End-to-end playable 3D match loop: 3D PlayCanvas arena with obstacles, third-person follow camera, per-player entity manager with distinct state materials (Water, Ice, protected, frozen, eliminated statue).
+- Server-authoritative MatchController: multi-round phase loop (regular 30s -> warning 8s -> deep freeze 30s -> round result 5s -> next round/match result), atomic deadline elimination of frozen Water, arena shrinkage across rounds (28m down to 12m), early Ice win check, and 5-round Water victory.
+- HUD & Controls: phase/round countdown timers, score counters, role banners, touch joystick and contextual action buttons (tag, hold rescue, help ping).
+- Automated tests: 55 unit and integration tests passing (`npm run test`), Playwright browser tests passing (`npm run test:e2e`), strict TypeScript type check passing across all packages (`npm run typecheck`), ESLint and Prettier passing (`npm run lint`), and production build passing (`npm run build`).
+
