@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "apps/server/src/**/*.test.ts",
+    "packages/shared/src/**/*.test.ts",
+    "*.config.ts"
+  ]
+}
