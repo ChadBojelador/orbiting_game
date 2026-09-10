@@ -6,6 +6,7 @@
 import type { LobbyRoom } from '../network/lobby-client.js';
 import { GameSession } from '../network/game-session.js';
 import { GAMEPLAY } from '@ice-water/shared';
+import { loadCharacterModel } from './character-model.js';
 
 const CAMERA_HEIGHT = 7;
 const CAMERA_DISTANCE = 10;
@@ -98,7 +99,15 @@ export class GameScene {
 
     const halfExtent = this.session.view.arenaHalfExtent ?? 28;
     this.arenaScene = new ArenaScene(app, pcModule, halfExtent);
-    this.playerEntities = new PlayerEntityManager(app, pcModule);
+    const characterModel = await loadCharacterModel(app, pcModule).catch((error: unknown) => {
+      console.warn(error);
+      return undefined;
+    });
+    if (this.destroyed) {
+      app.destroy();
+      return;
+    }
+    this.playerEntities = new PlayerEntityManager(app, pcModule, characterModel);
 
     app.start();
 

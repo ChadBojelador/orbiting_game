@@ -29,9 +29,6 @@ This file is the source of truth for current development work. The PRD defines w
 
 | ID | Task | Owner | Priority | Related feature | Dependencies |
 |---|---|---|---|---|---|
-| MVP-34 | Add 20–30 second reconnection reservation without bypassing deadlines | Unassigned | P1 | Reliability | MVP-10, MVP-26, MVP-29 |
-| MVP-38 | Add unit tests for tag range, rescue range, protection, and win rules | Unassigned | P0 | Quality | MVP-22, MVP-24, MVP-32 |
-| MVP-39 | Add integration tests for invalid messages and room lifecycle | Unassigned | P0 | Security | MVP-26, MVP-34 |
 | MVP-40 | Add browser test for join-to-results critical flow | Unassigned | P1 | Quality | MVP-32, MVP-34 |
 | MVP-41 | Add structured room lifecycle, error, and performance telemetry | Unassigned | P1 | Observability | MVP-05, MVP-26 |
 | MVP-42 | Implement low, medium, and high graphics presets | Unassigned | P1 | Performance | MVP-16, MVP-20, MVP-30 |
@@ -61,6 +58,44 @@ No tasks currently in progress.
 | ID | Task | Owner | Priority | Related feature | Dependencies |
 |---|---|---|---|---|---|
 | DOC-01 | Establish README, PRD, architecture, agent guide, contribution workflow, environment example, ignore rules, and task tracker | Unassigned | P0 | Foundation | — |
+
+### Completed active-match reconnection (2026-09-11)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-34 | Add 20–30 second reconnection reservation without bypassing deadlines | Unassigned | P1 | Reliability | MVP-10, MVP-26, MVP-29 |
+
+### Verification and scope (Active-match reconnection)
+
+- Active, frozen, and eliminated players reconnect to their current authoritative state during Regular play and Deep Freeze; disconnect/reconnect never clears frozen state or rolls back server-side changes.
+- Reconnect reservations expose a server-time deadline. Expiry rejects late reconnects, releases membership, and permanently eliminates active or frozen participants while retaining already eliminated state.
+- Deadline-first finalization is covered at the exact Deep Freeze boundary, including a disconnected frozen Water player receiving the atomic permanent-freeze result before reservation forfeit cleanup.
+
+### Completed room security and lifecycle integration (2026-09-11)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-39 | Add real-WebSocket integration coverage for invalid gameplay messages and authoritative room lifecycle | Unassigned | P0 | Security | MVP-26, MVP-34 |
+
+### Verification and scope (Room security and lifecycle)
+
+- Real Colyseus clients verify malformed movement and target payload rejection, unknown-message rejection, stale movement sequences, and the 12-action-per-second gameplay limit without permitting client-forged state or excess movement.
+- Integration flows cover late joins, intentional and expired host departure, reconnect-token expiry, membership release, host transfer, and invite removal after room disposal.
+- A controlled authoritative room tick receives tag and movement intent through real WebSockets, preserves eligible pre-deadline input, eliminates disconnected frozen Water atomically at the exact Deep Freeze deadline, and rejects post-deadline gameplay.
+
+### Completed baseline stabilization and development bots (2026-09-11)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-53 | Add configurable development-only wandering bots for solo match testing | Chad Bojelador | P1 | Developer experience | MVP-18, MVP-26 |
+| MVP-54 | Reserve bot seats, isolate browser tests from bots, and lock authoritative deadline tick ordering with boundary tests | Unassigned | P0 | Quality | MVP-28, MVP-53 |
+
+### Verification and scope (Baseline stabilization)
+
+- Development bot configuration retains at least one human seat and caps combined bots, connected humans, and reconnect-reserved humans at `ROOM_MAX_PLAYERS`, which remains limited to 150. Production forces the effective bot count to zero.
+- Playwright launches isolated server and client processes with `DEV_BOT_COUNT=0`; the desktop six-player and mobile validation assertions pass. On restricted Windows runners, the known child-process cleanup hang can still require terminating the completed test command.
+- Unit coverage includes valid and invalid capacity boundaries, exact-capacity bot population, bot overfill rejection, the last eligible rescue step before the Regular deadline, and the last eligible movement step before Deep Freeze resolution.
+- Verification completed with 86 non-database tests, root/workspace strict type checking, ESLint, targeted Prettier checks, and the production build passing. The configured PostgreSQL integration test could not connect to the local disposable database at port 55432 and was not treated as a product-code failure.
 
 ### Completed foundation and private rooms (2026-09-10)
 
@@ -113,6 +148,12 @@ No tasks currently in progress.
 | MVP-30 | Add static ice statues and spectator mode | Unassigned | P0 | Elimination | MVP-29 |
 | MVP-31 | Contract arena boundaries between configured rounds | Unassigned | P0 | Arena | MVP-15, MVP-26 |
 | MVP-32 | Implement Ice/Water win evaluation and results screen | Unassigned | P0 | Results | MVP-29, MVP-31 |
+
+### Completed gameplay rule coverage (2026-09-11)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-38 | Add direct unit coverage for movement, tag range and line-of-sight, cooldowns, rescue range and leases, multiple rescuers, protection, help pings, exact phase deadlines, and win rules | Unassigned | P0 | Quality | MVP-22, MVP-24, MVP-32 |
 
 ### Verification and scope (Gameplay loop)
 

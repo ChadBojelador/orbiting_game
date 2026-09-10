@@ -8,6 +8,7 @@ import { LobbyState, PlayerState } from './lobby-state.js';
 import type { RoomDirectory } from './room-directory.js';
 import { GameplayController } from '../gameplay/gameplay-controller.js';
 import { MatchController } from '../gameplay/match-controller.js';
+import { advanceAuthoritativeTick } from '../gameplay/authoritative-tick.js';
 import { BotRunner } from '../simulation/bot-runner.js';
 
 type GuestClient = Client<{ auth: GuestIdentity }>;
@@ -35,9 +36,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       (now, halfExtent) => this.gameplay.startRound(now, halfExtent),
     );
     private readonly bots: BotRunner | null =
-      config.devBotCount > 0
-        ? new BotRunner(this.state, this.gameplay, config.devBotCount)
-        : null;
+      config.devBotCount > 0 ? new BotRunner(this.state, this.gameplay, config.devBotCount) : null;
     private createdAt = Date.now();
 
     override async onCreate(options: unknown): Promise<void> {
@@ -47,7 +46,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
         typeof options.hostPlayerId !== 'string'
       )
         throw new ServerError(403, 'Create a room through the guest lobby');
-      this.maxClients = config.maxPlayers;
+      this.maxClients = config.maxHumanPlayers;
       this.maxMessagesPerSecond = 60;
       this.seatReservationTimeout = 15;
       this.state.inviteCode = options.inviteCode;
@@ -102,6 +101,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
         throw new ServerError(403, 'Room is unavailable');
       if (this.state.players.has(identity.playerId))
         throw new ServerError(409, 'This guest is already in the room');
+      if (this.state.players.size >= config.maxPlayers) throw new ServerError(409, 'Room is full');
       return identity;
     }
 
@@ -111,6 +111,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       if (
         this.state.phase !== 'lobby' ||
         this.state.players.has(identity.playerId) ||
+        this.state.players.size >= config.maxPlayers ||
         identity.expiresAt <= Date.now()
       )
         throw new ServerError(409, 'Seat is no longer available');
@@ -124,11 +125,15 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
 
     override async onDrop(client: GuestClient): Promise<void> {
       if (!client.auth) return;
+      const now = Date.now();
       const player = this.state.players.get(client.auth.playerId);
-      if (player) player.isConnected = false;
+      if (player) {
+        player.isConnected = false;
+        player.reconnectDeadline = now + config.reconnectSeconds * 1000;
+      }
       this.gameplay.disconnect(client.auth.playerId);
       this.controller.transferHost();
-      this.advance();
+      this.advance(now);
       try {
         await this.allowReconnection(client, config.reconnectSeconds);
       } catch {
@@ -141,32 +146,49 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
         void client.leave(4001);
         return;
       }
+      const now = Date.now();
       const player = this.state.players.get(client.auth.playerId);
       if (
         !player ||
-        client.auth.expiresAt <= Date.now() ||
+        client.auth.expiresAt <= now ||
+        player.reconnectDeadline === 0 ||
+        now >= player.reconnectDeadline ||
         (!['lobby', 'countdown'].includes(this.state.phase) && player.team === 'unassigned')
       ) {
         void client.leave(4001);
         return;
       }
       player.isConnected = true;
+      player.reconnectDeadline = 0;
       this.controller.transferHost();
     }
 
     override onLeave(client: GuestClient): void {
       const identity = client.auth;
       if (!identity) return;
+      const now = Date.now();
       this.gameplay.disconnect(identity.playerId);
-      if (this.state.phase === 'lobby' || this.state.phase === 'countdown')
+      if (this.state.phase === 'lobby' || this.state.phase === 'countdown') {
         this.state.players.delete(identity.playerId);
-      else {
+      } else {
+        // Resolve an authoritative phase deadline before applying a disconnect
+        // forfeit when both happen in the same event-loop turn.
+        this.advance(now);
         const player = this.state.players.get(identity.playerId);
-        if (player) player.isConnected = false;
+        if (player) {
+          player.isConnected = false;
+          player.reconnectDeadline = 0;
+          if (player.status === 'active' || player.status === 'frozen') {
+            player.status = 'eliminated';
+            player.protectedUntil = 0;
+            player.rescueProgress = 0;
+            player.rescuingTarget = '';
+          }
+        }
       }
       directory.release(identity.sessionId, this.roomId);
       this.controller.transferHost();
-      this.advance();
+      this.advance(now);
     }
 
     override onDispose(): void {
@@ -174,8 +196,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       directory.dispose(this.state.inviteCode, this.roomId);
     }
 
-    private advance(): void {
-      const now = Date.now();
+    private advance(now = Date.now()): void {
       if (now - this.createdAt > 15000) this.controller.transferHost();
       // Drive bot movement each tick so they count toward gameplay.
       this.bots?.tick(now);
@@ -190,10 +211,9 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
         }
         this.phaseChanged();
       }
-      if (this.match.tick(now)) {
+      if (advanceAuthoritativeTick(now, this.gameplay, this.match)) {
         // MatchController already emitted the phase-changed event.
       }
-      this.gameplay.advance(now);
     }
     private phaseChanged(): void {
       this.broadcast('match/phase-changed', {

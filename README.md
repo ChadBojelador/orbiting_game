@@ -2,7 +2,7 @@
 
 A browser-only multiplayer freeze-tag game for private groups of 6–150 players.
 
-**Implemented:** the npm monorepo, React/Vite/PlayCanvas lobby, signed guest sessions, private room creation and invite joining, connected roster, host countdown, and configurable Ice/Water assignment. Movement, freezing, rescue, timed rounds, and results belong to the next task groups and are not playable yet.
+**Implemented:** the npm monorepo, React/Vite/PlayCanvas client, signed guest sessions, private rooms, authoritative movement and actions, the five-round match loop, Deep Freeze elimination, spectating, and results. Development-only wandering bots can fill seats for solo testing.
 
 ## Run locally
 
@@ -26,9 +26,15 @@ Docker must be running before `db:up`. If Windows reserves port 5432, set `POSTG
 2. Share the eight-character invite code with friends.
 3. Each guest chooses a name and joins with the code. Use separate browser contexts for independent test guests.
 4. With six connected guests, the host can start the countdown. It cancels if the count drops below six.
-5. The server assigns Ice and Water at the deadline. The current playtest ends at this handoff; the UI identifies your team and explains that gameplay is pending.
+5. The server assigns Ice and Water at the deadline and starts the five-round match.
 
-Host duties transfer to the first connected guest when the host leaves. Unexpected disconnects reserve the same player for 25 seconds by default; the browser reconnects automatically, and a reload can reclaim the per-tab connection. Intentional **Leave room** releases the seat. Fresh joins close when countdown begins.
+Host duties transfer to the first connected guest when the host leaves. Unexpected disconnects reserve the same player for 25 seconds by default; the browser reconnects automatically, and a reload can reclaim the per-tab connection. During a match, reconnecting restores the current authoritative team, position, and freeze/elimination state, including any server-side changes that occurred while disconnected. If the reservation expires, an active or frozen participant forfeits and becomes permanently eliminated, and that match cannot be rejoined. Intentional **Leave room** releases the seat and has the same in-match forfeit outcome. Fresh joins close when countdown begins.
+
+### Test locally with bots
+
+Set `DEV_BOT_COUNT=5` in the root `.env`, restart `npm run dev`, and create a room. One human plus five server-side wandering bots satisfies the six-player start minimum. Bots occupy normal room seats and participate in authoritative movement, team assignment, freezing, and elimination, but they do not tag or rescue.
+
+`DEV_BOT_COUNT` must be between zero and `ROOM_MAX_PLAYERS - 1`, leaving at least one human seat. Human capacity is `ROOM_MAX_PLAYERS - DEV_BOT_COUNT`, so the combined bot and human population cannot exceed the configured room maximum or the global limit of 150. Production always runs with zero bots.
 
 ## Commands
 
@@ -46,7 +52,7 @@ Host duties transfer to the first connected guest when the host leaves. Unexpect
 | `npm run db:migrate`                | Apply transactional, checksummed SQL migrations                       |
 | `npm run db:up` / `npm run db:down` | Start / stop local PostgreSQL                                         |
 
-Install the test browser once with `npx playwright install chromium` (Linux CI uses `--with-deps`). Browser tests start their own servers unless local servers are already listening. Run them with an account allowed to terminate the child processes they launch; restrictive Windows sandboxes can hang during process-tree cleanup even after assertions pass.
+Install the test browser once with `npx playwright install chromium` (Linux CI uses `--with-deps`). Browser tests always start isolated client and server processes with `DEV_BOT_COUNT=0`; ports 5173 and 2567 must be free. Run them with an account allowed to terminate the child processes they launch; restrictive Windows sandboxes can hang during process-tree cleanup even after assertions pass.
 
 Database integration tests require an explicit `TEST_DATABASE_URL` pointing to a disposable test database. They report a skip when it is absent. The local verification uses a separate `icewater_test` database; CI provisions its own PostgreSQL service and runs this check. Never point the test URL at a production database.
 
@@ -61,7 +67,8 @@ The load harness verifies connection count, synchronized lobby state, and role a
 | `CLIENT_ORIGIN`                         | `http://localhost:5173`; exact allowed origin                                                                                |
 | `GUEST_SESSION_SIGNING_SECRET`          | Required random secret, at least 32 characters                                                                               |
 | `GUEST_SESSION_TTL_SECONDS`             | 3600; range 60–86400                                                                                                         |
-| `ROOM_MAX_PLAYERS`                      | 150; range 6–150; start minimum always six                                                                                   |
+| `ROOM_MAX_PLAYERS`                      | 150; range 6–150; total humans plus development bots; start minimum always six                                               |
+| `DEV_BOT_COUNT`                         | 0; development range 0 to `ROOM_MAX_PLAYERS - 1`; reserves seats from human capacity; disabled in production                 |
 | `COUNTDOWN_SECONDS`                     | 5; range 1–30                                                                                                                |
 | `RECONNECT_SECONDS`                     | 25; range 20–30                                                                                                              |
 | `ICE_COUNT_BRACKETS`                    | Optional JSON array of `{ "maxPlayers": 10, "icePlayers": 1 }` rows covering through 150; see the approved full table in PRD |
