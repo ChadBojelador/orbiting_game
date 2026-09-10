@@ -15,6 +15,7 @@ export interface PlayerView {
   displayName: string;
   team: Team;
   isConnected: boolean;
+  reconnectDeadline: number;
   x: number;
   z: number;
   yaw: number;

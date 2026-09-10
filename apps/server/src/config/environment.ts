@@ -9,9 +9,12 @@ export interface ServerConfig {
   signingSecret: string;
   databaseUrl?: string;
   isProduction: boolean;
+  /** Total room population, including development bots. */
   maxPlayers: number;
   /** Non-zero only in development. Bots fill seats so solo testing is possible. */
   devBotCount: number;
+  /** Human seats remaining after development bots reserve part of maxPlayers. */
+  maxHumanPlayers: number;
   countdownSeconds: number;
   reconnectSeconds: number;
   sessionTtlSeconds: number;
@@ -51,6 +54,11 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     if (!['postgres:', 'postgresql:'].includes(database.protocol))
       throw new Error('Invalid DATABASE_URL');
   }
+  const maxPlayers = integer('ROOM_MAX_PLAYERS', 150, 6, 150);
+  const requestedDevBotCount = integer('DEV_BOT_COUNT', 0, 0, 149);
+  if (requestedDevBotCount > maxPlayers - 1)
+    throw new Error('DEV_BOT_COUNT must be at most ROOM_MAX_PLAYERS - 1');
+  const devBotCount = isProduction ? 0 : requestedDevBotCount;
   return {
     host: env.GAME_SERVER_HOST ?? '127.0.0.1',
     port: integer('GAME_SERVER_PORT', 2567, 0, 65535),
@@ -58,8 +66,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     signingSecret: secret,
     databaseUrl: env.DATABASE_URL || undefined,
     isProduction,
-    maxPlayers: integer('ROOM_MAX_PLAYERS', 150, 6, 150),
-    devBotCount: isProduction ? 0 : integer('DEV_BOT_COUNT', 0, 0, 149),
+    maxPlayers,
+    devBotCount,
+    maxHumanPlayers: maxPlayers - devBotCount,
     countdownSeconds: integer('COUNTDOWN_SECONDS', 5, 1, 30),
     reconnectSeconds: integer('RECONNECT_SECONDS', 25, 20, 30),
     sessionTtlSeconds: integer('GUEST_SESSION_TTL_SECONDS', 3600, 60, 86400),
