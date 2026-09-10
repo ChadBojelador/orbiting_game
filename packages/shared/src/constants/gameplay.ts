@@ -14,4 +14,11 @@ export const GAMEPLAY = {
   inputExpiryMs: 250,
   maxInputQueue: 5,
   interpolationMs: 100,
+  // Match timing (milliseconds)
+  regularMs: 30_000,
+  warningMs: 8_000, // warning phase begins this many ms before the regular deadline
+  deepFreezeMs: 30_000,
+  roundResultMs: 5_000,
+  matchResultMs: 10_000,
+  maxRounds: 5,
 } as const;

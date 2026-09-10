@@ -7,6 +7,7 @@ import { LobbyController } from './lobby-controller.js';
 import { LobbyState, PlayerState } from './lobby-state.js';
 import type { RoomDirectory } from './room-directory.js';
 import { GameplayController } from '../gameplay/gameplay-controller.js';
+import { MatchController } from '../gameplay/match-controller.js';
 
 type GuestClient = Client<{ auth: GuestIdentity }>;
 export interface RoomDependencies {
@@ -24,7 +25,14 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       config.iceBrackets,
     );
     private readonly actions = new RateLimiter(4, 1000);
-    private readonly gameplay = new GameplayController(this.state, event => this.broadcast(event.type, event.payload));
+    private readonly gameplay = new GameplayController(this.state, (event) =>
+      this.broadcast(event.type, event.payload),
+    );
+    private readonly match = new MatchController(
+      this.state,
+      (event) => this.broadcast(event.type, event.payload as never),
+      (now, halfExtent) => this.gameplay.startRound(now, halfExtent),
+    );
     private createdAt = Date.now();
 
     override async onCreate(options: unknown): Promise<void> {
@@ -45,14 +53,19 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       this.setTimestep(() => this.advance(), GAMEPLAY.tickMs);
       this.patchRate = GAMEPLAY.tickMs;
       const gameplayMessages: (keyof GameplayMessages)[] = [
-        'input/move', 'action/tag', 'action/rescue-start', 'action/rescue-stop', 'action/help-ping',
+        'input/move',
+        'action/tag',
+        'action/rescue-start',
+        'action/rescue-stop',
+        'action/help-ping',
       ];
-      for (const type of gameplayMessages) this.onMessage(type, (client: GuestClient, payload: unknown) => {
-        if (!client.auth || client.auth.expiresAt <= Date.now())
-          return this.fail(client, 'unauthorized', 'Guest session expired');
-        const error = this.gameplay.handle(client.auth.playerId, type, payload, Date.now());
-        if (error) this.fail(client, 'invalid-action', error);
-      });
+      for (const type of gameplayMessages)
+        this.onMessage(type, (client: GuestClient, payload: unknown) => {
+          if (!client.auth || client.auth.expiresAt <= Date.now())
+            return this.fail(client, 'unauthorized', 'Guest session expired');
+          const error = this.gameplay.handle(client.auth.playerId, type, payload, Date.now());
+          if (error) this.fail(client, 'invalid-action', error);
+        });
       this.onMessage('room/start', (client: GuestClient, payload: unknown) => {
         if (!this.actions.take(client.sessionId))
           return this.fail(client, 'rate-limit', 'Slow down and try again');
@@ -157,8 +170,17 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       if (now - this.createdAt > 15000) this.controller.transferHost();
       if (this.controller.tick(now)) {
         if (this.state.phase === 'lobby') void this.unlock();
-        if (this.state.phase === 'regular') this.gameplay.start(now);
+        // When the countdown finishes and roles are assigned, start the match.
+        if (this.state.phase === 'regular' && this.state.round === 0) {
+          this.match.start(now);
+          // MatchController.start() emits the first phase-changed — skip duplicate.
+          this.gameplay.advance(now);
+          return;
+        }
         this.phaseChanged();
+      }
+      if (this.match.tick(now)) {
+        // MatchController already emitted the phase-changed event.
       }
       this.gameplay.advance(now);
     }

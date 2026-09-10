@@ -1,7 +1,11 @@
 import { GAMEPLAY } from '../constants/gameplay.js';
 import type { Position } from '../protocol/gameplay.js';
 
-export interface ArenaBlock extends Position { width: number; depth: number; height: number }
+export interface ArenaBlock extends Position {
+  width: number;
+  depth: number;
+  height: number;
+}
 export const ARENA = {
   halfExtent: 28,
   blocks: [
@@ -14,6 +18,15 @@ export const ARENA = {
   ] as readonly ArenaBlock[],
 } as const;
 
+// Approved shrink table: one entry per round, index 0 = round 1.
+// Half-extents decrease each round to discourage hiding.
+export const ARENA_ROUNDS: readonly number[] = [28, 24, 20, 16, 12];
+export function arenaHalfExtentForRound(round: number): number {
+  return (
+    ARENA_ROUNDS[Math.max(0, Math.min(ARENA_ROUNDS.length - 1, round - 1))] ?? ARENA.halfExtent
+  );
+}
+
 export function distanceSquared(a: Position, b: Position): number {
   return (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
 }
@@ -22,20 +35,35 @@ export function normalizeAxes(x: number, z: number): Position {
   const length = Math.max(1, Math.hypot(x, z));
   return { x: x / length, z: z / length };
 }
-export function isWalkable(position: Position, radius = GAMEPLAY.playerRadius): boolean {
-  const limit = ARENA.halfExtent - radius;
-  return Number.isFinite(position.x) && Number.isFinite(position.z) &&
-    Math.abs(position.x) <= limit && Math.abs(position.z) <= limit &&
-    !ARENA.blocks.some(block =>
-      Math.abs(position.x - block.x) < block.width / 2 + radius &&
-      Math.abs(position.z - block.z) < block.depth / 2 + radius);
+export function isWalkable(
+  position: Position,
+  radius: number = GAMEPLAY.playerRadius,
+  halfExtent: number = ARENA.halfExtent,
+): boolean {
+  const limit = halfExtent - radius;
+  return (
+    Number.isFinite(position.x) &&
+    Number.isFinite(position.z) &&
+    Math.abs(position.x) <= limit &&
+    Math.abs(position.z) <= limit &&
+    !ARENA.blocks.some(
+      (block) =>
+        Math.abs(position.x - block.x) < block.width / 2 + radius &&
+        Math.abs(position.z - block.z) < block.depth / 2 + radius,
+    )
+  );
 }
 
 // Conservative swept square footprint: separate axes permit wall sliding and
 // clip against the entire segment, so even long prediction corrections cannot tunnel.
-export function moveKinematic(position: Position, axes: Position, seconds: number): Position {
+export function moveKinematic(
+  position: Position,
+  axes: Position,
+  seconds: number,
+  halfExtent: number = ARENA.halfExtent,
+): Position {
   const direction = normalizeAxes(axes.x, axes.z);
-  const limit = ARENA.halfExtent - GAMEPLAY.playerRadius;
+  const limit = halfExtent - GAMEPLAY.playerRadius;
   const clamp = (n: number) => Math.max(-limit, Math.min(limit, n));
   let x = clamp(position.x + direction.x * GAMEPLAY.moveSpeed * Math.max(0, seconds));
   for (const block of ARENA.blocks) {
@@ -57,7 +85,7 @@ export function moveKinematic(position: Position, axes: Position, seconds: numbe
 }
 
 export function hasLineOfSight(a: Position, b: Position): boolean {
-  return !ARENA.blocks.some(block => {
+  return !ARENA.blocks.some((block) => {
     let near = 0;
     let far = 1;
     for (const axis of ['x', 'z'] as const) {
@@ -82,7 +110,6 @@ export function hasLineOfSight(a: Position, b: Position): boolean {
 export function createSpawnPoints(): Position[] {
   const points: Position[] = [];
   for (let z = -24; z <= 24; z += 3)
-    for (let x = -24; x <= 24; x += 3)
-      if (isWalkable({ x, z }, 0.8)) points.push({ x, z });
+    for (let x = -24; x <= 24; x += 3) if (isWalkable({ x, z }, 0.8)) points.push({ x, z });
   return points.sort((a, b) => a.x ** 2 + a.z ** 2 - b.x ** 2 - b.z ** 2 || a.z - b.z || a.x - b.x);
 }

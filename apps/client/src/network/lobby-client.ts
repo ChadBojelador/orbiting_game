@@ -110,6 +110,9 @@ export function snapshot(state: WireLobby): LobbyView {
     maxPlayers: state.maxPlayers,
     minPlayers: state.minPlayers,
     iceCount: state.iceCount,
+    round: state.round ?? 0,
+    maxRounds: state.maxRounds ?? 0,
+    arenaHalfExtent: state.arenaHalfExtent ?? 28,
     players: [...state.players.values()].map((player) => ({
       playerId: player.playerId,
       displayName: player.displayName,

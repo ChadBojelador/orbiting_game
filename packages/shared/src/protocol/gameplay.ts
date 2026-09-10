@@ -1,8 +1,15 @@
 import type { MatchPhase } from './lobby.js';
 
-export interface Position { x: number; z: number }
-export interface MoveInput extends Position { sequence: number }
-export interface TargetIntent { targetId: string }
+export interface Position {
+  x: number;
+  z: number;
+}
+export interface MoveInput extends Position {
+  sequence: number;
+}
+export interface TargetIntent {
+  targetId: string;
+}
 export type PlayerStatus = 'active' | 'frozen' | 'eliminated' | 'spectator';
 export interface GameplayMessages {
   'input/move': MoveInput;
@@ -15,9 +22,11 @@ export interface GameplayEvents {
   'player/frozen': { playerId: string; by: string; serverTime: number };
   'player/rescued': { playerId: string; by: string[]; protectedUntil: number; serverTime: number };
   'player/help-ping': { playerId: string; until: number; serverTime: number };
+  'player/permanently-frozen': { playerId: string; serverTime: number };
+  'arena/boundary-changed': { halfExtent: number; round: number; serverTime: number };
 }
 export type GameplayEvent = {
-  [K in keyof GameplayEvents]: { type: K; payload: GameplayEvents[K] }
+  [K in keyof GameplayEvents]: { type: K; payload: GameplayEvents[K] };
 }[keyof GameplayEvents];
 
 export function isPlayPhase(phase: MatchPhase): boolean {
