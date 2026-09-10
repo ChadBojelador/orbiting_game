@@ -97,7 +97,9 @@ export async function reconnectRoom(): Promise<LobbyRoom | null> {
     return room;
   } catch {
     clearReconnect();
-    throw new Error('Your room connection expired. Join again with the invite code.');
+    throw new Error(
+      'Your room connection expired. If the match has started, it can no longer be rejoined.',
+    );
   }
 }
 export function snapshot(state: WireLobby): LobbyView {
@@ -118,6 +120,7 @@ export function snapshot(state: WireLobby): LobbyView {
       displayName: player.displayName,
       team: player.team,
       isConnected: player.isConnected,
+      reconnectDeadline: player.reconnectDeadline,
       x: player.x,
       z: player.z,
       yaw: player.yaw,
