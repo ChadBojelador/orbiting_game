@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Test and coverage output
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# Runtime data
+logs/
+*.log
+*.pid
+tmp/
+temp/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Package-manager logs and caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+
+# Local databases and generated data
+*.sqlite
+*.sqlite3
+data/
+
+# IDE and editor settings
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Tool caches
+.eslintcache
+.cache/
+.turbo/
+
+# Generated optimized assets; source asset policy will define committed outputs.
+assets/generated/
+
