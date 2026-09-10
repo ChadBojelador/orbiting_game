@@ -58,8 +58,10 @@ export class LobbyController {
 
   transferHost(): void {
     const host = this.state.players.get(this.state.hostPlayerId);
-    if (host?.isConnected) return;
+    if (host?.isConnected && !host.playerId.startsWith('bot-')) return;
     this.state.hostPlayerId =
-      [...this.state.players.values()].find((player) => player.isConnected)?.playerId ?? '';
+      [...this.state.players.values()].find(
+        (player) => player.isConnected && !player.playerId.startsWith('bot-'),
+      )?.playerId ?? '';
   }
 }

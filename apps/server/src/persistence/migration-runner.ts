@@ -18,7 +18,8 @@ export async function runMigrations(
       'CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())',
     );
     for (const file of files) {
-      const sql = await readFile(new URL(file, directory), 'utf8');
+      const rawSql = await readFile(new URL(file, directory), 'utf8');
+      const sql = rawSql.replace(/\r\n/g, '\n');
       const checksum = createHash('sha256').update(sql).digest('hex');
       const existing = await client.query<{ checksum: string }>(
         'SELECT checksum FROM schema_migrations WHERE name = $1',
