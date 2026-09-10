@@ -1,5 +1,7 @@
 import { Server, matchMaker } from '@colyseus/core';
+import type { IncomingMessage } from 'node:http';
 import { WebSocketTransport } from '@colyseus/ws-transport';
+import { Encoder } from '@colyseus/schema';
 import express, { type ErrorRequestHandler } from 'express';
 import {
   ROOM_NAME,
@@ -19,6 +21,9 @@ export async function startServer(
   config: ServerConfig,
   database: Database = createDatabase(config.databaseUrl),
 ) {
+  // The measured 150-player initial state exceeds the encoder's 16 KiB default.
+  // This is Colyseus's explicit process-wide allocation setting.
+  Encoder.BUFFER_SIZE = 32 * 1024;
   const sessions = new GuestSessions(config.signingSecret, config.sessionTtlSeconds);
   const directory = new RoomDirectory();
   const sessionRate = new RateLimiter(600, 60000);
@@ -28,12 +33,12 @@ export async function startServer(
   let isListening = false;
   const transport = new WebSocketTransport({
     maxPayload: 4096,
-    beforeUpgrade(request, context) {
-      const origin = request.headers.get('origin');
-      if (origin && origin !== config.clientOrigin)
-        return new Response('Origin not allowed', { status: 403 });
-      if (!upgradeRate.take(context.ip ?? 'unknown'))
-        return new Response('Too many connections', { status: 429 });
+    verifyClient({ req }: { req: IncomingMessage }) {
+      const origin = req.headers.origin;
+      return (
+        (!origin || origin === config.clientOrigin) &&
+        upgradeRate.take(req.socket.remoteAddress ?? 'unknown')
+      );
     },
   });
   const server = new Server({
@@ -67,12 +72,10 @@ export async function startServer(
       app.get('/ready', async (_request, response) => {
         const isDatabaseReady = await database.isReady();
         const isReady = isListening && isDatabaseReady;
-        response
-          .status(isReady ? 200 : 503)
-          .json({
-            status: isReady ? 'ready' : 'not-ready',
-            database: isDatabaseReady ? 'ready' : 'unavailable',
-          });
+        response.status(isReady ? 200 : 503).json({
+          status: isReady ? 'ready' : 'not-ready',
+          database: isDatabaseReady ? 'ready' : 'unavailable',
+        });
       });
       app.use('/api', (request, response, next) => {
         const ip = request.socket.remoteAddress ?? 'unknown';
@@ -112,12 +115,10 @@ export async function startServer(
         }
         const name = previous?.displayName ?? sanitizeDisplayName(body.displayName);
         if (!name) {
-          response
-            .status(400)
-            .json({
-              message:
-                'Use 2–20 letters or numbers. Spaces, apostrophes, hyphens, and underscores are allowed.',
-            });
+          response.status(400).json({
+            message:
+              'Use 2–20 letters or numbers. Spaces, apostrophes, hyphens, and underscores are allowed.',
+          });
           return;
         }
         response.status(previous ? 200 : 201).json(sessions.issue(name, previous));
@@ -236,7 +237,7 @@ export async function startServer(
       response.end();
       return;
     }
-    const path = new URL(request.url ?? '/', 'http://localhost').pathname;
+    const path = (request.url ?? '/').split('?')[0] ?? '/';
     const isApi = [
       '/health',
       '/ready',

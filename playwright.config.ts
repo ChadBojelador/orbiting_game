@@ -9,7 +9,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: 'npx tsx apps/server/src/main.ts',
+      command: 'node --import tsx apps/server/src/main.ts',
       url: 'http://127.0.0.1:2567/health',
       reuseExistingServer: !process.env.CI,
       env: {
@@ -19,7 +19,7 @@ export default defineConfig({
       },
     },
     {
-      command: 'npm run dev -w @ice-water/client',
+      command: 'node node_modules/vite/bin/vite.js apps/client --host 127.0.0.1',
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
     },

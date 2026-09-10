@@ -53,11 +53,16 @@ export function LobbyPreview() {
           shape('ice-base', 'cylinder', '#4056D8', [0.7, 0.1, -0.1], [1.2, 0.12, 1.2]),
         ];
         const resize = () => {
-          app.resizeCanvas(canvas.clientWidth, canvas.clientHeight);
+          const parent = canvas.parentElement;
+          if (!parent) return;
+          app.setCanvasFillMode(pc.FILLMODE_NONE, parent.clientWidth, parent.clientHeight);
+          app.setCanvasResolution(pc.RESOLUTION_AUTO);
+          app.renderNextFrame = true;
         };
         const observer = new ResizeObserver(resize);
-        observer.observe(canvas);
+        if (canvas.parentElement) observer.observe(canvas.parentElement);
         resize();
+        app.autoRender = false;
         app.start();
         destroy = () => {
           observer.disconnect();
