@@ -8,6 +8,7 @@ import { LobbyState, PlayerState } from './lobby-state.js';
 import type { RoomDirectory } from './room-directory.js';
 import { GameplayController } from '../gameplay/gameplay-controller.js';
 import { MatchController } from '../gameplay/match-controller.js';
+import { BotRunner } from '../simulation/bot-runner.js';
 
 type GuestClient = Client<{ auth: GuestIdentity }>;
 export interface RoomDependencies {
@@ -33,6 +34,10 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       (event) => this.broadcast(event.type, event.payload as never),
       (now, halfExtent) => this.gameplay.startRound(now, halfExtent),
     );
+    private readonly bots: BotRunner | null =
+      config.devBotCount > 0
+        ? new BotRunner(this.state, this.gameplay, config.devBotCount)
+        : null;
     private createdAt = Date.now();
 
     override async onCreate(options: unknown): Promise<void> {
@@ -50,6 +55,9 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       this.state.maxPlayers = config.maxPlayers;
       await this.setMatchmaking({ private: true, unlisted: true });
       directory.register(this.state.inviteCode, this.roomId);
+      // Populate bot seats before registering message handlers so bots appear
+      // in the lobby roster from the moment the first real player joins.
+      this.bots?.start();
       this.setTimestep(() => this.advance(), GAMEPLAY.tickMs);
       this.patchRate = GAMEPLAY.tickMs;
       const gameplayMessages: (keyof GameplayMessages)[] = [
@@ -162,12 +170,15 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
     }
 
     override onDispose(): void {
+      this.bots?.stop();
       directory.dispose(this.state.inviteCode, this.roomId);
     }
 
     private advance(): void {
       const now = Date.now();
       if (now - this.createdAt > 15000) this.controller.transferHost();
+      // Drive bot movement each tick so they count toward gameplay.
+      this.bots?.tick(now);
       if (this.controller.tick(now)) {
         if (this.state.phase === 'lobby') void this.unlock();
         // When the countdown finishes and roles are assigned, start the match.
