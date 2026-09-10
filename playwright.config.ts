@@ -11,17 +11,18 @@ export default defineConfig({
     {
       command: 'node --import tsx apps/server/src/main.ts',
       url: 'http://127.0.0.1:2567/health',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       env: {
         GUEST_SESSION_SIGNING_SECRET: 'browser-test-secret-at-least-32-characters',
         COUNTDOWN_SECONDS: '3',
         CLIENT_ORIGIN: 'http://localhost:5173',
+        DEV_BOT_COUNT: '0',
       },
     },
     {
       command: 'node node_modules/vite/bin/vite.js apps/client --host 127.0.0.1',
       url: 'http://localhost:5173',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
     },
   ],
 });
