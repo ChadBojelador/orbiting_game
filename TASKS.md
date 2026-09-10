@@ -29,7 +29,6 @@ This file is the source of truth for current development work. The PRD defines w
 
 | ID | Task | Owner | Priority | Related feature | Dependencies |
 |---|---|---|---|---|---|
-| MVP-39 | Add integration tests for invalid messages and room lifecycle | Unassigned | P0 | Security | MVP-26, MVP-34 |
 | MVP-40 | Add browser test for join-to-results critical flow | Unassigned | P1 | Quality | MVP-32, MVP-34 |
 | MVP-41 | Add structured room lifecycle, error, and performance telemetry | Unassigned | P1 | Observability | MVP-05, MVP-26 |
 | MVP-42 | Implement low, medium, and high graphics presets | Unassigned | P1 | Performance | MVP-16, MVP-20, MVP-30 |
@@ -71,6 +70,18 @@ No tasks currently in progress.
 - Active, frozen, and eliminated players reconnect to their current authoritative state during Regular play and Deep Freeze; disconnect/reconnect never clears frozen state or rolls back server-side changes.
 - Reconnect reservations expose a server-time deadline. Expiry rejects late reconnects, releases membership, and permanently eliminates active or frozen participants while retaining already eliminated state.
 - Deadline-first finalization is covered at the exact Deep Freeze boundary, including a disconnected frozen Water player receiving the atomic permanent-freeze result before reservation forfeit cleanup.
+
+### Completed room security and lifecycle integration (2026-09-11)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-39 | Add real-WebSocket integration coverage for invalid gameplay messages and authoritative room lifecycle | Unassigned | P0 | Security | MVP-26, MVP-34 |
+
+### Verification and scope (Room security and lifecycle)
+
+- Real Colyseus clients verify malformed movement and target payload rejection, unknown-message rejection, stale movement sequences, and the 12-action-per-second gameplay limit without permitting client-forged state or excess movement.
+- Integration flows cover late joins, intentional and expired host departure, reconnect-token expiry, membership release, host transfer, and invite removal after room disposal.
+- A controlled authoritative room tick receives tag and movement intent through real WebSockets, preserves eligible pre-deadline input, eliminates disconnected frozen Water atomically at the exact Deep Freeze deadline, and rejects post-deadline gameplay.
 
 ### Completed baseline stabilization and development bots (2026-09-11)
 

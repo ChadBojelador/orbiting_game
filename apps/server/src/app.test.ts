@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { matchMaker, type Room as ServerRoom } from '@colyseus/core';
 import { Client, type Room } from '@colyseus/sdk';
 import {
+  GAMEPLAY,
   type GuestSession,
   type RoomReservation,
   type SessionError,
@@ -12,21 +14,31 @@ import { readConfig } from './config/environment.js';
 
 interface TestState {
   phase: MatchPhase;
+  phaseDeadline: number;
   hostPlayerId: string;
   players: Map<string, PlayerView>;
   iceCount: number;
 }
 type TestRoom = Room<unknown, TestState>;
+type AuthoritativeRoom = ServerRoom & { state: TestState };
+interface Participant {
+  identity: GuestSession;
+  room: TestRoom;
+}
 let app: Awaited<ReturnType<typeof startServer>>;
 let url: string;
 const rooms: TestRoom[] = [];
 let isDatabaseReady = true;
-const config = readConfig({
-  GUEST_SESSION_SIGNING_SECRET: 'test-secret-with-at-least-32-characters',
-  GAME_SERVER_PORT: '0',
-  ROOM_MAX_PLAYERS: '6',
-  COUNTDOWN_SECONDS: '1',
-});
+const config = {
+  ...readConfig({
+    GUEST_SESSION_SIGNING_SECRET: 'test-secret-with-at-least-32-characters',
+    GAME_SERVER_PORT: '0',
+    ROOM_MAX_PLAYERS: '6',
+    COUNTDOWN_SECONDS: '1',
+  }),
+  // Keep production validation at 20–30 seconds; only accelerate integration expiry.
+  reconnectSeconds: 1,
+};
 async function post(path: string, body: unknown, token?: string) {
   return fetch(`${url}${path}`, {
     method: 'POST',
@@ -54,11 +66,54 @@ async function enter(
   const room: TestRoom = await new Client(url).consumeSeatReservation<TestState>(reservation.seat);
   rooms.push(room);
   room.onMessage('match/phase-changed', () => {});
+  room.onMessage('arena/boundary-changed', () => {});
+  room.onMessage('player/frozen', () => {});
+  room.onMessage('player/permanently-frozen', () => {});
   await waitFor(() => !!room.state?.players);
   return { room, code: reservation.inviteCode };
 }
-async function waitFor(predicate: () => boolean) {
-  await expect.poll(predicate, { timeout: 5000, interval: 25 }).toBe(true);
+async function waitFor(predicate: () => boolean, timeout = 5000) {
+  await expect.poll(predicate, { timeout, interval: 25 }).toBe(true);
+}
+async function startMatch(prefix: string): Promise<{ participants: Participant[]; code: string }> {
+  const hostIdentity = await guest(`${prefix} Host`);
+  const first = await enter(hostIdentity);
+  const participants: Participant[] = [{ identity: hostIdentity, room: first.room }];
+  for (let index = 1; index < 6; index++) {
+    const identity = await guest(`${prefix} ${index}`);
+    participants.push({ identity, room: (await enter(identity, first.code)).room });
+  }
+  await waitFor(() => first.room.state.players.size === 6);
+  first.room.send('room/start', {});
+  await waitFor(() => first.room.state.phase === 'regular');
+  return { participants, code: first.code };
+}
+function authoritativeRoom(room: TestRoom): AuthoritativeRoom {
+  const current = matchMaker.getLocalRoomById(room.roomId);
+  if (!current) throw new Error('Authoritative room is unavailable');
+  return current as AuthoritativeRoom;
+}
+function advanceRoom(room: AuthoritativeRoom, now: number): void {
+  const advance: unknown = Reflect.get(room, 'advance');
+  if (typeof advance !== 'function') throw new Error('Room advance hook is unavailable');
+  Reflect.apply(advance, room, [now]);
+  room.broadcastPatch();
+}
+function errorInbox(room: TestRoom) {
+  const errors: SessionError[] = [];
+  room.onMessage<SessionError>('session/error', (error) => errors.push(error));
+  return errors;
+}
+async function sendForError(
+  room: TestRoom,
+  errors: SessionError[],
+  type: string,
+  payload: unknown,
+): Promise<SessionError> {
+  const index = errors.length;
+  room.send(type, payload);
+  await waitFor(() => errors.length > index);
+  return errors[index]!;
 }
 
 beforeAll(async () => {
@@ -174,6 +229,173 @@ describe('HTTP and real WebSocket room flow', () => {
     expect(watcher.room.state.players.size).toBe(2);
     await reconnected.leave();
     await watcher.room.leave();
+  });
+  it('rejects malformed gameplay, stale sequences, forged outcomes, and action floods', async () => {
+    const { participants } = await startMatch('Authority');
+    const actor = participants[0]!;
+    const rateActor = participants[1]!;
+    const actorErrors = errorInbox(actor.room);
+    const rateErrors = errorInbox(rateActor.room);
+    const before = actor.room.state.players.get(actor.identity.playerId)!;
+    const original = { x: before.x, z: before.z, team: before.team, status: before.status };
+
+    expect(
+      await sendForError(actor.room, actorErrors, 'input/move', {
+        x: 2,
+        z: 0,
+        sequence: 1,
+      }),
+    ).toMatchObject({ code: 'invalid-action', message: 'Invalid movement input' });
+    expect(
+      await sendForError(actor.room, actorErrors, 'action/tag', {
+        targetId: participants[1]!.identity.playerId,
+        status: 'eliminated',
+      }),
+    ).toMatchObject({ code: 'invalid-action', message: 'Invalid target' });
+    expect(
+      await sendForError(actor.room, actorErrors, 'match/result', {
+        winner: 'water',
+      }),
+    ).toMatchObject({ code: 'invalid-message' });
+
+    actor.room.send('input/move', { x: 1, z: 0, sequence: 1 });
+    await waitFor(() => actor.room.state.players.get(actor.identity.playerId)?.inputSequence === 1);
+    expect(
+      await sendForError(actor.room, actorErrors, 'input/move', {
+        x: 1,
+        z: 0,
+        sequence: 1,
+      }),
+    ).toMatchObject({ code: 'invalid-action', message: 'Stale or invalid input sequence' });
+
+    const authoritative = actor.room.state.players.get(actor.identity.playerId)!;
+    expect({ team: authoritative.team, status: authoritative.status }).toEqual({
+      team: original.team,
+      status: original.status,
+    });
+    expect(
+      Math.hypot(authoritative.x - original.x, authoritative.z - original.z),
+    ).toBeLessThanOrEqual((GAMEPLAY.moveSpeed * GAMEPLAY.tickMs) / 1000 + 0.001);
+
+    const rateStart = rateErrors.length;
+    for (let index = 0; index < 13; index++) rateActor.room.send('action/help-ping', {});
+    await waitFor(() => rateErrors.length >= rateStart + 13);
+    expect(rateErrors.slice(rateStart)).toContainEqual({
+      code: 'invalid-action',
+      message: 'Too many gameplay requests',
+    });
+
+    await Promise.all(participants.map(({ room }) => room.leave()));
+  });
+  it('expires a dropped host reservation, transfers host, rejects reconnect, and disposes', async () => {
+    const host = await guest('Expiring Host');
+    const watcherIdentity = await guest('Expiry Watcher');
+    const first = await enter(host);
+    const watcher = await enter(watcherIdentity, first.code);
+    const token = first.room.reconnectionToken;
+    first.room.reconnection.enabled = false;
+    first.room.connection.close(4010);
+
+    await waitFor(() => watcher.room.state.players.get(host.playerId)?.isConnected === false);
+    await waitFor(() => !watcher.room.state.players.has(host.playerId), 3000);
+    expect(watcher.room.state.hostPlayerId).toBe(watcherIdentity.playerId);
+    await expect(new Client(url).reconnect<TestState>(token)).rejects.toThrow();
+
+    await watcher.room.leave();
+    await waitFor(() => !matchMaker.getLocalRoomById(first.room.roomId));
+    await expect
+      .poll(
+        async () =>
+          (await post('/api/rooms/join', { inviteCode: first.code }, (await guest()).token)).status,
+      )
+      .toBe(404);
+  });
+  it('applies pre-deadline intent before atomic resolution and rejects post-deadline intent', async () => {
+    const { participants } = await startMatch('Deadline');
+    const observer = participants[0]!;
+    const serverRoom = authoritativeRoom(observer.room);
+    // Pause automatic simulation while preserving a patch loop we can flush manually.
+    serverRoom.setTimestep(() => {}, 60_000);
+
+    const icePlayer = [...observer.room.state.players.values()].find(
+      (player) => player.team === 'ice',
+    )!;
+    const targetPlayer = [...observer.room.state.players.values()].find(
+      (player) => player.team === 'water' && player.playerId !== observer.identity.playerId,
+    )!;
+    const ice = participants.find(({ identity }) => identity.playerId === icePlayer.playerId)!;
+    const target = participants.find(
+      ({ identity }) => identity.playerId === targetPlayer.playerId,
+    )!;
+    const authoritativeIce = serverRoom.state.players.get(ice.identity.playerId)!;
+    const authoritativeTarget = serverRoom.state.players.get(target.identity.playerId)!;
+    authoritativeIce.x = 0;
+    authoritativeIce.z = 0;
+    authoritativeTarget.x = 1;
+    authoritativeTarget.z = 0;
+    advanceRoom(serverRoom, Date.now() + GAMEPLAY.tickMs);
+
+    const frozen = new Promise<{ playerId: string }>((resolve) =>
+      observer.room.onMessage('player/frozen', resolve),
+    );
+    ice.room.send('action/tag', { targetId: target.identity.playerId });
+    expect((await frozen).playerId).toBe(target.identity.playerId);
+    serverRoom.broadcastPatch();
+    await waitFor(
+      () => observer.room.state.players.get(target.identity.playerId)?.status === 'frozen',
+    );
+
+    const reconnectToken = target.room.reconnectionToken;
+    target.room.reconnection.enabled = false;
+    target.room.connection.close(4010);
+    await waitFor(
+      () => serverRoom.state.players.get(target.identity.playerId)?.isConnected === false,
+    );
+    serverRoom.broadcastPatch();
+    await waitFor(
+      () => observer.room.state.players.get(target.identity.playerId)?.isConnected === false,
+    );
+
+    const deadline = Date.now() + 100;
+    serverRoom.state.phase = 'deep-freeze';
+    serverRoom.state.phaseDeadline = deadline;
+    serverRoom.broadcastPatch();
+    const sequence = authoritativeIce.inputSequence + 1;
+    const startingX = authoritativeIce.x;
+    const permanentlyFrozen = new Promise<{ playerId: string; serverTime: number }>((resolve) =>
+      observer.room.onMessage('player/permanently-frozen', resolve),
+    );
+    ice.room.send('input/move', { x: 1, z: 0, sequence });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    advanceRoom(serverRoom, deadline);
+
+    expect(await permanentlyFrozen).toEqual({
+      playerId: target.identity.playerId,
+      serverTime: deadline,
+    });
+    await waitFor(() => observer.room.state.phase === 'round-result');
+    expect(observer.room.state.players.get(target.identity.playerId)?.status).toBe('eliminated');
+    expect(observer.room.state.players.get(ice.identity.playerId)?.inputSequence).toBe(sequence);
+    expect(observer.room.state.players.get(ice.identity.playerId)!.x).toBeGreaterThan(startingX);
+
+    const iceErrors = errorInbox(ice.room);
+    expect(
+      await sendForError(ice.room, iceErrors, 'input/move', {
+        x: 1,
+        z: 0,
+        sequence: sequence + 1,
+      }),
+    ).toMatchObject({ code: 'invalid-action', message: 'Gameplay is unavailable in this phase' });
+
+    const reconnected: TestRoom = await new Client(url).reconnect<TestState>(reconnectToken);
+    rooms.push(reconnected);
+    await waitFor(
+      () => reconnected.state.players.get(target.identity.playerId)?.status === 'eliminated',
+    );
+    await Promise.all([
+      reconnected.leave(),
+      ...participants.filter(({ room }) => room !== target.room).map(({ room }) => room.leave()),
+    ]);
   });
   it('rate-limits repeated room operations by authenticated guest', async () => {
     const identity = await guest('Rate Guest');
