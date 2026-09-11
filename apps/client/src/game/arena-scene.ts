@@ -3,16 +3,25 @@
  * Collision remains defined solely by the shared ARENA specification.
  */
 import type * as PC from 'playcanvas';
-import { ARENA } from '@ice-water/shared';
+import { ARENA, ARENA_COLLISION } from '@ice-water/shared';
 import { ArenaDecoration } from '../environment/arena-decoration.js';
 import {
   createEnvironmentMaterials,
   destroyEnvironmentMaterials,
   type EnvironmentMaterials,
 } from '../environment/materials.js';
+import type { CameraObstacle } from './third-person-camera.js';
 
 export class ArenaScene {
   private readonly entities: PC.Entity[] = [];
+  private readonly cameraObstacles: CameraObstacle[] = ARENA_COLLISION.blocks.map((block) => ({
+    minX: block.x - block.width / 2,
+    maxX: block.x + block.width / 2,
+    minY: 0,
+    maxY: block.height,
+    minZ: block.z - block.depth / 2,
+    maxZ: block.z + block.depth / 2,
+  }));
   private boundaryEntities: PC.Entity[] = [];
   private currentHalfExtent: number;
   private readonly materials: EnvironmentMaterials;
@@ -47,6 +56,16 @@ export class ArenaScene {
       entity.destroy();
     }
     destroyEnvironmentMaterials(this.materials);
+  }
+
+  /** Static camera geometry is separate from visuals so the world blockout can replace it. */
+  getCameraObstacles(): readonly CameraObstacle[] {
+    return this.cameraObstacles;
+  }
+
+  /** Agent 1's deterministic terrain sampler plugs in here when the authored world lands. */
+  getGroundHeight(_x: number, _z: number): number {
+    return 0;
   }
 
   private build(): void {
