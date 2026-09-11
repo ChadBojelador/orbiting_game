@@ -21,7 +21,7 @@ When documents disagree, stop and surface the conflict. Do not silently choose a
 ## Tech stack
 
 - TypeScript throughout application code
-- PlayCanvas for the 3D browser client
+- Three.js for the 3D browser client
 - React for lobby, HUD, settings, and results
 - Vite for client development and builds
 - Node.js and Colyseus for authoritative rooms and networking
@@ -33,7 +33,7 @@ When documents disagree, stop and surface the conflict. Do not silently choose a
 ## Planned folder structure
 
 ```text
-apps/client/       Browser UI and PlayCanvas presentation
+apps/client/       Browser UI and Three.js presentation
 apps/server/       Authoritative Colyseus server
 packages/shared/   Safe shared protocol types and pure utilities
 tests/e2e/         Browser-level critical flows

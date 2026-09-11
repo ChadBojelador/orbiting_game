@@ -1,9 +1,6 @@
-/**
- * Creates and updates one PlayCanvas entity per player. The shared character model
- * carries pose and motion while simple ground markers preserve crowd readability.
- */
-import type * as PC from 'playcanvas';
 import type { LobbyView, PlayerView } from '@ice-water/shared';
+import * as THREE from 'three';
+import { worldHeightAt } from '../world/world-layout.js';
 import type {
   CharacterAnimation,
   CharacterInstance,
@@ -20,10 +17,11 @@ const COLORS = {
 } as const;
 
 interface PlayerEntity {
-  root: PC.Entity;
-  accent: PC.Entity;
-  bodyMat: PC.StandardMaterial;
-  materials: PC.StandardMaterial[];
+  root: THREE.Group;
+  accent: THREE.Mesh;
+  bodyMaterial: THREE.MeshStandardMaterial;
+  accentMaterial: THREE.MeshStandardMaterial;
+  ownedGeometries: THREE.BufferGeometry[];
   character?: CharacterInstance;
   currentStatus: string;
   currentTeam: string;
@@ -37,8 +35,7 @@ export class PlayerEntityManager {
   private readonly entities = new Map<string, PlayerEntity>();
 
   constructor(
-    private readonly app: PC.Application,
-    private readonly pc: typeof PC,
+    private readonly scene: THREE.Scene,
     private readonly characterModel?: CharacterModelFactory,
   ) {}
 
@@ -46,15 +43,16 @@ export class PlayerEntityManager {
     view: LobbyView,
     positions: Map<string, { x: number; z: number; yaw: number }>,
     localPlayerId: string,
+    deltaSeconds: number,
   ): void {
     const seen = new Set<string>();
     for (const player of view.players) {
       seen.add(player.playerId);
-      const pos = positions.get(player.playerId);
-      if (!pos) continue;
+      const position = positions.get(player.playerId);
+      if (!position) continue;
       let entity = this.entities.get(player.playerId);
       if (!entity) entity = this.createEntity(player, localPlayerId);
-      this.updateEntity(entity, player, pos);
+      this.updateEntity(entity, player, position, deltaSeconds);
     }
     for (const [id, entity] of this.entities) {
       if (!seen.has(id)) {
@@ -70,55 +68,52 @@ export class PlayerEntityManager {
   }
 
   private createEntity(player: PlayerView, localPlayerId: string): PlayerEntity {
-    const { pc, app } = this;
-    const root = new pc.Entity(`player-${player.playerId}`);
-    app.root.addChild(root);
+    const root = new THREE.Group();
+    root.name = `player-${player.playerId}`;
+    this.scene.add(root);
 
     const initialColor = player.team === 'ice' ? COLORS.ice : COLORS.water;
-    const fallbackMaterial = new pc.StandardMaterial();
-    fallbackMaterial.diffuse = new pc.Color().fromString(initialColor);
-    fallbackMaterial.gloss = 0.3;
-    fallbackMaterial.update();
-
+    const fallbackMaterial = new THREE.MeshStandardMaterial({
+      color: initialColor,
+      roughness: 0.58,
+    });
+    const ownedGeometries: THREE.BufferGeometry[] = [];
     let character: CharacterInstance | undefined;
     if (this.characterModel) {
       character = this.characterModel.instantiate(initialColor, 'Idle');
-      root.addChild(character.entity);
-      fallbackMaterial.destroy();
+      root.add(character.root);
+      fallbackMaterial.dispose();
     } else {
-      // If the GLB request fails, players remain visible as the original lightweight shape.
-      const body = new pc.Entity('fallback-body');
-      body.addComponent('render', { type: 'sphere', material: fallbackMaterial });
-      body.setLocalScale(0.7, 0.85, 0.7);
-      body.setLocalPosition(0, 0.85, 0);
-      root.addChild(body);
+      const bodyGeometry = new THREE.SphereGeometry(0.7, 10, 8);
+      const body = new THREE.Mesh(bodyGeometry, fallbackMaterial);
+      body.name = 'fallback-body';
+      body.scale.y = 1.2;
+      body.position.y = 0.85;
+      body.castShadow = true;
+      root.add(body);
+      ownedGeometries.push(bodyGeometry);
     }
 
-    const accentMaterial = new pc.StandardMaterial();
-    accentMaterial.diffuse = new pc.Color().fromString(
-      player.team === 'ice' ? COLORS.iceAccent : COLORS.water,
-    );
-    accentMaterial.emissive = new pc.Color().fromString(
-      player.team === 'ice' ? COLORS.iceAccent : COLORS.water,
-    );
-    accentMaterial.emissiveIntensity = 0.25;
-    accentMaterial.gloss = 0.65;
-    accentMaterial.update();
+    const accentMaterial = new THREE.MeshStandardMaterial({
+      color: player.team === 'ice' ? COLORS.iceAccent : COLORS.water,
+      emissive: player.team === 'ice' ? COLORS.iceAccent : COLORS.water,
+      emissiveIntensity: 0.25,
+      roughness: 0.3,
+    });
+    const accentGeometry = new THREE.CylinderGeometry(0.53, 0.53, 0.06, 16);
+    const accent = new THREE.Mesh(accentGeometry, accentMaterial);
+    accent.name = 'team-marker';
+    accent.position.y = 0.03;
+    root.add(accent);
+    ownedGeometries.push(accentGeometry);
+    if (player.playerId === localPlayerId) root.scale.setScalar(1.12);
 
-    const accent = new pc.Entity('team-marker');
-    accent.addComponent('render', { type: 'cylinder', material: accentMaterial });
-    accent.setLocalScale(1.05, 0.06, 1.05);
-    accent.setLocalPosition(0, 0.03, 0);
-    root.addChild(accent);
-
-    if (player.playerId === localPlayerId) root.setLocalScale(1.12, 1.12, 1.12);
-
-    const bodyMat = character?.material ?? fallbackMaterial;
     const entity: PlayerEntity = {
       root,
       accent,
-      bodyMat,
-      materials: [bodyMat, accentMaterial],
+      bodyMaterial: character?.material ?? fallbackMaterial,
+      accentMaterial,
+      ownedGeometries,
       character,
       currentStatus: player.status,
       currentTeam: player.team,
@@ -134,18 +129,17 @@ export class PlayerEntityManager {
   private updateEntity(
     entity: PlayerEntity,
     player: PlayerView,
-    pos: { x: number; z: number; yaw: number },
+    position: { x: number; z: number; yaw: number },
+    deltaSeconds: number,
   ): void {
-    const { pc } = this;
     const previousStatus = entity.currentStatus;
-    const dx = pos.x - entity.lastX;
-    const dz = pos.z - entity.lastZ;
+    const dx = position.x - entity.lastX;
+    const dz = position.z - entity.lastZ;
     const isMoving = dx * dx + dz * dz > 0.000_004;
-    entity.lastX = pos.x;
-    entity.lastZ = pos.z;
-
-    entity.root.setPosition(pos.x, 0, pos.z);
-    entity.root.setEulerAngles(0, pos.yaw * (180 / Math.PI), 0);
+    entity.lastX = position.x;
+    entity.lastZ = position.z;
+    entity.root.position.set(position.x, worldHeightAt(position.x, position.z) + 0.08, position.z);
+    entity.root.rotation.y = position.yaw;
 
     const isProtected = Date.now() < player.protectedUntil;
     if (
@@ -156,24 +150,18 @@ export class PlayerEntityManager {
       entity.currentStatus = player.status;
       entity.currentTeam = player.team;
       entity.isProtected = isProtected;
-
-      if (player.status === 'eliminated') {
-        entity.bodyMat.diffuse = new pc.Color().fromString(COLORS.eliminated);
-        entity.bodyMat.gloss = 0.05;
-      } else if (player.status === 'frozen') {
-        entity.bodyMat.diffuse = new pc.Color().fromString(COLORS.frozen);
-        entity.bodyMat.gloss = 0.6;
-      } else if (isProtected && player.team === 'water') {
-        entity.bodyMat.diffuse = new pc.Color().fromString(COLORS.protected);
-        entity.bodyMat.gloss = 0.5;
-      } else if (player.team === 'ice') {
-        entity.bodyMat.diffuse = new pc.Color().fromString(COLORS.ice);
-        entity.bodyMat.gloss = 0.3;
-      } else {
-        entity.bodyMat.diffuse = new pc.Color().fromString(COLORS.water);
-        entity.bodyMat.gloss = 0.3;
-      }
-      entity.bodyMat.update();
+      const bodyColor =
+        player.status === 'eliminated'
+          ? COLORS.eliminated
+          : player.status === 'frozen'
+            ? COLORS.frozen
+            : isProtected && player.team === 'water'
+              ? COLORS.protected
+              : player.team === 'ice'
+                ? COLORS.ice
+                : COLORS.water;
+      entity.bodyMaterial.color.set(bodyColor);
+      entity.bodyMaterial.roughness = player.status === 'frozen' ? 0.22 : 0.58;
 
       const accentColor =
         isProtected && player.team === 'water'
@@ -181,14 +169,10 @@ export class PlayerEntityManager {
           : player.team === 'ice'
             ? COLORS.iceAccent
             : COLORS.water;
-      const accentMaterial = entity.materials[1];
-      if (accentMaterial) {
-        accentMaterial.diffuse = new pc.Color().fromString(accentColor);
-        accentMaterial.emissive = new pc.Color().fromString(accentColor);
-        accentMaterial.update();
-      }
-      entity.accent.enabled = player.status !== 'eliminated' && player.status !== 'spectator';
-      entity.root.enabled = player.status !== 'spectator';
+      entity.accentMaterial.color.set(accentColor);
+      entity.accentMaterial.emissive.set(accentColor);
+      entity.accent.visible = player.status !== 'eliminated' && player.status !== 'spectator';
+      entity.root.visible = player.status !== 'spectator';
 
       if (previousStatus === 'frozen' && player.status === 'active') {
         entity.recoveryEndsAt = Date.now() + 450;
@@ -205,11 +189,13 @@ export class PlayerEntityManager {
             ? 'Run'
             : 'Idle';
     entity.character?.play(nextAnimation);
+    entity.character?.update(deltaSeconds);
   }
 
   private destroyEntity(entity: PlayerEntity): void {
-    this.app.root.removeChild(entity.root);
-    entity.root.destroy();
-    for (const material of entity.materials) material.destroy();
+    this.scene.remove(entity.root);
+    for (const geometry of entity.ownedGeometries) geometry.dispose();
+    entity.bodyMaterial.dispose();
+    entity.accentMaterial.dispose();
   }
 }

@@ -1,5 +1,11 @@
 import { schema, t, type SchemaType } from '@colyseus/schema';
-import { MIN_PLAYERS, type MatchPhase, type Team, type PlayerStatus } from '@ice-water/shared';
+import {
+  ARENA,
+  MIN_PLAYERS,
+  type MatchPhase,
+  type Team,
+  type PlayerStatus,
+} from '@ice-water/shared';
 
 export const PlayerState = schema(
   {
@@ -38,7 +44,7 @@ export const LobbyState = schema(
     iceCount: t.uint8().default(0),
     round: t.uint8().default(0),
     maxRounds: t.uint8().default(0),
-    arenaHalfExtent: t.float32().default(28),
+    arenaHalfExtent: t.float32().default(ARENA.halfExtent),
     matchWinner: t.string<'ice' | 'water' | ''>().default(''),
     players: t.map(PlayerState),
   },
