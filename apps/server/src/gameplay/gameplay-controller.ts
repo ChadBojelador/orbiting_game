@@ -1,5 +1,6 @@
 import {
   GAMEPLAY,
+  ARENA_COLLISION,
   canRescueInPhase,
   createSpawnPoints,
   hasLineOfSight,
@@ -11,6 +12,7 @@ import {
   type GameplayEvent,
   type GameplayMessages,
   type MoveInput,
+  type StaticCollisionGeometry,
 } from '@ice-water/shared';
 import type { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { SpatialGrid } from '../simulation/spatial-grid.js';
@@ -43,6 +45,7 @@ export class GameplayController {
   constructor(
     private readonly state: LobbyState,
     private readonly emit: (event: GameplayEvent) => void = () => {},
+    private readonly collision: StaticCollisionGeometry = ARENA_COLLISION,
   ) {}
 
   /** Called once per round start. Spawns/respawns active (non-eliminated) players. */
@@ -54,7 +57,7 @@ export class GameplayController {
     this.rescues.clear();
     this.progress.clear();
     // Respawn every non-eliminated player.
-    const spawns = createSpawnPoints();
+    const spawns = createSpawnPoints(this.collision);
     let index = 0;
     for (const player of this.state.players.values()) {
       if (player.team === 'unassigned' || player.status === 'eliminated') continue;
@@ -179,7 +182,9 @@ export class GameplayController {
     if (targetId === player.playerId) return undefined;
     return this.grid
       .nearby(player, range)
-      .find((target) => target.playerId === targetId && hasLineOfSight(player, target));
+      .find(
+        (target) => target.playerId === targetId && hasLineOfSight(player, target, this.collision),
+      );
   }
 
   private tag(player: PlayerState, targetId: string, now: number): string | null {
@@ -234,6 +239,7 @@ export class GameplayController {
         next.input,
         GAMEPLAY.tickMs / 1000,
         this.state.arenaHalfExtent,
+        this.collision,
       );
       player.x = position.x;
       player.z = position.z;

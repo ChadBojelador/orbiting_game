@@ -6,6 +6,9 @@ export interface ArenaBlock extends Position {
   depth: number;
   height: number;
 }
+export interface StaticCollisionGeometry {
+  readonly blocks: readonly ArenaBlock[];
+}
 export const ARENA = {
   halfExtent: 28,
   blocks: [
@@ -17,6 +20,7 @@ export const ARENA = {
     { x: 0, z: 17, width: 8, depth: 2, height: 1.2 },
   ] as readonly ArenaBlock[],
 } as const;
+export const ARENA_COLLISION: StaticCollisionGeometry = { blocks: ARENA.blocks };
 
 // Approved shrink table: one entry per round, index 0 = round 1.
 // Half-extents decrease each round to discourage hiding.
@@ -39,6 +43,7 @@ export function isWalkable(
   position: Position,
   radius: number = GAMEPLAY.playerRadius,
   halfExtent: number = ARENA.halfExtent,
+  collision: StaticCollisionGeometry = ARENA_COLLISION,
 ): boolean {
   const limit = halfExtent - radius;
   return (
@@ -46,7 +51,7 @@ export function isWalkable(
     Number.isFinite(position.z) &&
     Math.abs(position.x) <= limit &&
     Math.abs(position.z) <= limit &&
-    !ARENA.blocks.some(
+    !collision.blocks.some(
       (block) =>
         Math.abs(position.x - block.x) < block.width / 2 + radius &&
         Math.abs(position.z - block.z) < block.depth / 2 + radius,
@@ -61,12 +66,13 @@ export function moveKinematic(
   axes: Position,
   seconds: number,
   halfExtent: number = ARENA.halfExtent,
+  collision: StaticCollisionGeometry = ARENA_COLLISION,
 ): Position {
   const direction = normalizeAxes(axes.x, axes.z);
   const limit = halfExtent - GAMEPLAY.playerRadius;
   const clamp = (n: number) => Math.max(-limit, Math.min(limit, n));
   let x = clamp(position.x + direction.x * GAMEPLAY.moveSpeed * Math.max(0, seconds));
-  for (const block of ARENA.blocks) {
+  for (const block of collision.blocks) {
     const left = block.x - block.width / 2 - GAMEPLAY.playerRadius;
     const right = block.x + block.width / 2 + GAMEPLAY.playerRadius;
     if (Math.abs(position.z - block.z) >= block.depth / 2 + GAMEPLAY.playerRadius) continue;
@@ -74,7 +80,7 @@ export function moveKinematic(
     if (position.x >= right && x < right) x = right;
   }
   let z = clamp(position.z + direction.z * GAMEPLAY.moveSpeed * Math.max(0, seconds));
-  for (const block of ARENA.blocks) {
+  for (const block of collision.blocks) {
     const front = block.z - block.depth / 2 - GAMEPLAY.playerRadius;
     const back = block.z + block.depth / 2 + GAMEPLAY.playerRadius;
     if (Math.abs(x - block.x) >= block.width / 2 + GAMEPLAY.playerRadius) continue;
@@ -84,8 +90,12 @@ export function moveKinematic(
   return { x, z };
 }
 
-export function hasLineOfSight(a: Position, b: Position): boolean {
-  return !ARENA.blocks.some((block) => {
+export function hasLineOfSight(
+  a: Position,
+  b: Position,
+  collision: StaticCollisionGeometry = ARENA_COLLISION,
+): boolean {
+  return !collision.blocks.some((block) => {
     let near = 0;
     let far = 1;
     for (const axis of ['x', 'z'] as const) {
@@ -107,9 +117,12 @@ export function hasLineOfSight(a: Position, b: Position): boolean {
   });
 }
 
-export function createSpawnPoints(): Position[] {
+export function createSpawnPoints(
+  collision: StaticCollisionGeometry = ARENA_COLLISION,
+): Position[] {
   const points: Position[] = [];
   for (let z = -24; z <= 24; z += 3)
-    for (let x = -24; x <= 24; x += 3) if (isWalkable({ x, z }, 0.8)) points.push({ x, z });
+    for (let x = -24; x <= 24; x += 3)
+      if (isWalkable({ x, z }, 0.8, ARENA.halfExtent, collision)) points.push({ x, z });
   return points.sort((a, b) => a.x ** 2 + a.z ** 2 - b.x ** 2 - b.z ** 2 || a.z - b.z || a.x - b.x);
 }

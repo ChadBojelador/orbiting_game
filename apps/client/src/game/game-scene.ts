@@ -7,20 +7,19 @@ import type { LobbyRoom } from '../network/lobby-client.js';
 import { GameSession } from '../network/game-session.js';
 import { GAMEPLAY } from '@ice-water/shared';
 import { loadCharacterModel } from './character-model.js';
+import { ThirdPersonCamera } from './third-person-camera.js';
 
-const CAMERA_HEIGHT = 7;
-const CAMERA_DISTANCE = 10;
 const CAMERA_FOV = 55;
-// Smooth-follow spring for camera yaw to avoid jarring snaps.
-const CAM_SMOOTH = 0.12;
+const CAMERA_TARGET_HEIGHT = 1.2;
 
 export class GameScene {
   private readonly session: GameSession;
+  private readonly cameraController = new ThirdPersonCamera();
   private destroyed = false;
   private animFrame = 0;
-  private cameraYaw = 0; // current smooth yaw
-  private targetCameraYaw = 0;
+  private lastFrameAt = 0;
   private lastPointer: { x: number; y: number } | null = null;
+  private activePointerId: number | null = null;
   private readonly cleanups: (() => void)[] = [];
 
   // PlayCanvas objects allocated after dynamic import.
@@ -123,16 +122,20 @@ export class GameScene {
           })(),
     );
 
-    this.loop();
+    this.loop(performance.now());
   }
 
-  private loop(): void {
+  private loop(frameAt: number): void {
     if (this.destroyed) return;
     const { pc, app, camera, cameraTarget, arenaScene, playerEntities, session } = this;
     if (!pc || !app || !camera || !cameraTarget || !arenaScene || !playerEntities) {
-      this.animFrame = requestAnimationFrame(() => this.loop());
+      this.animFrame = requestAnimationFrame((time) => this.loop(time));
       return;
     }
+    const seconds = this.lastFrameAt
+      ? Math.min(0.1, Math.max(0, (frameAt - this.lastFrameAt) / 1000))
+      : 0;
+    this.lastFrameAt = frameAt;
 
     const view = session.view;
 
@@ -146,21 +149,36 @@ export class GameScene {
     // Resolve positions for all players.
     const serverNow = session.serverNow();
     const renderTime = serverNow - GAMEPLAY.interpolationMs;
-    const positions = new Map<string, { x: number; z: number; yaw: number }>();
+    const positions = new Map<string, { x: number; y: number; z: number; yaw: number }>();
 
     const localPlayer = session.local();
     for (const player of view.players) {
       if (player.playerId === session.playerId) {
         // Use client-predicted position for local player.
         const pred = session.prediction;
-        positions.set(player.playerId, { x: pred.position.x, z: pred.position.z, yaw: pred.yaw });
+        positions.set(player.playerId, {
+          x: pred.position.x,
+          y: arenaScene.getGroundHeight(pred.position.x, pred.position.z),
+          z: pred.position.z,
+          yaw: pred.yaw,
+        });
       } else {
         const interp = session.remotes.get(player.playerId);
         const sample = interp?.at(renderTime);
         if (sample) {
-          positions.set(player.playerId, { x: sample.x, z: sample.z, yaw: sample.yaw });
+          positions.set(player.playerId, {
+            x: sample.x,
+            y: arenaScene.getGroundHeight(sample.x, sample.z),
+            z: sample.z,
+            yaw: sample.yaw,
+          });
         } else {
-          positions.set(player.playerId, { x: player.x, z: player.z, yaw: player.yaw });
+          positions.set(player.playerId, {
+            x: player.x,
+            y: arenaScene.getGroundHeight(player.x, player.z),
+            z: player.z,
+            yaw: player.yaw,
+          });
         }
       }
     }
@@ -168,45 +186,58 @@ export class GameScene {
     // Update player entities.
     playerEntities.update(view, positions, session.playerId);
 
-    // Camera: smooth yaw from input, then position behind/above local player.
-    this.cameraYaw += (this.targetCameraYaw - this.cameraYaw) * CAM_SMOOTH;
-    session.input.cameraYaw = this.cameraYaw;
-
     const localPos = localPlayer
-      ? (positions.get(localPlayer.playerId) ?? { x: 0, z: 0 })
-      : { x: 0, z: 0 };
-    const camX = localPos.x + Math.sin(this.cameraYaw) * CAMERA_DISTANCE;
-    const camZ = localPos.z + Math.cos(this.cameraYaw) * CAMERA_DISTANCE;
-    camera.setPosition(camX, CAMERA_HEIGHT, camZ);
-    cameraTarget.setPosition(localPos.x, 1.2, localPos.z);
+      ? (positions.get(localPlayer.playerId) ?? { x: 0, y: 0, z: 0 })
+      : { x: 0, y: 0, z: 0 };
+    const pose = this.cameraController.update(
+      { x: localPos.x, y: localPos.y + CAMERA_TARGET_HEIGHT, z: localPos.z },
+      seconds,
+      arenaScene.getCameraObstacles(),
+      (x, z) => arenaScene.getGroundHeight(x, z),
+    );
+    session.input.cameraYaw = pose.yaw;
+    camera.setPosition(pose.position.x, pose.position.y, pose.position.z);
+    cameraTarget.setPosition(pose.target.x, pose.target.y, pose.target.z);
     camera.lookAt(cameraTarget.getPosition());
 
     app.renderNextFrame = true;
-    this.animFrame = requestAnimationFrame(() => this.loop());
+    this.animFrame = requestAnimationFrame((time) => this.loop(time));
   }
 
   private bindCameraControls(): void {
     const onPointerDown = (e: PointerEvent) => {
-      if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
+      if (!e.isPrimary || e.button !== 0) return;
+      this.activePointerId = e.pointerId;
       this.lastPointer = { x: e.clientX, y: e.clientY };
+      this.canvas.setPointerCapture(e.pointerId);
     };
     const onPointerMove = (e: PointerEvent) => {
-      if (!this.lastPointer) return;
+      if (!this.lastPointer || e.pointerId !== this.activePointerId) return;
       const dx = e.clientX - this.lastPointer.x;
-      this.targetCameraYaw -= dx * 0.006;
+      const dy = e.clientY - this.lastPointer.y;
+      this.cameraController.orbit(dx, dy);
       this.lastPointer = { x: e.clientX, y: e.clientY };
     };
-    const onPointerUp = () => {
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== this.activePointerId) return;
+      if (this.canvas.hasPointerCapture(e.pointerId))
+        this.canvas.releasePointerCapture(e.pointerId);
       this.lastPointer = null;
+      this.activePointerId = null;
     };
 
     this.canvas.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
     this.cleanups.push(() => {
+      if (this.activePointerId !== null && this.canvas.hasPointerCapture(this.activePointerId)) {
+        this.canvas.releasePointerCapture(this.activePointerId);
+      }
       this.canvas.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
     });
   }
 }
