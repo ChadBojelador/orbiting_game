@@ -90,9 +90,10 @@ export class GameScene {
 
     const camera = new pcModule.Entity('camera');
     camera.addComponent('camera', {
-      clearColor: new pcModule.Color(0.52, 0.78, 0.88),
+      clearColor: new pcModule.Color().fromString('#A9DCE6'),
       fov: CAMERA_FOV,
       farClip: 300,
+      toneMapping: pcModule.TONEMAP_ACES,
     });
     app.root.addChild(camera);
     this.camera = camera;
