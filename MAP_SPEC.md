@@ -72,14 +72,14 @@
 
 ## Elevation bands
 
-| Level | Elevation | Uses | Transition language |
-|---|---:|---|---|
-| 0 | `Y 0..3` | Ocean, beach, lagoon, small islands | Sand shelves and shallow water |
-| 1 | `Y 4..9` | Meadow, coast terraces | Long walkable slopes and low cream ledges |
-| 2 | `Y 10..16` | Central Village | Broad green terraces with bridge crossings |
-| 3 | `Y 17..25` | Forest and Crystal Valley | Switchbacks, roots, crystal shelves |
-| 4 | `Y 26..40` | Mountain approaches and upper cliffs | Ridge trails and guarded ramps |
-| 5 | `Y 41..64` | Ice Peaks and summit | Snow shelves, frozen cascade, final overlook |
+| Level |  Elevation | Uses                                 | Transition language                          |
+| ----- | ---------: | ------------------------------------ | -------------------------------------------- |
+| 0     |   `Y 0..3` | Ocean, beach, lagoon, small islands  | Sand shelves and shallow water               |
+| 1     |   `Y 4..9` | Meadow, coast terraces               | Long walkable slopes and low cream ledges    |
+| 2     | `Y 10..16` | Central Village                      | Broad green terraces with bridge crossings   |
+| 3     | `Y 17..25` | Forest and Crystal Valley            | Switchbacks, roots, crystal shelves          |
+| 4     | `Y 26..40` | Mountain approaches and upper cliffs | Ridge trails and guarded ramps               |
+| 5     | `Y 41..64` | Ice Peaks and summit                 | Snow shelves, frozen cascade, final overlook |
 
 Elevation changes must be made with walkable ramps or switchbacks on named routes. Vertical cliff faces are cream stone with softened, faceted profiles. No biome may appear as a rectangular slab.
 
@@ -171,21 +171,21 @@ Elevation changes must be made with walkable ramps or switchbacks on named route
 
 ## Permanent landmarks
 
-| Stable ID | Position | Navigation role |
-|---|---:|---|
-| `LM_VILLAGE_CRYSTAL` | `(0, 15, 1)` | World hub and four-way orientation anchor |
-| `LM_VILLAGE_BELL` | `(-16, 14, 8)` | West-side village marker |
-| `LM_VILLAGE_GATE` | `(4, 13, -24)` | Frames the mountain waterfall |
-| `LM_FOREST_TREE` | `(-65, 34, -18)` | West-biome canopy beacon |
-| `LM_GROVE_POOL` | `(-92, 18, -13)` | Hidden-grove reward marker |
-| `LM_CRYSTAL_SPIRE` | `(69, 33, -14)` | East-biome beacon visible across the island |
-| `LM_CRYSTAL_CAVE_MOUTH` | `(89, 20, -24)` | Cave entrance silhouette |
-| `LM_ICE_SUMMIT` | `(10, 62, -91)` | Northern global landmark |
-| `LM_FROZEN_FALL` | `(20, 46, -65)` | Vertical water-network anchor |
-| `LM_MEADOW_WINDMILL` | `(-21, 17, 62)` | Southern mainland beacon |
-| `LM_RIVER_FORK` | `(4, 6, 76)` | Route split toward beach crossings |
-| `LM_BEACH_ARCH` | `(35, 10, 103)` | Coast and hidden-island frame |
-| `LM_ISLAND_MOONSTONE` | `(35, 8, 117)` | Southern loop reward marker |
+| Stable ID               |         Position | Navigation role                             |
+| ----------------------- | ---------------: | ------------------------------------------- |
+| `LM_VILLAGE_CRYSTAL`    |     `(0, 15, 1)` | World hub and four-way orientation anchor   |
+| `LM_VILLAGE_BELL`       |   `(-16, 14, 8)` | West-side village marker                    |
+| `LM_VILLAGE_GATE`       |   `(4, 13, -24)` | Frames the mountain waterfall               |
+| `LM_FOREST_TREE`        | `(-65, 34, -18)` | West-biome canopy beacon                    |
+| `LM_GROVE_POOL`         | `(-92, 18, -13)` | Hidden-grove reward marker                  |
+| `LM_CRYSTAL_SPIRE`      |  `(69, 33, -14)` | East-biome beacon visible across the island |
+| `LM_CRYSTAL_CAVE_MOUTH` |  `(89, 20, -24)` | Cave entrance silhouette                    |
+| `LM_ICE_SUMMIT`         |  `(10, 62, -91)` | Northern global landmark                    |
+| `LM_FROZEN_FALL`        |  `(20, 46, -65)` | Vertical water-network anchor               |
+| `LM_MEADOW_WINDMILL`    |  `(-21, 17, 62)` | Southern mainland beacon                    |
+| `LM_RIVER_FORK`         |     `(4, 6, 76)` | Route split toward beach crossings          |
+| `LM_BEACH_ARCH`         |  `(35, 10, 103)` | Coast and hidden-island frame               |
+| `LM_ISLAND_MOONSTONE`   |   `(35, 8, 117)` | Southern loop reward marker                 |
 
 ## Connected water network
 
@@ -204,29 +204,29 @@ The renderer may use simplified ribbon geometry during blockout, but these relat
 
 ## Bridges and crossings
 
-| Stable ID | Center | Heading / span | Connects |
-|---|---:|---|---|
-| `BR_VILLAGE_NORTH` | `(0, 14, -28)` | east-west / 11 | Village north gate to mountain trail across the cascade stream |
-| `BR_CRYSTAL_01` | `(55, 19, -5)` | north-south / 10 | Crystal west and east floor lanes |
-| `BR_MEADOW_01` | `(-5, 8, 65)` | east-west / 12 | Meadow banks on the beach road |
-| `BR_ISLAND_01` | `(24, 4, 118)` | east-west / 13 | Middle isle to Hidden Island |
+| Stable ID          |         Center | Heading / span   | Connects                                                       |
+| ------------------ | -------------: | ---------------- | -------------------------------------------------------------- |
+| `BR_VILLAGE_NORTH` | `(0, 14, -28)` | east-west / 11   | Village north gate to mountain trail across the cascade stream |
+| `BR_CRYSTAL_01`    | `(55, 19, -5)` | north-south / 10 | Crystal west and east floor lanes                              |
+| `BR_MEADOW_01`     |  `(-5, 8, 65)` | east-west / 12   | Meadow banks on the beach road                                 |
+| `BR_ISLAND_01`     | `(24, 4, 118)` | east-west / 13   | Middle isle to Hidden Island                                   |
 
 Bridge decks must be at least 4 units wide for opposing traffic. Their approaches must align to terrain height with no step greater than `0.35` units.
 
 ## Primary routes
 
-| Stable ID | Ordered waypoints `(x,y,z)` | Purpose |
-|---|---|---|
-| `PATH_VILLAGE_CRYSTAL` | `(22,14,2) -> (35,16,1) -> (50,18,-2) -> (65,20,-10)` | East ascent and primary-loop leg |
-| `PATH_CRYSTAL_ICE` | `(64,21,-32) -> (49,28,-48) -> (34,36,-65) -> (16,47,-80)` | Crystal switchback to summit |
-| `PATH_ICE_FOREST` | `(-2,45,-77) -> (-22,31,-57) -> (-39,25,-43) -> (-54,22,-31)` | West ridge descent |
-| `PATH_FOREST_VILLAGE` | `(-46,21,-17) -> (-31,17,-4) -> (-20,14,2)` | Forest return to hub |
-| `PATH_VILLAGE_MEADOW` | `(2,11,24) -> (0,9,36) -> (-3,7,54) -> (-5,7,65)` | Broad south road |
-| `PATH_MEADOW_BEACH` | `(2,6,75) -> (5,5,86) -> (9,3,99) -> (10,2,109)` | River-following coast route |
-| `PATH_BEACH_ISLANDS` | `(15,2,109) -> (10,3,119) -> (24,4,118) -> (37,3,116)` | Stepping-stone route |
-| `PATH_ISLAND_MEADOW` | `(37,3,116) -> (42,4,101) -> (35,8,84) -> (23,9,69)` | East headland return |
-| `PATH_FOREST_SHORTCUT` | `(-62,19,10) -> (-47,14,27) -> (-34,10,43) -> (-23,8,53)` | Forest-to-meadow optional connector |
-| `PATH_CRYSTAL_MEADOW` | `(72,18,13) -> (57,14,28) -> (43,11,43) -> (28,9,57)` | Crystal-to-meadow optional connector |
+| Stable ID              | Ordered waypoints `(x,y,z)`                                   | Purpose                              |
+| ---------------------- | ------------------------------------------------------------- | ------------------------------------ |
+| `PATH_VILLAGE_CRYSTAL` | `(22,14,2) -> (35,16,1) -> (50,18,-2) -> (65,20,-10)`         | East ascent and primary-loop leg     |
+| `PATH_CRYSTAL_ICE`     | `(64,21,-32) -> (49,28,-48) -> (34,36,-65) -> (16,47,-80)`    | Crystal switchback to summit         |
+| `PATH_ICE_FOREST`      | `(-2,45,-77) -> (-22,31,-57) -> (-39,25,-43) -> (-54,22,-31)` | West ridge descent                   |
+| `PATH_FOREST_VILLAGE`  | `(-46,21,-17) -> (-31,17,-4) -> (-20,14,2)`                   | Forest return to hub                 |
+| `PATH_VILLAGE_MEADOW`  | `(2,11,24) -> (0,9,36) -> (-3,7,54) -> (-5,7,65)`             | Broad south road                     |
+| `PATH_MEADOW_BEACH`    | `(2,6,75) -> (5,5,86) -> (9,3,99) -> (10,2,109)`              | River-following coast route          |
+| `PATH_BEACH_ISLANDS`   | `(15,2,109) -> (10,3,119) -> (24,4,118) -> (37,3,116)`        | Stepping-stone route                 |
+| `PATH_ISLAND_MEADOW`   | `(37,3,116) -> (42,4,101) -> (35,8,84) -> (23,9,69)`          | East headland return                 |
+| `PATH_FOREST_SHORTCUT` | `(-62,19,10) -> (-47,14,27) -> (-34,10,43) -> (-23,8,53)`     | Forest-to-meadow optional connector  |
+| `PATH_CRYSTAL_MEADOW`  | `(72,18,13) -> (57,14,28) -> (43,11,43) -> (28,9,57)`         | Crystal-to-meadow optional connector |
 
 The two mandatory exploration loops are:
 
@@ -235,13 +235,13 @@ The two mandatory exploration loops are:
 
 ## Secrets and entrances
 
-| Stable ID | Entrance / exit | Rule |
-|---|---|---|
-| `SEC_HIDDEN_GROVE` | `(-84,20,-7)` / `(-76,18,12)` | Root-arch loop; never a dead end |
-| `SEC_CRYSTAL_CAVE` | `(89,20,-24)` / `(76,23,-34)` | Short curved tunnel bypassing the valley channel |
-| `SEC_ICE_OVERLOOK` | `(-19,49,-96)` / `(-22,39,-73)` | Summit-side overlook with guarded return slope |
-| `SEC_HIDDEN_ISLAND` | `(35,3,111)` / `(42,4,101)` | Revealed by passing beneath the beach arch |
-| `SEC_MEADOW_FOREST` | `(-34,10,43)` / `(-47,14,27)` | Explicit forest shortcut, wide enough for group pursuit |
+| Stable ID           | Entrance / exit                 | Rule                                                    |
+| ------------------- | ------------------------------- | ------------------------------------------------------- |
+| `SEC_HIDDEN_GROVE`  | `(-84,20,-7)` / `(-76,18,12)`   | Root-arch loop; never a dead end                        |
+| `SEC_CRYSTAL_CAVE`  | `(89,20,-24)` / `(76,23,-34)`   | Short curved tunnel bypassing the valley channel        |
+| `SEC_ICE_OVERLOOK`  | `(-19,49,-96)` / `(-22,39,-73)` | Summit-side overlook with guarded return slope          |
+| `SEC_HIDDEN_ISLAND` | `(35,3,111)` / `(42,4,101)`     | Revealed by passing beneath the beach arch              |
+| `SEC_MEADOW_FOREST` | `(-34,10,43)` / `(-47,14,27)`   | Explicit forest shortcut, wide enough for group pursuit |
 
 Secrets may contain small visual rewards but cannot create mechanically superior hiding pockets outside the active arena boundary.
 
@@ -261,13 +261,13 @@ Secrets may contain small visual rewards but cannot create mechanically superior
 
 The island remains physically stable across all rounds. The Deep Freeze boundary contracts independently using the following half-extents centered on the village:
 
-| Round | Half-extent | Intended readable area |
-|---:|---:|---|
-| 1 | 118 | Entire mainland and southern island loop |
-| 2 | 102 | Excludes the farthest islets and summit overlook |
-| 3 | 86 | Focuses play on mainland biomes |
-| 4 | 70 | Pulls play toward village, inner forest, inner valley, and north meadow |
-| 5 | 54 | Final hub-centered confrontation |
+| Round | Half-extent | Intended readable area                                                  |
+| ----: | ----------: | ----------------------------------------------------------------------- |
+|     1 |         118 | Entire mainland and southern island loop                                |
+|     2 |         102 | Excludes the farthest islets and summit overlook                        |
+|     3 |          86 | Focuses play on mainland biomes                                         |
+|     4 |          70 | Pulls play toward village, inner forest, inner valley, and north meadow |
+|     5 |          54 | Final hub-centered confrontation                                        |
 
 The boundary is a magical weather wall, not a terrain wall. Server authority continues to own its active size and movement clamping.
 

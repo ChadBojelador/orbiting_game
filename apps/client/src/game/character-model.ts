@@ -1,20 +1,11 @@
 import characterModelUrl from '../../../../assets/character/test_char_model.glb?url';
-import type * as PC from 'playcanvas';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 
 export type CharacterAnimation = 'Idle' | 'Run' | 'Frozen' | 'Unfrozen' | 'Wave';
 
-interface CharacterContainerResource {
-  animations: PC.Asset[];
-  instantiateRenderEntity(options?: object): PC.Entity;
-}
-
-interface ClipDefinition {
-  sourceName: string;
-  speed: number;
-  loop: boolean;
-}
-
-const CLIPS: Record<CharacterAnimation, ClipDefinition> = {
+const CLIPS: Record<CharacterAnimation, { sourceName: string; speed: number; loop: boolean }> = {
   Idle: { sourceName: 'Armature|Idle', speed: 1, loop: true },
   Run: { sourceName: 'Armature|Run', speed: 1.15, loop: true },
   Frozen: { sourceName: 'Armature|freeze', speed: 1, loop: false },
@@ -23,77 +14,70 @@ const CLIPS: Record<CharacterAnimation, ClipDefinition> = {
 };
 
 export interface CharacterInstance {
-  entity: PC.Entity;
-  material: PC.StandardMaterial;
+  root: THREE.Object3D;
+  material: THREE.MeshStandardMaterial;
   play(animation: CharacterAnimation, blendTime?: number): void;
+  update(deltaSeconds: number): void;
 }
 
 export class CharacterModelFactory {
   constructor(
-    private readonly pc: typeof PC,
-    private readonly resource: CharacterContainerResource,
+    private readonly source: THREE.Object3D,
+    private readonly animations: readonly THREE.AnimationClip[],
   ) {}
 
   instantiate(color: string, initialAnimation: CharacterAnimation): CharacterInstance {
-    const entity = this.resource.instantiateRenderEntity({ castShadows: true });
-    entity.name = 'character-model';
-    entity.setLocalScale(0.2, 0.2, 0.2);
+    const root = cloneSkeleton(this.source);
+    root.name = 'character-model';
+    root.scale.setScalar(0.2);
+    const material = new THREE.MeshStandardMaterial({ color, roughness: 0.58, metalness: 0 });
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.material = material;
+      object.castShadow = true;
+      object.receiveShadow = true;
+    });
 
-    const material = new this.pc.StandardMaterial();
-    material.diffuse = new this.pc.Color().fromString(color);
-    material.gloss = 0.28;
-    material.metalness = 0;
-    material.update();
-
-    for (const component of entity.findComponents('render')) {
-      const render = component as PC.RenderComponent;
-      for (const meshInstance of render.meshInstances ?? []) meshInstance.material = material;
-    }
-
-    entity.addComponent('anim', { activate: true });
-    for (const [stateName, definition] of Object.entries(CLIPS) as [
+    const mixer = new THREE.AnimationMixer(root);
+    const actions = new Map<CharacterAnimation, THREE.AnimationAction>();
+    for (const [name, definition] of Object.entries(CLIPS) as [
       CharacterAnimation,
-      ClipDefinition,
+      (typeof CLIPS)[CharacterAnimation],
     ][]) {
-      const animation = this.resource.animations.find(
-        (candidate) => candidate.name === definition.sourceName,
+      const clip = this.animations.find((candidate) => candidate.name === definition.sourceName);
+      if (!clip) continue;
+      const action = mixer.clipAction(clip);
+      action.timeScale = definition.speed;
+      action.setLoop(
+        definition.loop ? THREE.LoopRepeat : THREE.LoopOnce,
+        definition.loop ? Infinity : 1,
       );
-      if (!animation?.resource) continue;
-      entity.anim?.assignAnimation(
-        stateName,
-        animation.resource as PC.AnimTrack,
-        undefined,
-        definition.speed,
-        definition.loop,
-      );
+      action.clampWhenFinished = !definition.loop;
+      actions.set(name, action);
     }
 
     let currentAnimation = initialAnimation;
-    entity.anim?.baseLayer?.transition(initialAnimation);
-
+    actions.get(initialAnimation)?.play();
     return {
-      entity,
+      root,
       material,
       play(animation, blendTime = 0.12) {
         if (animation === currentAnimation) return;
+        const previous = actions.get(currentAnimation);
+        const next = actions.get(animation);
         currentAnimation = animation;
-        entity.anim?.baseLayer?.transition(animation, blendTime);
+        if (!next) return;
+        next.reset().fadeIn(blendTime).play();
+        previous?.fadeOut(blendTime);
+      },
+      update(deltaSeconds) {
+        mixer.update(deltaSeconds);
       },
     };
   }
 }
 
-export function loadCharacterModel(
-  app: PC.Application,
-  pc: typeof PC,
-): Promise<CharacterModelFactory> {
-  return new Promise((resolve, reject) => {
-    app.assets.loadFromUrl(characterModelUrl, 'container', (error, asset) => {
-      if (error || !asset?.resource) {
-        reject(new Error(`Unable to load character model: ${String(error ?? 'missing resource')}`));
-        return;
-      }
-      resolve(new CharacterModelFactory(pc, asset.resource as CharacterContainerResource));
-    });
-  });
+export async function loadCharacterModel(): Promise<CharacterModelFactory> {
+  const gltf = await new GLTFLoader().loadAsync(characterModelUrl);
+  return new CharacterModelFactory(gltf.scene, gltf.animations);
 }
