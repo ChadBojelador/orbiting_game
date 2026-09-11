@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_PLAYERS } from '@ice-water/shared';
 import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { LobbyController } from '../rooms/lobby-controller.js';
 import { GameplayController } from '../gameplay/gameplay-controller.js';
@@ -9,6 +8,7 @@ import { DEFAULT_ICE_BRACKETS } from '../config/ice-brackets.js';
 describe('BotRunner and solo playtest', () => {
   it('populates bots and allows solo host to start countdown when total reaches MIN_PLAYERS', () => {
     const state = new LobbyState();
+    state.maxPlayers = 6;
     state.hostPlayerId = 'human-host';
 
     // Add human host
@@ -68,5 +68,19 @@ describe('BotRunner and solo playtest', () => {
 
     lobby.transferHost();
     expect(state.hostPlayerId).toBe('human-player');
+  });
+
+  it('refuses to add bots beyond the total room capacity', () => {
+    const state = new LobbyState();
+    state.maxPlayers = 6;
+    const human = new PlayerState();
+    human.playerId = 'human-player';
+    state.players.set(human.playerId, human);
+    const gameplay = new GameplayController(state, () => {});
+
+    expect(() => new BotRunner(state, gameplay, 6).start()).toThrow(
+      'Development bots exceed room capacity',
+    );
+    expect(state.players.size).toBe(1);
   });
 });

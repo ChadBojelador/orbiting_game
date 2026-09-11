@@ -95,12 +95,18 @@ export function App() {
     });
     next.onLeave(() => {
       if (roomRef.current !== next) return;
+      const wasActiveMatch =
+        next.state?.phase !== undefined && !['lobby', 'countdown'].includes(next.state.phase);
       clearReconnect();
       roomRef.current = null;
       setRoom(null);
       setLobby(null);
       setMatchResult(null);
-      setError('You left the room or the connection expired. You can join again.');
+      setError(
+        wasActiveMatch
+          ? 'Your reconnection window expired. This match can no longer be rejoined.'
+          : 'You left the room or the connection expired. You can join again.',
+      );
     });
     update();
   }

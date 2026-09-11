@@ -1,4 +1,3 @@
-import { GAMEPLAY } from '@ice-water/shared';
 import { PlayerState } from '../rooms/lobby-state.js';
 import type { LobbyState } from '../rooms/lobby-state.js';
 import type { GameplayController } from '../gameplay/gameplay-controller.js';
@@ -8,8 +7,16 @@ const DIRECTION_CHANGE_MS = 2000;
 
 // Readable display names for bots shown in the lobby.
 const BOT_NAMES = [
-  'IcyBot', 'WaterBot', 'FreezeBot', 'ChillBot', 'SlushBot',
-  'SnowBot', 'GlacierBot', 'FrostBot', 'TundraBot', 'ArcticBot',
+  'IcyBot',
+  'WaterBot',
+  'FreezeBot',
+  'ChillBot',
+  'SlushBot',
+  'SnowBot',
+  'GlacierBot',
+  'FrostBot',
+  'TundraBot',
+  'ArcticBot',
 ];
 
 interface BotMotion {
@@ -42,6 +49,8 @@ export class BotRunner {
 
   /** Insert bot players into the room state. Call once inside onCreate. */
   start(): void {
+    if (this.state.players.size + this.count > this.state.maxPlayers)
+      throw new Error('Development bots exceed room capacity');
     for (let i = 0; i < this.count; i++) {
       const id = `bot-${i}`;
       const player = new PlayerState();

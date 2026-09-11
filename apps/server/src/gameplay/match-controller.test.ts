@@ -89,6 +89,20 @@ describe('MatchController', () => {
     expect(state.phaseDeadline).toBe(deadline + GAMEPLAY.deepFreezeMs);
   });
 
+  it('does not enter Deep Freeze before the exact regular deadline', () => {
+    ctrl.start(250);
+    const deadline = 250 + GAMEPLAY.regularMs;
+
+    ctrl.tick(deadline - GAMEPLAY.warningMs);
+    expect(ctrl.tick(deadline - 1)).toBe(false);
+    expect(state.phase).toBe('warning');
+    expect(state.phaseDeadline).toBe(deadline);
+
+    expect(ctrl.tick(deadline)).toBe(true);
+    expect(state.phase).toBe('deep-freeze');
+    expect(state.phaseDeadline).toBe(deadline + GAMEPLAY.deepFreezeMs);
+  });
+
   it('atomically permanently-freezes frozen Water at Deep Freeze deadline', () => {
     ctrl.start(0);
     const deadline = GAMEPLAY.regularMs;
@@ -96,13 +110,40 @@ describe('MatchController', () => {
     ctrl.tick(deadline); // → deep-freeze
     // Freeze one Water player.
     state.players.get('water-0')!.status = 'frozen';
-    // At deep-freeze deadline.
     const dfDeadline = deadline + GAMEPLAY.deepFreezeMs;
+
+    expect(ctrl.tick(dfDeadline - 1)).toBe(false);
+    expect(state.phase).toBe('deep-freeze');
+    expect(state.players.get('water-0')!.status).toBe('frozen');
+    expect(events.some((event) => event.type === 'player/permanently-frozen')).toBe(false);
+
+    // At the exact deadline, all pending eliminations resolve in the same tick.
     ctrl.tick(dfDeadline);
     expect(state.players.get('water-0')!.status).toBe('eliminated');
     expect(state.players.get('water-1')!.status).toBe('active'); // untouched
     const permFreezeEvent = events.find((e) => e.type === 'player/permanently-frozen');
     expect(permFreezeEvent).toBeDefined();
+  });
+
+  it('eliminates disconnected frozen Water at the same authoritative deadline', () => {
+    ctrl.start(0);
+    const regularDeadline = GAMEPLAY.regularMs;
+    ctrl.tick(regularDeadline - GAMEPLAY.warningMs);
+    ctrl.tick(regularDeadline);
+    const disconnected = state.players.get('water-0')!;
+    disconnected.status = 'frozen';
+    disconnected.isConnected = false;
+    disconnected.reconnectDeadline = regularDeadline + GAMEPLAY.deepFreezeMs + 5_000;
+
+    const deepFreezeDeadline = regularDeadline + GAMEPLAY.deepFreezeMs;
+    ctrl.tick(deepFreezeDeadline);
+
+    expect(disconnected.status).toBe('eliminated');
+    expect(disconnected.isConnected).toBe(false);
+    expect(events).toContainEqual({
+      type: 'player/permanently-frozen',
+      payload: { playerId: disconnected.playerId, serverTime: deepFreezeDeadline },
+    });
   });
 
   it('transitions deep-freeze → round-result → next regular', () => {
@@ -118,6 +159,23 @@ describe('MatchController', () => {
     expect(state.arenaHalfExtent).toBe(arenaHalfExtentForRound(2));
   });
 
+  it('does not leave round result before its exact deadline', () => {
+    ctrl.start(0);
+    const deepFreezeDeadline = GAMEPLAY.regularMs + GAMEPLAY.deepFreezeMs;
+    ctrl.tick(GAMEPLAY.regularMs - GAMEPLAY.warningMs);
+    ctrl.tick(GAMEPLAY.regularMs);
+    ctrl.tick(deepFreezeDeadline);
+    const roundResultDeadline = deepFreezeDeadline + GAMEPLAY.roundResultMs;
+
+    expect(ctrl.tick(roundResultDeadline - 1)).toBe(false);
+    expect(state.phase).toBe('round-result');
+    expect(state.round).toBe(1);
+
+    expect(ctrl.tick(roundResultDeadline)).toBe(true);
+    expect(state.phase).toBe('regular');
+    expect(state.round).toBe(2);
+  });
+
   it('declares match-result after maxRounds rounds', () => {
     ctrl.start(0);
     let now = 0;
@@ -131,7 +189,7 @@ describe('MatchController', () => {
     }
     expect(state.phase).toBe('match-result');
     const resultEvent = events.find((e) => e.type === 'match/result');
-    expect((resultEvent?.payload as { winner: string }).winner).toBe('water');
+    expect(resultEvent?.payload).toEqual({ winner: 'water', reason: 'rounds-complete' });
   });
 
   it('Ice wins immediately when all Water are frozen', () => {
@@ -145,7 +203,18 @@ describe('MatchController', () => {
     expect(state.phase).toBe('match-result');
     expect(state.matchWinner).toBe('ice');
     const resultEvent = events.find((e) => e.type === 'match/result');
-    expect((resultEvent?.payload as { winner: string }).winner).toBe('ice');
+    expect(resultEvent?.payload).toEqual({ winner: 'ice', reason: 'all-frozen' });
+  });
+
+  it('does not award Ice while any active Water player remains', () => {
+    ctrl.start(1000);
+    state.players.get('water-0')!.status = 'frozen';
+    state.players.get('water-1')!.status = 'eliminated';
+
+    expect(ctrl.tick(1001)).toBe(false);
+    expect(state.phase).toBe('regular');
+    expect(state.matchWinner).toBe('');
+    expect(events.some((event) => event.type === 'match/result')).toBe(false);
   });
 
   it('does not resolve match if there are no Water players', () => {
