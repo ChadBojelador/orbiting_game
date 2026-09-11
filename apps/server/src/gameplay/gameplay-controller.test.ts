@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ARENA, GAMEPLAY, type GameplayEvent } from '@ice-water/shared';
+import { GAMEPLAY, type GameplayEvent } from '@ice-water/shared';
 import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { GameplayController } from './gameplay-controller.js';
 
@@ -73,15 +73,17 @@ describe('GameplayController', () => {
     });
 
     it('normalizes diagonal speed and clamps movement to the arena boundary', () => {
-      const { controller, players, now } = makeFixture([
-        { id: 'water', team: 'water', x: ARENA.halfExtent - GAMEPLAY.playerRadius - 0.1 },
+      const testHalfExtent = 18;
+      const { controller, players, state, now } = makeFixture([
+        { id: 'water', team: 'water', x: testHalfExtent - GAMEPLAY.playerRadius - 0.1 },
       ]);
       const player = players.get('water')!;
+      state.arenaHalfExtent = testHalfExtent;
 
       expect(controller.handle('water', 'input/move', { x: 1, z: 1, sequence: 1 }, now)).toBeNull();
       controller.advance(now + GAMEPLAY.tickMs);
 
-      expect(player.x).toBeCloseTo(ARENA.halfExtent - GAMEPLAY.playerRadius, 5);
+      expect(player.x).toBeCloseTo(testHalfExtent - GAMEPLAY.playerRadius, 5);
       expect(player.z).toBeCloseTo((GAMEPLAY.moveSpeed * GAMEPLAY.tickMs) / 1000 / Math.sqrt(2), 5);
       expect(player.inputSequence).toBe(1);
     });
