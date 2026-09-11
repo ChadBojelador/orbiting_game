@@ -41,6 +41,7 @@ export class GameSession {
   private receivedAt = performance.now();
   private rescueTarget = '';
   private rescueSentAt = 0;
+  private jumpRequested = false;
   private readonly cleanups: (() => void)[] = [];
 
   constructor(
@@ -107,6 +108,12 @@ export class GameSession {
     this.stopRescue();
   }
 
+  consumeJumpRequest(): boolean {
+    const requested = this.jumpRequested;
+    this.jumpRequested = false;
+    return requested;
+  }
+
   private stopRescue(): void {
     if (this.rescueTarget && this.isConnected) this.room.send('action/rescue-stop', {});
     this.rescueTarget = '';
@@ -115,6 +122,7 @@ export class GameSession {
     const local = this.local();
     if (!local || !this.isConnected || !isPlayPhase(this.view.phase)) return;
     const input = this.input.sample(GAMEPLAY.tickMs / 1000);
+    this.jumpRequested ||= input.hasJump;
     const now = this.serverNow();
     const canMove = this.canMove(local) && !document.hidden;
     const move = this.prediction.predict(canMove ? input : { x: 0, z: 0 }, canMove);

@@ -145,6 +145,9 @@ export class GameScene {
       );
     }
     this.playerEntities?.update(view, positions, this.session.playerId, deltaSeconds);
+    if (this.session.consumeJumpRequest()) {
+      this.playerEntities?.triggerJump(this.session.playerId);
+    }
 
     const localPosition = localPlayer
       ? (positions.get(localPlayer.playerId) ?? { x: 0, z: 8 })

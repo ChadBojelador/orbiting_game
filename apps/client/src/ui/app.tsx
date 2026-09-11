@@ -48,11 +48,15 @@ export function App() {
     const music = musicRef.current;
     if (!music) return;
     music.volume = 0.32;
-    if (!guest || room) {
+    if (!guest) {
       music.pause();
       setIsMusicPlaying(false);
+    } else if (isMusicPlaying && music.paused) {
+      void music.play().catch(() => setIsMusicPlaying(false));
+    } else if (!isMusicPlaying) {
+      music.pause();
     }
-  }, [guest, room]);
+  }, [guest, isMusicPlaying, room]);
 
   function toggleMusic() {
     const music = musicRef.current;
@@ -221,8 +225,27 @@ export function App() {
   if (isInGame && lobby && guest) {
     return (
       <div className="game-shell">
+        <audio
+          ref={musicRef}
+          src="/music/bg1.mp3"
+          loop
+          preload="metadata"
+          onPlay={() => setIsMusicPlaying(true)}
+          onPause={() => setIsMusicPlaying(false)}
+        />
         {/* Full-screen 3D canvas */}
         <canvas ref={gameCanvasRef} className="game-canvas" aria-label="3D game arena" />
+
+        <button
+          className="game-music-button"
+          type="button"
+          onClick={toggleMusic}
+          aria-pressed={isMusicPlaying}
+          aria-label={isMusicPlaying ? 'Mute soundtrack' : 'Play soundtrack'}
+        >
+          <span aria-hidden="true">{isMusicPlaying ? '♫' : '♪'}</span>
+          {isMusicPlaying ? 'Sound on' : 'Sound off'}
+        </button>
 
         {/* HUD overlay */}
         {lobby.phase !== 'match-result' && (

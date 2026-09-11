@@ -30,6 +30,7 @@ interface PlayerEntity {
   lastZ: number;
   movingUntil: number;
   recoveryEndsAt: number;
+  jumpStartedAt: number;
 }
 
 const MOVEMENT_ANIMATION_HOLD_MS = 180;
@@ -68,6 +69,11 @@ export class PlayerEntityManager {
   destroy(): void {
     for (const entity of this.entities.values()) this.destroyEntity(entity);
     this.entities.clear();
+  }
+
+  triggerJump(playerId: string): void {
+    const entity = this.entities.get(playerId);
+    if (entity && Date.now() - entity.jumpStartedAt > 350) entity.jumpStartedAt = Date.now();
   }
 
   private createEntity(player: PlayerView, localPlayerId: string): PlayerEntity {
@@ -125,6 +131,7 @@ export class PlayerEntityManager {
       lastZ: player.z,
       movingUntil: 0,
       recoveryEndsAt: 0,
+      jumpStartedAt: 0,
     };
     this.entities.set(player.playerId, entity);
     return entity;
@@ -146,7 +153,15 @@ export class PlayerEntityManager {
     const isMoving = now < entity.movingUntil;
     entity.lastX = position.x;
     entity.lastZ = position.z;
-    entity.root.position.set(position.x, worldHeightAt(position.x, position.z) + 0.08, position.z);
+    const jumpElapsed = entity.jumpStartedAt === 0 ? 500 : now - entity.jumpStartedAt;
+    const jumpProgress = Math.min(1, Math.max(0, jumpElapsed / 500));
+    const jumpOffset = entity.jumpStartedAt === 0 ? 0 : Math.sin(jumpProgress * Math.PI) * 0.8;
+    if (jumpProgress >= 1) entity.jumpStartedAt = 0;
+    entity.root.position.set(
+      position.x,
+      worldHeightAt(position.x, position.z) + 0.08 + jumpOffset,
+      position.z,
+    );
     entity.root.rotation.y = position.yaw;
 
     const isProtected = now < player.protectedUntil;
