@@ -8,20 +8,6 @@ interface CharacterContainerResource {
   instantiateRenderEntity(options?: object): PC.Entity;
 }
 
-interface ClipDefinition {
-  sourceName: string;
-  speed: number;
-  loop: boolean;
-}
-
-const CLIPS: Record<CharacterAnimation, ClipDefinition> = {
-  Idle: { sourceName: 'Armature|Idle', speed: 1, loop: true },
-  Run: { sourceName: 'Armature|Run', speed: 1.15, loop: true },
-  Frozen: { sourceName: 'Armature|freeze', speed: 1, loop: false },
-  Unfrozen: { sourceName: 'Armature|unfrozen', speed: 1, loop: false },
-  Wave: { sourceName: 'Armature|Wave', speed: 0.9, loop: true },
-};
-
 export interface CharacterInstance {
   entity: PC.Entity;
   material: PC.StandardMaterial;
@@ -50,34 +36,59 @@ export class CharacterModelFactory {
       for (const meshInstance of render.meshInstances ?? []) meshInstance.material = material;
     }
 
-    entity.addComponent('anim', { activate: true });
-    for (const [stateName, definition] of Object.entries(CLIPS) as [
-      CharacterAnimation,
-      ClipDefinition,
-    ][]) {
-      const animation = this.resource.animations.find(
-        (candidate) => candidate.name === definition.sourceName,
-      );
-      if (!animation?.resource) continue;
-      entity.anim?.assignAnimation(
-        stateName,
-        animation.resource as PC.AnimTrack,
-        undefined,
-        definition.speed,
-        definition.loop,
-      );
+    // The GLB needs a skin update track to render its mesh parts. Its action clips
+    // are intentionally not used: they separate the test export in PlayCanvas.
+    const skinTrack = this.resource.animations.find(
+      (candidate) => candidate.name === 'Armature|Idle',
+    );
+    if (skinTrack?.resource) {
+      entity.addComponent('anim', { activate: true });
+      if (entity.anim) {
+        entity.anim.assignAnimation(
+          'SkinUpdate',
+          skinTrack.resource as PC.AnimTrack,
+          undefined,
+          1,
+          true,
+        );
+        entity.anim.baseLayer?.transition('SkinUpdate');
+      }
     }
 
     let currentAnimation = initialAnimation;
-    entity.anim?.baseLayer?.transition(initialAnimation);
+    let stateStartedAt = performance.now();
 
     return {
       entity,
       material,
-      play(animation, blendTime = 0.12) {
-        if (animation === currentAnimation) return;
-        currentAnimation = animation;
-        entity.anim?.baseLayer?.transition(animation, blendTime);
+      play(animation) {
+        if (animation !== currentAnimation) {
+          currentAnimation = animation;
+          stateStartedAt = performance.now();
+        }
+
+        const elapsed = (performance.now() - stateStartedAt) / 1000;
+        const scale = 0.2;
+        if (animation === 'Run') {
+          entity.setLocalPosition(0, Math.abs(Math.sin(elapsed * 10)) * 0.055, 0);
+          entity.setLocalEulerAngles(0, 0, Math.sin(elapsed * 10) * 4);
+          return;
+        }
+        if (animation === 'Unfrozen') {
+          const bounce = Math.max(0, 1 - elapsed * 2.2) * Math.sin(elapsed * 15) * 0.08;
+          entity.setLocalPosition(0, bounce, 0);
+          entity.setLocalEulerAngles(0, 0, 0);
+          entity.setLocalScale(scale, scale * (1 + bounce * 0.4), scale);
+          return;
+        }
+        if (animation === 'Wave') {
+          entity.setLocalPosition(0, Math.sin(elapsed * 3) * 0.025, 0);
+          entity.setLocalEulerAngles(0, Math.sin(elapsed * 2) * 9, 0);
+          return;
+        }
+        entity.setLocalPosition(0, 0, 0);
+        entity.setLocalEulerAngles(0, 0, 0);
+        entity.setLocalScale(scale, scale, scale);
       },
     };
   }
