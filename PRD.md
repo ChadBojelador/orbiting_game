@@ -62,8 +62,19 @@ Players need an accessible multiplayer party game that supports a large crowd, i
 - A host creates a private room and receives an invite code.
 - Players join the room through that code.
 - A room supports 6–150 players.
-- The server chooses the Ice-player count from a configurable room-size bracket table. The initial bracket values remain a balancing decision that must be documented before role implementation.
+- The server chooses the Ice-player count from a configurable room-size bracket table. The initial playtest table below was approved on 2026-09-10; it remains subject to playtest balancing.
 - Team assignments remain unchanged for the match.
+
+| Connected players at countdown completion | Ice players |
+|---|---|
+| 6–10 | 1 |
+| 11–20 | 2 |
+| 21–35 | 3 |
+| 36–50 | 5 |
+| 51–75 | 7 |
+| 76–100 | 10 |
+| 101–125 | 12 |
+| 126–150 | 15 |
 
 ### Movement and arena
 

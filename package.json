@@ -1,0 +1,43 @@
+{
+  "name": "ice-ice-water",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": "24.18.0",
+    "npm": "11.17.0"
+  },
+  "packageManager": "npm@11.17.0",
+  "scripts": {
+    "setup:local": "tsx scripts/setup-local.ts",
+    "dev": "npm run build -w @ice-water/shared && tsx scripts/dev.ts",
+    "test": "npm run build -w @ice-water/shared && vitest run",
+    "test:e2e": "npm run build -w @ice-water/shared && playwright test",
+    "test:load": "npm run build -w @ice-water/shared && tsx tests/load/lobby-load.ts",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "npm run build -w @ice-water/shared && tsc -p tsconfig.json && npm run typecheck --workspaces",
+    "build": "npm run build -w @ice-water/shared && npm run build -w @ice-water/server && tsx scripts/build-server.ts && npm run build -w @ice-water/client",
+    "db:migrate": "tsx apps/server/src/persistence/migrate.ts",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@colyseus/sdk": "0.18.2",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.2",
+    "eslint": "10.10.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "tsx": "4.23.13",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.0"
+  }
+}
