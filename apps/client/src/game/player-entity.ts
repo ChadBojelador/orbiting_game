@@ -44,7 +44,7 @@ export class PlayerEntityManager {
 
   update(
     view: LobbyView,
-    positions: Map<string, { x: number; z: number; yaw: number }>,
+    positions: Map<string, { x: number; y: number; z: number; yaw: number }>,
     localPlayerId: string,
   ): void {
     const seen = new Set<string>();
@@ -134,7 +134,7 @@ export class PlayerEntityManager {
   private updateEntity(
     entity: PlayerEntity,
     player: PlayerView,
-    pos: { x: number; z: number; yaw: number },
+    pos: { x: number; y: number; z: number; yaw: number },
   ): void {
     const { pc } = this;
     const previousStatus = entity.currentStatus;
@@ -144,7 +144,7 @@ export class PlayerEntityManager {
     entity.lastX = pos.x;
     entity.lastZ = pos.z;
 
-    entity.root.setPosition(pos.x, 0, pos.z);
+    entity.root.setPosition(pos.x, pos.y, pos.z);
     entity.root.setEulerAngles(0, pos.yaw * (180 / Math.PI), 0);
 
     const isProtected = Date.now() < player.protectedUntil;
