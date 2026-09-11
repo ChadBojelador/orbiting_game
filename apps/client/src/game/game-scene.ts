@@ -43,7 +43,7 @@ export class GameScene {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene.background = new THREE.Color(0xaeddf0);
-    this.scene.fog = new THREE.Fog(0xc8e9ec, 165, 340);
+    this.scene.fog = new THREE.Fog(0xc8e9ec, 250, 560);
     this.configureLighting();
     this.world = new WorldLayout(this.scene, this.session.view.arenaHalfExtent || ARENA.halfExtent);
     this.bindResize();
@@ -77,12 +77,12 @@ export class GameScene {
     sun.position.set(-85, 135, 75);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -125;
-    sun.shadow.camera.right = 125;
-    sun.shadow.camera.top = 125;
-    sun.shadow.camera.bottom = -125;
+    sun.shadow.camera.left = -220;
+    sun.shadow.camera.right = 220;
+    sun.shadow.camera.top = 220;
+    sun.shadow.camera.bottom = -220;
     sun.shadow.camera.near = 30;
-    sun.shadow.camera.far = 330;
+    sun.shadow.camera.far = 520;
     sun.shadow.bias = -0.0004;
     this.scene.add(sun);
   }

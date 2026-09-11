@@ -51,6 +51,7 @@ function addTriangle(
 
 function surfaceColor(x: number, z: number, elevation: number): THREE.Color {
   if (z > 88 || elevation < 4) return new THREE.Color(PALETTE.sand);
+  if (z > 118 && elevation > 9) return new THREE.Color(PALETTE.cliff);
   if (z < -55 || elevation > 35) return new THREE.Color(PALETTE.snow);
   if (x < -28 && z < 24) return new THREE.Color(PALETTE.forest);
   if (x > 30 && z < 26) return new THREE.Color(PALETTE.crystal);
@@ -232,6 +233,37 @@ function createLandmarks(): THREE.Group {
   });
   const creamMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.cliff, roughness: 0.88 });
 
+  const addOuterLandmark = (
+    name: string,
+    x: number,
+    z: number,
+    material: THREE.Material,
+    height: number,
+    radius: number,
+  ): void => {
+    const landmark = new THREE.Group();
+    landmark.name = name;
+    const base = terrainHeightAt({ x, z });
+    landmark.position.set(x, base, z);
+    landmark.add(
+      mesh(
+        new THREE.CylinderGeometry(radius * 0.72, radius, height * 0.62, 7),
+        material,
+        `${name}-base`,
+        new THREE.Vector3(0, height * 0.31, 0),
+      ),
+    );
+    landmark.add(
+      mesh(
+        new THREE.ConeGeometry(radius * 0.92, height * 0.55, 7),
+        material,
+        `${name}-crown`,
+        new THREE.Vector3(0, height * 0.75, 0),
+      ),
+    );
+    group.add(landmark);
+  };
+
   const villageCrystal = new THREE.Group();
   villageCrystal.name = 'LM_VILLAGE_CRYSTAL';
   villageCrystal.position.set(0, terrainHeightAt({ x: 0, z: 1 }) + 3.4, 1);
@@ -353,6 +385,25 @@ function createLandmarks(): THREE.Group {
   moonstone.position.set(37, terrainHeightAt({ x: 37, z: 116 }) + 3.5, 116);
   group.add(moonstone);
 
+  for (const [name, x, z, height, radius, material] of [
+    ['LM_VILLAGE_CLOCKTOWER', 15, -18, 12, 2.2, woodMaterial],
+    ['LM_FOREST_SHRINE', -139, -15, 7, 3.2, creamMaterial],
+    ['LM_FOREST_RAVINE', -126, 45, 8, 2.6, woodMaterial],
+    ['LM_CRYSTAL_GARDENS', 123, -36, 14, 3.6, crystalMaterial],
+    ['LM_CRYSTAL_FALLS', 84, -65, 16, 4.2, crystalMaterial],
+    ['LM_CRYSTAL_CAVE', 145, -28, 9, 3.5, crystalMaterial],
+    ['LM_ICE_CAVE', -18, -143, 13, 3.7, iceMaterial],
+    ['LM_SKY_RIDGE', 52, -124, 17, 3.4, iceMaterial],
+    ['LM_MEADOW_BARN', -65, 91, 6, 4.2, woodMaterial],
+    ['LM_FLOWER_HILL', 61, 75, 8, 3.3, leafLightMaterial],
+    ['LM_COASTAL_OVERLOOK', 20, 139, 10, 3.5, creamMaterial],
+    ['LM_BEACH_DOCK', -42, 163, 5, 3.8, woodMaterial],
+    ['LM_BEACH_COVE', 24, 156, 7, 3.2, creamMaterial],
+    ['LM_RUINED_ISLAND', 132, 149, 11, 4.4, creamMaterial],
+  ] as const) {
+    addOuterLandmark(name, x, z, material, height, radius);
+  }
+
   return group;
 }
 
@@ -428,6 +479,28 @@ function createBlockoutDetails(): THREE.Group {
     [91, -4],
     [75, 13],
     [51, 17],
+    [-112, -42],
+    [-124, -18],
+    [-137, 7],
+    [-101, 34],
+    [-126, 47],
+    [104, -29],
+    [126, -42],
+    [145, -26],
+    [83, -68],
+    [58, -94],
+    [-18, -120],
+    [49, -133],
+    [-69, 89],
+    [-91, 98],
+    [58, 78],
+    [82, 86],
+    [19, 131],
+    [-18, 143],
+    [-52, 164],
+    [73, 166],
+    [103, 176],
+    [137, 151],
   ];
   for (const [x, z] of treePoints) {
     const y = terrainHeightAt({ x, z });
@@ -458,6 +531,16 @@ function createBlockoutDetails(): THREE.Group {
     [13, 65],
     [24, 51],
     [-19, 77],
+    [-68, 92],
+    [-48, 103],
+    [57, 73],
+    [78, 84],
+    [-2, 133],
+    [18, 145],
+    [-31, 163],
+    [24, 157],
+    [64, 170],
+    [104, 174],
   ] as const) {
     const bloom = mesh(new THREE.IcosahedronGeometry(0.65, 0), flower, 'placeholder-flower');
     bloom.position.set(x, terrainHeightAt({ x, z }) + 0.75, z);
@@ -586,6 +669,21 @@ export class WorldLayout {
         waterfallMaterial,
       ),
     );
+    for (const [id, top, bottom, width] of [
+      ['WF_CRYSTAL_02', [84, 32, -65], [84, 24, -76], 6],
+      ['WF_COASTAL_01', [8, 15, 142], [-2, 8, 153], 5],
+      ['WF_COASTAL_02', [-18, 12, 145], [-18, 6, 157], 4],
+    ] as const) {
+      this.root.add(
+        createWaterfall(
+          id,
+          new THREE.Vector3(...top),
+          new THREE.Vector3(...bottom),
+          width,
+          waterfallMaterial,
+        ),
+      );
+    }
 
     this.root.add(createLandmarks(), createBlockoutDetails());
     this.boundary = this.createBoundary(this.currentHalfExtent);
