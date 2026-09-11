@@ -1,6 +1,6 @@
 # Lobby preview production brief
 
-- Purpose: a small original procedural PlayCanvas rendering for the foundation lobby, demonstrating engine initialization and cleanup.
+- Purpose: a small original procedural Three.js rendering for the foundation lobby, demonstrating engine initialization and cleanup.
 - Composition: two abstract clay tokens on a mint circular plinth, viewed from an elevated three-quarter camera. No arena collision, gameplay, or production character art.
 - Palette: mint #79D49A, aqua #48CFE3, indigo #4056D8, pale frost #BDEFFF, cream #FFF1D1, coral #FF8D7A.
 - Constraints: built-in sphere, cylinder, and box geometry only; static lighting; no textures, external fonts, network assets, or motion required. Accessible text fallback when WebGL 2 is unavailable.

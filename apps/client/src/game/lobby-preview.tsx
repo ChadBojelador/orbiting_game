@@ -10,28 +10,20 @@ export function LobbyPreview() {
     let isDisposed = false;
     let destroy: (() => void) | undefined;
 
-    void import('playcanvas')
-      .then(async (pc) => {
+    void Promise.all([import('three'), import('./character-model.js')])
+      .then(async ([THREE, { loadCharacterModel }]) => {
         if (isDisposed) return;
-        const app = new pc.Application(canvas, {
-          graphicsDeviceOptions: { deviceTypes: ['webgl2'], antialias: true, alpha: true },
-        });
-        app.scene.ambientLight = new pc.Color(0.8, 0.85, 0.9);
-
-        const camera = new pc.Entity('camera');
-        camera.addComponent('camera', { clearColor: new pc.Color(0.84, 0.96, 0.92), fov: 38 });
-        camera.setPosition(4, 3.5, 6);
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
+        camera.position.set(4, 3.5, 6);
         camera.lookAt(0, 0.85, 0);
-        app.root.addChild(camera);
-
-        const light = new pc.Entity('sun');
-        light.addComponent('light', {
-          type: 'directional',
-          color: new pc.Color(1, 0.94, 0.8),
-          intensity: 1.4,
-        });
-        light.setEulerAngles(45, 30, 0);
-        app.root.addChild(light);
+        scene.add(new THREE.HemisphereLight(0xe8fbff, 0x5f7564, 2));
+        const sun = new THREE.DirectionalLight(0xffedca, 2);
+        sun.position.set(-4, 7, 5);
+        scene.add(sun);
 
         const shape = (
           name: string,
@@ -39,62 +31,69 @@ export function LobbyPreview() {
           position: [number, number, number],
           scale: [number, number, number],
         ) => {
-          const entity = new pc.Entity(name);
-          const material = new pc.StandardMaterial();
-          material.diffuse = new pc.Color().fromString(color);
-          material.update();
-          entity.addComponent('render', { type: 'cylinder', material });
-          entity.setPosition(...position);
-          entity.setLocalScale(...scale);
-          app.root.addChild(entity);
-          return material;
+          const material = new THREE.MeshStandardMaterial({ color, roughness: 0.75 });
+          const object = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1, 20), material);
+          object.name = name;
+          object.position.set(...position);
+          object.scale.set(...scale);
+          scene.add(object);
         };
-
-        const materials = [
-          shape('plinth', '#79D49A', [0, -0.1, 0], [3.8, 0.35, 2.8]),
-          shape('water-base', '#FFF1D1', [-0.85, 0.1, 0.1], [1.2, 0.12, 1.2]),
-          shape('ice-base', '#4056D8', [0.85, 0.1, -0.1], [1.2, 0.12, 1.2]),
-        ];
+        shape('plinth', '#79D49A', [0, -0.1, 0], [3.8, 0.35, 2.8]);
+        shape('water-base', '#FFF1D1', [-0.85, 0.1, 0.1], [1.2, 0.12, 1.2]);
+        shape('ice-base', '#4056D8', [0.85, 0.1, -0.1], [1.2, 0.12, 1.2]);
 
         const resize = () => {
           const parent = canvas.parentElement;
           if (!parent) return;
-          app.setCanvasFillMode(pc.FILLMODE_NONE, parent.clientWidth, parent.clientHeight);
-          app.setCanvasResolution(pc.RESOLUTION_AUTO);
-          app.renderNextFrame = true;
+          const width = Math.max(1, parent.clientWidth);
+          const height = Math.max(1, parent.clientHeight);
+          renderer.setSize(width, height, false);
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
         };
         const observer = new ResizeObserver(resize);
         if (canvas.parentElement) observer.observe(canvas.parentElement);
         resize();
-        app.start();
 
-        const { loadCharacterModel } = await import('./character-model.js');
-        const factory = await loadCharacterModel(app, pc);
+        const factory = await loadCharacterModel();
         if (isDisposed) {
-          app.destroy();
+          observer.disconnect();
+          renderer.dispose();
           return;
         }
-
         const water = factory.instantiate('#48CFE3', 'Wave');
-        water.entity.setPosition(-0.85, 0.16, 0.1);
-        water.entity.setEulerAngles(0, 18, 0);
-        app.root.addChild(water.entity);
-
+        water.root.position.set(-0.85, 0.16, 0.1);
+        water.root.rotation.y = THREE.MathUtils.degToRad(18);
+        scene.add(water.root);
         const frozen = factory.instantiate('#BDEFFF', 'Frozen');
-        frozen.entity.setPosition(0.85, 0.16, -0.1);
-        frozen.entity.setEulerAngles(0, -18, 0);
-        app.root.addChild(frozen.entity);
-        materials.push(water.material, frozen.material);
+        frozen.root.position.set(0.85, 0.16, -0.1);
+        scene.add(frozen.root);
+
+        let animationFrame = 0;
+        let previousTime = performance.now();
+        const render = (time: number) => {
+          const delta = Math.min(0.05, (time - previousTime) / 1000);
+          previousTime = time;
+          water.update(delta);
+          frozen.update(delta);
+          renderer.render(scene, camera);
+          animationFrame = requestAnimationFrame(render);
+        };
+        animationFrame = requestAnimationFrame(render);
 
         destroy = () => {
+          cancelAnimationFrame(animationFrame);
           observer.disconnect();
-          app.destroy();
-          for (const material of materials) material.destroy();
+          scene.traverse((object) => {
+            if (!(object instanceof THREE.Mesh)) return;
+            object.geometry.dispose();
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            for (const material of materials) material.dispose();
+          });
+          renderer.dispose();
         };
       })
-      .catch(() => {
-        if (!isDisposed) setHasGraphics(false);
-      });
+      .catch(() => setHasGraphics(false));
 
     return () => {
       isDisposed = true;
@@ -103,15 +102,11 @@ export function LobbyPreview() {
   }, []);
 
   return (
-    <div className="preview">
+    <div className="lobby-preview" aria-hidden="true">
       {hasGraphics ? (
-        <canvas
-          ref={canvasRef}
-          aria-label="A waving Water character and a frozen character on a mint platform"
-          role="img"
-        />
+        <canvas ref={canvasRef} />
       ) : (
-        <p>Water runs. Ice chases. Everyone has a part to play.</p>
+        <div className="preview-fallback">ICE / WATER</div>
       )}
     </div>
   );

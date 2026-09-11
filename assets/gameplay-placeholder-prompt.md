@@ -6,7 +6,7 @@
 - **Character:** One reusable articulated low-poly traveler hierarchy; rounded head, compact torso, two mitten arms and wide feet. Shared meshes/materials and procedural idle, run, rescue and freeze poses. Ice has angular shoulder/crown accents; Water has a rounded crest; protection has a cream ring; frozen players have a faceted shell and raised-arm pose.
 - **Constraints:** No downloaded textures or models, no player collision, simple static geometry matching shared collision bounds, no per-player lights, capped pixel ratio, reduced-motion support. State labels supplement color. Mobile movement lower left, contextual action lower right; unobstructed center view.
 - **IP exclusions:** No Pokémon, Pokopia, third-party characters, recognizable creature silhouettes, franchise costumes/logos, weapons, text textures or watermarks.
-- **Source/license:** Original repository-authored geometry using the existing MIT-licensed PlayCanvas engine. No external asset import. Existing concept is a mood reference only.
+- **Source/license:** Original repository-authored geometry using the MIT-licensed Three.js engine. No external world-asset import. Existing concept is a mood reference only.
 
 ## HUD design plan
 
