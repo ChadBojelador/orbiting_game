@@ -2,7 +2,7 @@
 
 A browser-only multiplayer freeze-tag game for private groups of 6–150 players.
 
-**Implemented:** the npm monorepo, React/Vite/PlayCanvas client, signed guest sessions, private rooms, authoritative movement and actions, the five-round match loop, Deep Freeze elimination, spectating, and results. Development-only wandering bots can fill seats for solo testing.
+**Implemented:** the npm monorepo, React/Vite/Three.js client, signed guest sessions, private rooms, authoritative movement and actions, the five-round match loop, Deep Freeze elimination, spectating, and results. Development-only wandering bots can fill seats for solo testing.
 
 ## Run locally
 
@@ -83,7 +83,7 @@ HTTP routes are `/health`, `/ready`, `POST /api/guest-session`, `POST /api/rooms
 ## Structure and sources of truth
 
 ```text
-apps/client/src/    React UI, network adapter, and PlayCanvas presentation
+apps/client/src/    React UI, network adapter, and Three.js presentation
 apps/server/src/    Authentication, authoritative rooms, configuration, persistence
 packages/shared/   Safe protocol types, constants, and pure validation
 tests/e2e/         Browser lobby flows
@@ -98,7 +98,7 @@ assets/            Original art guidance and retained production briefs
 - [TASKS.md](TASKS.md): current work and verification
 - [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md): contribution rules
 
-The project uses TypeScript, PlayCanvas, React, Vite, Node.js, Colyseus, PostgreSQL, npm workspaces, Vitest, and Playwright. Dependencies are pinned in `package-lock.json`. The lobby preview uses original procedural geometry; no third-party character or image assets were imported.
+The project uses TypeScript, Three.js, React, Vite, Node.js, Colyseus, PostgreSQL, npm workspaces, Vitest, and Playwright. Dependencies are pinned in `package-lock.json`. The world blockout uses original repository-authored geometry and the project-owned character GLB; no third-party world assets were imported.
 
 ## Contributors
 

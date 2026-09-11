@@ -1,34 +1,30 @@
-/**
- * GameScene — top-level PlayCanvas app for in-game play.
- * Manages third-person follow camera, arena, player entities, and the per-frame loop.
- * Connects to GameSession (networking) and GameInput (controls).
- */
+import { ARENA, GAMEPLAY } from '@ice-water/shared';
+import * as THREE from 'three';
 import type { LobbyRoom } from '../network/lobby-client.js';
 import { GameSession } from '../network/game-session.js';
-import { GAMEPLAY } from '@ice-water/shared';
+import { WorldLayout, WORLD_CAMERA_FAR, worldHeightAt } from '../world/world-layout.js';
 import { loadCharacterModel } from './character-model.js';
-import { ThirdPersonCamera } from './third-person-camera.js';
+import { PlayerEntityManager } from './player-entity.js';
 
-const CAMERA_FOV = 55;
-const CAMERA_TARGET_HEIGHT = 1.2;
+const CAMERA_HEIGHT = 8;
+const CAMERA_DISTANCE = 12;
+const CAMERA_FOV = 52;
+const CAMERA_SMOOTHING = 0.12;
 
 export class GameScene {
   private readonly session: GameSession;
-  private readonly cameraController = new ThirdPersonCamera();
+  private readonly scene = new THREE.Scene();
+  private readonly camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, WORLD_CAMERA_FAR);
+  private readonly renderer: THREE.WebGLRenderer;
+  private readonly world: WorldLayout;
+  private playerEntities?: PlayerEntityManager;
   private destroyed = false;
-  private animFrame = 0;
-  private lastFrameAt = 0;
+  private animationFrame = 0;
+  private cameraYaw = 0;
+  private targetCameraYaw = 0;
   private lastPointer: { x: number; y: number } | null = null;
-  private activePointerId: number | null = null;
+  private previousFrameTime = performance.now();
   private readonly cleanups: (() => void)[] = [];
-
-  // PlayCanvas objects allocated after dynamic import.
-  private pc?: typeof import('playcanvas');
-  private app?: import('playcanvas').Application;
-  private arenaScene?: import('./arena-scene.js').ArenaScene;
-  private playerEntities?: import('./player-entity.js').PlayerEntityManager;
-  private camera?: import('playcanvas').Entity;
-  private cameraTarget?: import('playcanvas').Entity;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -37,207 +33,160 @@ export class GameScene {
     private readonly onStateChange?: (phase: string) => void,
   ) {
     this.session = new GameSession(room, playerId);
-    void this.initPlayCanvas();
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      powerPreference: 'high-performance',
+    });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    this.scene.background = new THREE.Color(0xaeddf0);
+    this.scene.fog = new THREE.Fog(0xc8e9ec, 165, 340);
+    this.configureLighting();
+    this.world = new WorldLayout(this.scene, this.session.view.arenaHalfExtent || ARENA.halfExtent);
+    this.bindResize();
     this.bindCameraControls();
+    void this.initializePlayers();
+    this.loop(performance.now());
   }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    cancelAnimationFrame(this.animFrame);
+    cancelAnimationFrame(this.animationFrame);
     this.session.destroy();
-    for (const fn of this.cleanups) fn();
-    this.arenaScene?.destroy();
+    for (const cleanup of this.cleanups) cleanup();
     this.playerEntities?.destroy();
-    this.app?.destroy();
+    this.world.destroy();
+    this.renderer.dispose();
   }
 
   getInput() {
     return this.session.input;
   }
 
-  private async initPlayCanvas(): Promise<void> {
-    const [pcModule, { ArenaScene }, { PlayerEntityManager }] = await Promise.all([
-      import('playcanvas'),
-      import('./arena-scene.js'),
-      import('./player-entity.js'),
-    ]);
-    if (this.destroyed) return;
-    this.pc = pcModule;
+  private configureLighting(): void {
+    const hemisphere = new THREE.HemisphereLight(0xcaf4ff, 0x658060, 1.65);
+    hemisphere.name = 'sky-fill';
+    this.scene.add(hemisphere);
 
-    const app = new pcModule.Application(this.canvas, {
-      graphicsDeviceOptions: { deviceTypes: ['webgl2', 'webgl1'], antialias: true, alpha: false },
+    const sun = new THREE.DirectionalLight(0xffe3b5, 2.35);
+    sun.name = 'warm-sun';
+    sun.position.set(-85, 135, 75);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -125;
+    sun.shadow.camera.right = 125;
+    sun.shadow.camera.top = 125;
+    sun.shadow.camera.bottom = -125;
+    sun.shadow.camera.near = 30;
+    sun.shadow.camera.far = 330;
+    sun.shadow.bias = -0.0004;
+    this.scene.add(sun);
+  }
+
+  private async initializePlayers(): Promise<void> {
+    const characterModel = await loadCharacterModel().catch((error: unknown) => {
+      console.warn(error);
+      return undefined;
     });
-    this.app = app;
+    if (this.destroyed) return;
+    this.playerEntities = new PlayerEntityManager(this.scene, characterModel);
+  }
 
+  private bindResize(): void {
     const resize = () => {
       const parent = this.canvas.parentElement;
       if (!parent) return;
-      app.setCanvasFillMode(pcModule.FILLMODE_NONE, parent.clientWidth, parent.clientHeight);
-      app.setCanvasResolution(pcModule.RESOLUTION_AUTO);
+      const width = Math.max(1, parent.clientWidth);
+      const height = Math.max(1, parent.clientHeight);
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.renderer.setSize(width, height, false);
+      this.camera.aspect = width / height;
+      this.camera.updateProjectionMatrix();
     };
     const observer = new ResizeObserver(resize);
     if (this.canvas.parentElement) observer.observe(this.canvas.parentElement);
     resize();
     this.cleanups.push(() => observer.disconnect());
-
-    // Camera rig: pivot entity at player position, camera offset above and behind.
-    const cameraTarget = new pcModule.Entity('cam-target');
-    cameraTarget.setPosition(0, 1, 0);
-    app.root.addChild(cameraTarget);
-    this.cameraTarget = cameraTarget;
-
-    const camera = new pcModule.Entity('camera');
-    camera.addComponent('camera', {
-      clearColor: new pcModule.Color().fromString('#A9DCE6'),
-      fov: CAMERA_FOV,
-      farClip: 300,
-      toneMapping: pcModule.TONEMAP_ACES,
-    });
-    app.root.addChild(camera);
-    this.camera = camera;
-
-    const halfExtent = this.session.view.arenaHalfExtent ?? 28;
-    this.arenaScene = new ArenaScene(app, pcModule, halfExtent);
-    const characterModel = await loadCharacterModel(app, pcModule).catch((error: unknown) => {
-      console.warn(error);
-      return undefined;
-    });
-    if (this.destroyed) {
-      app.destroy();
-      return;
-    }
-    this.playerEntities = new PlayerEntityManager(app, pcModule, characterModel);
-
-    app.start();
-
-    // Listen for arena boundary changes.
-    this.cleanups.push(
-      this.session['room' as keyof typeof this.session] !== undefined
-        ? (() => {
-            return () => {};
-          })()
-        : (() => {
-            return () => {};
-          })(),
-    );
-
-    this.loop(performance.now());
   }
 
-  private loop(frameAt: number): void {
+  private loop(now: number): void {
     if (this.destroyed) return;
-    const { pc, app, camera, cameraTarget, arenaScene, playerEntities, session } = this;
-    if (!pc || !app || !camera || !cameraTarget || !arenaScene || !playerEntities) {
-      this.animFrame = requestAnimationFrame((time) => this.loop(time));
-      return;
-    }
-    const seconds = this.lastFrameAt
-      ? Math.min(0.1, Math.max(0, (frameAt - this.lastFrameAt) / 1000))
-      : 0;
-    this.lastFrameAt = frameAt;
+    const deltaSeconds = Math.min(0.05, Math.max(0, (now - this.previousFrameTime) / 1000));
+    this.previousFrameTime = now;
+    const view = this.session.view;
+    this.onStateChange?.(view.phase);
+    this.world.setHalfExtent(view.arenaHalfExtent || ARENA.halfExtent);
+    this.world.update(now / 1000);
 
-    const view = session.view;
-
-    // Notify parent on phase change.
-    if (this.onStateChange) this.onStateChange(view.phase);
-
-    // Arena boundary.
-    const halfExtent = view.arenaHalfExtent ?? 28;
-    arenaScene.setHalfExtent(halfExtent);
-
-    // Resolve positions for all players.
-    const serverNow = session.serverNow();
+    const serverNow = this.session.serverNow();
     const renderTime = serverNow - GAMEPLAY.interpolationMs;
-    const positions = new Map<string, { x: number; y: number; z: number; yaw: number }>();
-
-    const localPlayer = session.local();
+    const positions = new Map<string, { x: number; z: number; yaw: number }>();
+    const localPlayer = this.session.local();
     for (const player of view.players) {
-      if (player.playerId === session.playerId) {
-        // Use client-predicted position for local player.
-        const pred = session.prediction;
+      if (player.playerId === this.session.playerId) {
+        const prediction = this.session.prediction;
         positions.set(player.playerId, {
-          x: pred.position.x,
-          y: arenaScene.getGroundHeight(pred.position.x, pred.position.z),
-          z: pred.position.z,
-          yaw: pred.yaw,
+          x: prediction.position.x,
+          z: prediction.position.z,
+          yaw: prediction.yaw,
         });
-      } else {
-        const interp = session.remotes.get(player.playerId);
-        const sample = interp?.at(renderTime);
-        if (sample) {
-          positions.set(player.playerId, {
-            x: sample.x,
-            y: arenaScene.getGroundHeight(sample.x, sample.z),
-            z: sample.z,
-            yaw: sample.yaw,
-          });
-        } else {
-          positions.set(player.playerId, {
-            x: player.x,
-            y: arenaScene.getGroundHeight(player.x, player.z),
-            z: player.z,
-            yaw: player.yaw,
-          });
-        }
+        continue;
       }
+      const sample = this.session.remotes.get(player.playerId)?.at(renderTime);
+      positions.set(
+        player.playerId,
+        sample
+          ? { x: sample.x, z: sample.z, yaw: sample.yaw }
+          : { x: player.x, z: player.z, yaw: player.yaw },
+      );
     }
+    this.playerEntities?.update(view, positions, this.session.playerId, deltaSeconds);
 
-    // Update player entities.
-    playerEntities.update(view, positions, session.playerId);
-
-    const localPos = localPlayer
-      ? (positions.get(localPlayer.playerId) ?? { x: 0, y: 0, z: 0 })
-      : { x: 0, y: 0, z: 0 };
-    const pose = this.cameraController.update(
-      { x: localPos.x, y: localPos.y + CAMERA_TARGET_HEIGHT, z: localPos.z },
-      seconds,
-      arenaScene.getCameraObstacles(),
-      (x, z) => arenaScene.getGroundHeight(x, z),
+    this.cameraYaw += (this.targetCameraYaw - this.cameraYaw) * CAMERA_SMOOTHING;
+    this.session.input.cameraYaw = this.cameraYaw;
+    const localPosition = localPlayer
+      ? (positions.get(localPlayer.playerId) ?? { x: 0, z: 8 })
+      : { x: 0, z: 8 };
+    const terrainY = worldHeightAt(localPosition.x, localPosition.z);
+    const cameraTarget = new THREE.Vector3(localPosition.x, terrainY + 1.35, localPosition.z);
+    const desiredCamera = new THREE.Vector3(
+      localPosition.x + Math.sin(this.cameraYaw) * CAMERA_DISTANCE,
+      terrainY + CAMERA_HEIGHT,
+      localPosition.z + Math.cos(this.cameraYaw) * CAMERA_DISTANCE,
     );
-    session.input.cameraYaw = pose.yaw;
-    camera.setPosition(pose.position.x, pose.position.y, pose.position.z);
-    cameraTarget.setPosition(pose.target.x, pose.target.y, pose.target.z);
-    camera.lookAt(cameraTarget.getPosition());
-
-    app.renderNextFrame = true;
-    this.animFrame = requestAnimationFrame((time) => this.loop(time));
+    this.camera.position.lerp(desiredCamera, 0.18);
+    this.camera.lookAt(cameraTarget);
+    this.renderer.render(this.scene, this.camera);
+    this.animationFrame = requestAnimationFrame((frameTime) => this.loop(frameTime));
   }
 
   private bindCameraControls(): void {
-    const onPointerDown = (e: PointerEvent) => {
-      if (!e.isPrimary || e.button !== 0) return;
-      this.activePointerId = e.pointerId;
-      this.lastPointer = { x: e.clientX, y: e.clientY };
-      this.canvas.setPointerCapture(e.pointerId);
+    const onPointerDown = (event: PointerEvent) => {
+      if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return;
+      this.lastPointer = { x: event.clientX, y: event.clientY };
     };
-    const onPointerMove = (e: PointerEvent) => {
-      if (!this.lastPointer || e.pointerId !== this.activePointerId) return;
-      const dx = e.clientX - this.lastPointer.x;
-      const dy = e.clientY - this.lastPointer.y;
-      this.cameraController.orbit(dx, dy);
-      this.lastPointer = { x: e.clientX, y: e.clientY };
+    const onPointerMove = (event: PointerEvent) => {
+      if (!this.lastPointer) return;
+      this.targetCameraYaw -= (event.clientX - this.lastPointer.x) * 0.006;
+      this.lastPointer = { x: event.clientX, y: event.clientY };
     };
-    const onPointerUp = (e: PointerEvent) => {
-      if (e.pointerId !== this.activePointerId) return;
-      if (this.canvas.hasPointerCapture(e.pointerId))
-        this.canvas.releasePointerCapture(e.pointerId);
+    const onPointerUp = () => {
       this.lastPointer = null;
-      this.activePointerId = null;
     };
-
     this.canvas.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
     this.cleanups.push(() => {
-      if (this.activePointerId !== null && this.canvas.hasPointerCapture(this.activePointerId)) {
-        this.canvas.releasePointerCapture(this.activePointerId);
-      }
       this.canvas.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerUp);
     });
   }
 }
