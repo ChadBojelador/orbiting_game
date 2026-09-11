@@ -35,12 +35,35 @@ export function App() {
   const [isBusy, setIsBusy] = useState(true);
   const [connection, setConnection] = useState('Connected');
   const [copyLabel, setCopyLabel] = useState('Copy invite code');
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [now, setNow] = useState(0);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const clock = useRef({ server: 0, received: 0 });
   const roomRef = useRef<LobbyRoom | null>(null);
   const gameCanvasRef = useRef<HTMLCanvasElement>(null);
   const gameSceneRef = useRef<import('../game/game-scene.js').GameScene | null>(null);
+  const musicRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const music = musicRef.current;
+    if (!music) return;
+    music.volume = 0.32;
+    if (!guest || room) {
+      music.pause();
+      setIsMusicPlaying(false);
+    }
+  }, [guest, room]);
+
+  function toggleMusic() {
+    const music = musicRef.current;
+    if (!music) return;
+    if (music.paused) {
+      void music.play().then(() => setIsMusicPlaying(true)).catch(() => setIsMusicPlaying(false));
+    } else {
+      music.pause();
+      setIsMusicPlaying(false);
+    }
+  }
 
   // Mount/unmount the 3D game scene when entering/leaving play phases.
   useEffect(() => {
@@ -253,18 +276,30 @@ export function App() {
 
   return (
     <main className="shell">
+      <audio
+        ref={musicRef}
+        src="/music/bg1.mp3"
+        loop
+        preload="metadata"
+        onPlay={() => setIsMusicPlaying(true)}
+        onPause={() => setIsMusicPlaying(false)}
+      />
       <header className="topbar">
         <a className="brand" href="/" aria-label="Ice Ice Water home">
           <span aria-hidden="true">❄</span> Ice Ice Water!
         </a>
-        <span className="edition">Private playtest</span>
+        <div className="topbar-actions">
+          <button className="music-toggle" type="button" onClick={toggleMusic} aria-pressed={isMusicPlaying}>
+            <span aria-hidden="true">{isMusicPlaying ? '♫' : '♪'}</span>
+            {isMusicPlaying ? 'Sound on' : 'Play soundtrack'}
+          </button>
+          <span className="edition">Private playtest</span>
+        </div>
       </header>
       <div className="layout">
         <section className="intro" aria-labelledby="game-title">
-          <h1 id="game-title">
-            A little chill.
-            <br />A lot of friends.
-          </h1>
+          <p className="eyebrow"><span aria-hidden="true">✦</span> A cozy freeze-tag adventure</p>
+          <h1 id="game-title">A little chill.<br />A lot of friends.</h1>
           <p className="lede">
             Gather your crew for a game of freeze tag. Keep moving, stick together, and don't get
             left on ice.
