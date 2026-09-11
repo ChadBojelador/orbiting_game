@@ -181,7 +181,7 @@ p {
   max-width: 470px;
 }
 .preview {
-  height: 250px;
+  height: 280px;
   margin: 20px 0 18px;
   overflow: hidden;
   border: 2px solid rgba(36, 52, 84, 0.16);
@@ -464,7 +464,7 @@ footer {
     font-size: 15px;
   }
   .preview {
-    height: 175px;
+    height: 220px;
   }
   .edition {
     font-size: 10px;
@@ -541,6 +541,27 @@ footer {
 }
 .game-leave-button:hover {
   background: rgba(36, 52, 84, 1);
+}
+.game-music-button {
+  position: absolute;
+  top: 16px;
+  right: 124px;
+  z-index: 20;
+  min-height: auto;
+  padding: 8px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(36, 52, 84, 0.85);
+  color: #fff;
+  font-size: 12px;
+  backdrop-filter: blur(8px);
+}
+.game-music-button span {
+  display: inline-block;
+  width: 16px;
+  color: #9beaff;
+  font-size: 16px;
+  vertical-align: -1px;
 }
 
 /* Game HUD */
