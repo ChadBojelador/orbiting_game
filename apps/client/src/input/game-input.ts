@@ -1,5 +1,8 @@
 import { normalizeAxes, type Position } from '@ice-water/shared';
 
+const INPUT_ACCELERATION = 9;
+const INPUT_DECELERATION = 13;
+
 export function cameraRelative(axes: Position, yaw: number): Position {
   const { x, z } = normalizeAxes(axes.x, axes.z);
   return { x: x * Math.cos(yaw) + z * Math.sin(yaw), z: z * Math.cos(yaw) - x * Math.sin(yaw) };
@@ -10,11 +13,29 @@ export function touchAxes(dx: number, dy: number, radius: number): Position {
   return normalizeAxes(dx / radius, dy / radius);
 }
 
+export function smoothAxes(
+  current: Position,
+  target: Position,
+  seconds: number,
+  acceleration = INPUT_ACCELERATION,
+  deceleration = INPUT_DECELERATION,
+): Position {
+  const targetLength = Math.hypot(target.x, target.z);
+  const maxDelta = (targetLength > 0 ? acceleration : deceleration) * Math.max(0, seconds);
+  const dx = target.x - current.x;
+  const dz = target.z - current.z;
+  const distance = Math.hypot(dx, dz);
+  if (distance <= maxDelta || distance === 0) return { ...target };
+  const scale = maxDelta / distance;
+  return { x: current.x + dx * scale, z: current.z + dz * scale };
+}
+
 export class GameInput {
   cameraYaw = 0;
   touch: Position = { x: 0, z: 0 };
   isTouchRescuing = false;
   private readonly keys = new Set<string>();
+  private movement: Position = { x: 0, z: 0 };
   private hasTag = false;
   private hasPing = false;
 
@@ -27,12 +48,13 @@ export class GameInput {
   reset(): void {
     this.keys.clear();
     this.touch = { x: 0, z: 0 };
+    this.movement = { x: 0, z: 0 };
     this.isTouchRescuing = false;
     this.hasTag = false;
     this.hasPing = false;
   }
-  sample() {
-    const axes = cameraRelative(
+  sample(seconds = 0): ReturnType<GameInput['createSample']> {
+    const desired = cameraRelative(
       {
         x:
           Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) -
@@ -45,8 +67,13 @@ export class GameInput {
       },
       this.cameraYaw,
     );
+    this.movement = smoothAxes(this.movement, desired, seconds);
+    return this.createSample();
+  }
+
+  private createSample() {
     const sample = {
-      ...axes,
+      ...this.movement,
       isRescuing: this.keys.has('KeyE') || this.isTouchRescuing,
       hasTag: this.hasTag,
       hasPing: this.hasPing,

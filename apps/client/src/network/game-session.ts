@@ -114,7 +114,7 @@ export class GameSession {
   private tick(): void {
     const local = this.local();
     if (!local || !this.isConnected || !isPlayPhase(this.view.phase)) return;
-    const input = this.input.sample();
+    const input = this.input.sample(GAMEPLAY.tickMs / 1000);
     const now = this.serverNow();
     const canMove = this.canMove(local) && !document.hidden;
     const move = this.prediction.predict(canMove ? input : { x: 0, z: 0 }, canMove);

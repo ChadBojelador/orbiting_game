@@ -3,10 +3,19 @@
  * Palette follows ART_DIRECTION.md: mint floor, warm sun, cool accent, translucent boundary.
  */
 import type * as PC from 'playcanvas';
-import { ARENA } from '@ice-water/shared';
+import { ARENA, ARENA_COLLISION } from '@ice-water/shared';
+import type { CameraObstacle } from './third-person-camera.js';
 
 export class ArenaScene {
   private readonly entities: PC.Entity[] = [];
+  private readonly cameraObstacles: CameraObstacle[] = ARENA_COLLISION.blocks.map((block) => ({
+    minX: block.x - block.width / 2,
+    maxX: block.x + block.width / 2,
+    minY: 0,
+    maxY: block.height,
+    minZ: block.z - block.depth / 2,
+    maxZ: block.z + block.depth / 2,
+  }));
   private boundaryEntities: PC.Entity[] = [];
   private currentHalfExtent: number;
 
@@ -35,6 +44,16 @@ export class ArenaScene {
       this.app.root.removeChild(e);
       e.destroy();
     }
+  }
+
+  /** Static camera geometry is separate from visuals so the world blockout can replace it. */
+  getCameraObstacles(): readonly CameraObstacle[] {
+    return this.cameraObstacles;
+  }
+
+  /** Agent 1's deterministic terrain sampler plugs in here when the authored world lands. */
+  getGroundHeight(_x: number, _z: number): number {
+    return 0;
   }
 
   private build(): void {
