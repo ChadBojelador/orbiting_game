@@ -4,12 +4,12 @@ This workflow is designed for two collaborators. Keep it lightweight while ensur
 
 ## Initial repository setup
 
-The workspace is not currently a Git repository. When both contributors are ready:
+Git and the GitHub repository are initialized. Maintain the following protections:
 
-1. Initialize Git and create the GitHub repository.
+1. Work from the existing repository; preserve the configured origin and upstream remotes.
 2. Use `main` as the protected, releasable branch.
 3. Require one approving review for pull requests into `main` when the GitHub plan permits it.
-4. Require automated checks after CI is configured.
+4. Require the `quality` CI check and an up-to-date branch before merging.
 
 ## Branching strategy
 

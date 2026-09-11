@@ -88,8 +88,8 @@ stateDiagram-v2
     [*] --> Lobby
     Lobby --> Countdown: host starts with 6+ players
     Countdown --> RegularRound: roles assigned / round starts
-    RegularRound --> DeepFreezeWarning: 30-second regular timer ends
-    DeepFreezeWarning --> DeepFreeze: warning ends
+    RegularRound --> DeepFreezeWarning: warning within regular play
+    DeepFreezeWarning --> DeepFreeze: 30-second regular deadline
     DeepFreeze --> RoundResolution: 30-second deadline
     RoundResolution --> MatchResult: win condition or final round
     RoundResolution --> RegularRound: next round
@@ -140,6 +140,7 @@ Private-room joins, room events, and gameplay use Colyseus messages over secure 
 - `action/rescue-start` and `action/rescue-stop` — rescue intent
 - `action/help-ping` — rate-limited frozen-player ping
 - `session/ready` — readiness during countdown
+- `room/start` — host requests the lobby countdown with an empty payload
 
 Rescue messages are valid only during the 30-second regular phase. The server rejects them during Deep Freeze regardless of client presentation.
 
@@ -297,6 +298,22 @@ One regional deployment should begin with the fewest moving parts. Redis is intr
 Initial private playtests should target a free hosting tier. Because free offerings can sleep, cap bandwidth, or limit long-lived WebSockets, the provider must be chosen through a measured hosting spike. The architecture must not depend on a specific free provider until those limits are verified.
 
 ## Deployment evolution
+
+### Foundation and private-room implementation (2026-09-10)
+
+- Toolchain: Node 24.18.0 / npm 11.17.0; exact package versions and transitive dependencies are pinned in `package-lock.json`. React/Vite/PlayCanvas, Colyseus core + WebSocket transport + SDK + schema, Express, and node-postgres implement the already selected stack. Express supplies the narrow HTTP routes; native HTTP-only routing was considered but would duplicate body parsing and error handling. `pg` uses parameterized SQL and a small migration runner instead of adding an ORM. Development-only tools are TypeScript, tsx, ESLint, Prettier, Vitest, and Playwright.
+- Dependency review: current npm metadata was checked for versions, engines, licenses, and compatibility. Runtime packages are MIT licensed (Playwright tooling is Apache-2.0). `npm audit` reported no known vulnerabilities at installation. PlayCanvas is imported dynamically so the form can initialize independently of the engine; production bundle measurements belong in the verification record. No additional runtime asset downloads or physics, identity, Redis, or orchestration services were introduced.
+- Colyseus 0.18 built-in HTTP matchmaking runs ahead of Express. An HTTP boundary allowlist blocks public create/join/list endpoints, including `joinById`, before dispatch. Initial seat reservations are exclusively issued by the authenticated invite APIs; WebSocket `onAuth` verifies the signed session again. Reconnection remains a capability-based Colyseus endpoint. Origins are checked for HTTP and upgrades; socket payloads are capped at 4 KiB. TLS must terminate at a trusted reverse proxy outside local development, and the raw game port must not be public.
+- Sessions use a versioned HMAC-SHA256 envelope with random UUID player/session identifiers, a sanitized name, and expiration. The signature is timing-safe compared; tokens are not logged or persisted in PostgreSQL. Default lifetime is one hour (configurable 60–86,400 seconds), and authenticated refresh retains identity/name. The browser stores tokens per tab in sessionStorage and discards them on name change. No authentication provider or JWT library is needed for this single-issuer opaque token protocol.
+- Each process owns its explicit invite-code and membership directory. Eight-character invite codes use cryptographically random characters excluding ambiguous glyphs. One guest session may hold one pending/connected seat at a time. Pending seats expire after 15 seconds; disconnected clients retain their player for a configurable 20–30-second reservation (25 by default). Invite entries are removed on disposal. Multi-process discovery remains deferred.
+- HTTP limits per direct peer IP: 600 guest requests/minute, 600 room requests/minute, and 600 upgrades/reconnections/minute; room requests also have a 10/minute session limit. These initial values accommodate a large group behind one NAT and require playtest tuning. Forwarded IP headers are not trusted for HTTP limits. Rooms cap inbound messages at 12/second and start requests at 4/second. The game process does not persist per-IP request data.
+- Room capacity defaults to 150 and may be lowered to 6–150 using `ROOM_MAX_PLAYERS`; the start minimum remains six. The server cancels a countdown if fewer than six remain connected, transfers host to the first connected member on departure, and rejects fresh joins once countdown begins. If a creator never consumes the seat, host recovery occurs after the 15-second reservation timeout. The default countdown is five seconds (configurable 1–30).
+- At countdown completion, the server shuffles connected players using Node crypto randomness and assigns the approved Ice-count brackets. `ICE_COUNT_BRACKETS` may override the table with complete, increasing thresholds through 150; values must preserve Water at the bottom of each bracket. Roles are retained for the match. A disconnected, unassigned guest cannot enter an already started match through reconnect.
+- The first two task groups stop at role assignment and the `regular` phase handoff. The UI explicitly says movement/tagging/rounds are pending. No fake round loop or game outcomes are implemented ahead of MVP-26/28. Warning timing is corrected with user approval: it occurs within the 30-second regular phase, never as extra time between phases.
+- PostgreSQL is available through a local Compose service pinned by image digest, with a named volume and loopback-only port. The migration runner uses transactions, an advisory lock, and checksums to reject edited applied migrations. `/health` reports process liveness; `/ready` returns 503 when PostgreSQL is absent/unreachable. Local lobby development can proceed while the database is unavailable; production configuration requires a database URL.
+- The schema types live on the server. The safe shared package holds only protocol interfaces, constants, and pure validation. Colyseus `schema()` field builders avoid legacy decorator/class-field compiler incompatibilities.
+
+## Deployment stages
 
 1. **Local:** client, one game server, and PostgreSQL.
 2. **MVP playtest:** free-tier static hosting, one regional game-server deployment, and free-tier or local PostgreSQL where verified.
