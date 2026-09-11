@@ -137,6 +137,7 @@ Players need an accessible multiplayer party game that supports a large crowd, i
 ### Reliability and results
 
 - **FR-16:** A disconnected player may reclaim the same session within a configurable 20–30 second window.
+- **FR-16A:** Disconnecting or reconnecting does not reset a player's authoritative team, position, or active, frozen, or eliminated state; any intervening server-authoritative gameplay and deadline changes are retained. If the reservation expires during a match, an active or frozen participant forfeits and becomes permanently eliminated; an already eliminated participant remains eliminated, and the match cannot be rejoined.
 - **FR-17:** Disconnecting cannot remove a player's frozen state or bypass a phase deadline.
 - **FR-18:** Permanently eliminated players can spectate without affecting gameplay.
 - **FR-19:** The server records a match summary and basic contribution totals.

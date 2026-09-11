@@ -7,6 +7,7 @@ export const PlayerState = schema(
     displayName: t.string().default(''),
     team: t.string<Team>().default('unassigned'),
     isConnected: t.boolean().default(true),
+    reconnectDeadline: t.number().default(0),
     x: t.float32().default(0),
     z: t.float32().default(0),
     yaw: t.float32().default(0),

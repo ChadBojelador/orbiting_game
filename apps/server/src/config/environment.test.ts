@@ -5,6 +5,8 @@ const valid = { GUEST_SESSION_SIGNING_SECRET: 'test-only-valid-signing-secret-wi
 it('validates secrets, capacity, reconnection windows, and production transport configuration', () => {
   expect(readConfig(valid)).toMatchObject({
     maxPlayers: 150,
+    devBotCount: 0,
+    maxHumanPlayers: 150,
     countdownSeconds: 5,
     reconnectSeconds: 25,
   });
@@ -13,6 +15,9 @@ it('validates secrets, capacity, reconnection windows, and production transport 
     { GUEST_SESSION_SIGNING_SECRET: '' },
     { ROOM_MAX_PLAYERS: '151' },
     { ROOM_MAX_PLAYERS: '5' },
+    { ROOM_MAX_PLAYERS: '6', DEV_BOT_COUNT: '6' },
+    { ROOM_MAX_PLAYERS: '100', DEV_BOT_COUNT: '100' },
+    { DEV_BOT_COUNT: '150' },
     { RECONNECT_SECONDS: '19' },
     { RECONNECT_SECONDS: '31' },
     { COUNTDOWN_SECONDS: '0' },
@@ -23,4 +28,32 @@ it('validates secrets, capacity, reconnection windows, and production transport 
     { DATABASE_URL: 'http://db.example' },
   ])
     expect(() => readConfig({ ...valid, ...override })).toThrow();
+});
+
+it('reserves bot seats from room capacity while retaining at least one human seat', () => {
+  expect(readConfig({ ...valid, ROOM_MAX_PLAYERS: '150', DEV_BOT_COUNT: '149' })).toMatchObject({
+    maxPlayers: 150,
+    devBotCount: 149,
+    maxHumanPlayers: 1,
+  });
+  expect(
+    readConfig({
+      ...valid,
+      NODE_ENV: 'production',
+      CLIENT_ORIGIN: 'https://game.example',
+      DATABASE_URL: 'postgresql://localhost/game',
+      ROOM_MAX_PLAYERS: '6',
+      DEV_BOT_COUNT: '5',
+    }),
+  ).toMatchObject({ maxPlayers: 6, devBotCount: 0, maxHumanPlayers: 6 });
+  expect(() =>
+    readConfig({
+      ...valid,
+      NODE_ENV: 'production',
+      CLIENT_ORIGIN: 'https://game.example',
+      DATABASE_URL: 'postgresql://localhost/game',
+      ROOM_MAX_PLAYERS: '6',
+      DEV_BOT_COUNT: '6',
+    }),
+  ).toThrow('DEV_BOT_COUNT must be at most ROOM_MAX_PLAYERS - 1');
 });
