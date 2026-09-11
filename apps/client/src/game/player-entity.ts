@@ -28,8 +28,11 @@ interface PlayerEntity {
   isProtected: boolean;
   lastX: number;
   lastZ: number;
+  movingUntil: number;
   recoveryEndsAt: number;
 }
+
+const MOVEMENT_ANIMATION_HOLD_MS = 180;
 
 export class PlayerEntityManager {
   private readonly entities = new Map<string, PlayerEntity>();
@@ -120,6 +123,7 @@ export class PlayerEntityManager {
       isProtected: false,
       lastX: player.x,
       lastZ: player.z,
+      movingUntil: 0,
       recoveryEndsAt: 0,
     };
     this.entities.set(player.playerId, entity);
@@ -135,13 +139,17 @@ export class PlayerEntityManager {
     const previousStatus = entity.currentStatus;
     const dx = position.x - entity.lastX;
     const dz = position.z - entity.lastZ;
-    const isMoving = dx * dx + dz * dz > 0.000_004;
+    const now = Date.now();
+    if (dx * dx + dz * dz > 0.000_004) {
+      entity.movingUntil = now + MOVEMENT_ANIMATION_HOLD_MS;
+    }
+    const isMoving = now < entity.movingUntil;
     entity.lastX = position.x;
     entity.lastZ = position.z;
     entity.root.position.set(position.x, worldHeightAt(position.x, position.z) + 0.08, position.z);
     entity.root.rotation.y = position.yaw;
 
-    const isProtected = Date.now() < player.protectedUntil;
+    const isProtected = now < player.protectedUntil;
     if (
       entity.currentStatus !== player.status ||
       entity.isProtected !== isProtected ||
@@ -175,7 +183,7 @@ export class PlayerEntityManager {
       entity.root.visible = player.status !== 'spectator';
 
       if (previousStatus === 'frozen' && player.status === 'active') {
-        entity.recoveryEndsAt = Date.now() + 450;
+        entity.recoveryEndsAt = now + 450;
         entity.character?.play('Unfrozen', 0.05);
       }
     }
@@ -183,11 +191,11 @@ export class PlayerEntityManager {
     const nextAnimation: CharacterAnimation =
       player.status === 'frozen' || player.status === 'eliminated'
         ? 'Frozen'
-        : Date.now() < entity.recoveryEndsAt
+        : now < entity.recoveryEndsAt
           ? 'Unfrozen'
           : isMoving
             ? 'Run'
-            : 'Idle';
+            : 'Wave';
     entity.character?.play(nextAnimation);
     entity.character?.update(deltaSeconds);
   }

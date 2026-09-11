@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { LobbyView, MatchPhase } from '@ice-water/shared';
 
 interface GameHudProps {
@@ -32,11 +33,22 @@ function formatTime(ms: number): string {
 
 export function GameHud({ view, localPlayerId, serverNow }: GameHudProps) {
   const localPlayer = view.players.find((p) => p.playerId === localPlayerId);
+  const [showFrozenAlert, setShowFrozenAlert] = useState(false);
   const remaining = view.phaseDeadline > 0 ? view.phaseDeadline - serverNow : 0;
   const isDeepFreeze = view.phase === 'deep-freeze' || view.phase === 'warning';
   const isFrozen = localPlayer?.status === 'frozen';
   const isEliminated = localPlayer?.status === 'eliminated';
   const team = localPlayer?.team ?? 'water';
+
+  useEffect(() => {
+    if (localPlayer?.status !== 'frozen') {
+      setShowFrozenAlert(false);
+      return;
+    }
+    setShowFrozenAlert(true);
+    const timeout = window.setTimeout(() => setShowFrozenAlert(false), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [localPlayer?.status]);
 
   const aliveWater = view.players.filter((p) => p.team === 'water' && p.status === 'active').length;
   const frozenWater = view.players.filter(
@@ -49,6 +61,12 @@ export function GameHud({ view, localPlayerId, serverNow }: GameHudProps) {
 
   return (
     <div className={`game-hud ${isDeepFreeze ? 'deep-freeze-active' : ''}`} aria-live="polite">
+      {showFrozenAlert && (
+        <div className="hud-frozen-alert" role="alert">
+          YOU ARE FROZEN
+        </div>
+      )}
+
       {/* Top bar: phase and timer */}
       <div className="hud-top">
         <div className={`hud-phase hud-phase--${view.phase}`}>{phaseName(view.phase)}</div>
