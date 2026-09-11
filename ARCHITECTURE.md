@@ -30,7 +30,7 @@ Static assets and the application bundle can be cached globally. Persistent WebS
 
 ### Responsibilities
 
-- Render the 3D world through PlayCanvas.
+- Render the 3D world through Three.js.
 - Render room creation/joining, lobby, HUD, settings, and results through React.
 - Capture keyboard and touch intent.
 - Predict local presentation and interpolate remote entities.
@@ -43,7 +43,7 @@ Static assets and the application bundle can be cached globally. Persistent WebS
 
 - The browser never decides whether a tag, rescue, elimination, or win occurred.
 - React must not drive per-frame character movement.
-- PlayCanvas rendering state may be richer than synchronized gameplay state, but it cannot contradict server outcomes.
+- Three.js rendering state may be richer than synchronized gameplay state, but it cannot contradict server outcomes.
 - Browser-visible `VITE_` variables are public configuration, never secrets.
 
 ### 3D performance strategy
@@ -240,7 +240,8 @@ sequenceDiagram
 
 ```text
 apps/client/src/
-├── game/                   # PlayCanvas app, scenes, entities, animation, camera
+├── game/                   # Three.js scene lifecycle, entities, animation, camera
+├── world/                  # Authored terrain, water, routes, landmarks, and boundaries
 ├── network/                # Colyseus connection, reconciliation, event adapters
 ├── ui/                     # React lobby, HUD, settings, results
 ├── input/                  # Keyboard and touch input normalization
@@ -270,9 +271,11 @@ Client and server must not import directly from one another. Both may depend on 
 
 ## Important technical decisions
 
-### PlayCanvas instead of a Web-exported native engine
+### Three.js instead of PlayCanvas or a Web-exported native engine
 
-The game is browser-only. A browser-native engine keeps runtime and networking integration simpler and supports targeted WebGL/WebGPU optimization.
+The game is browser-only. Three.js keeps the runtime browser-native while exposing the low-level geometry control required by the authored multi-biome island. The prior PlayCanvas prototype was functional, but the approved world brief requires Three.js and stable code-defined terrain, river, bridge, and landmark geometry. Migrating the small prototype renderer was lower risk than maintaining two engines or translating every world module across an adapter. The tradeoff is that scene lifecycle, animation mixing, disposal, and future quality tiers remain explicit application responsibilities.
+
+`MAP_SPEC.md` is the source of truth for physical layout. Pure `X/Z` land masks, route corridors, river exclusions, bridge footprints, spawn generation, and terrain-height sampling live in `packages/shared` so authoritative movement and client prediction agree. The server continues synchronizing only `X/Z`; the client derives `Y` deterministically from the authored surface. Routes do not vertically overlap, so this preserves the existing compact protocol. A future overpass, jump, or airborne mechanic would require adding authoritative `Y` and revisiting distance and line-of-sight rules.
 
 ### Colyseus instead of raw WebSockets
 
@@ -302,8 +305,8 @@ Initial private playtests should target a free hosting tier. Because free offeri
 
 ### Foundation and private-room implementation (2026-09-10)
 
-- Toolchain: Node 24.18.0 / npm 11.17.0; exact package versions and transitive dependencies are pinned in `package-lock.json`. React/Vite/PlayCanvas, Colyseus core + WebSocket transport + SDK + schema, Express, and node-postgres implement the already selected stack. Express supplies the narrow HTTP routes; native HTTP-only routing was considered but would duplicate body parsing and error handling. `pg` uses parameterized SQL and a small migration runner instead of adding an ORM. Development-only tools are TypeScript, tsx, ESLint, Prettier, Vitest, and Playwright.
-- Dependency review: current npm metadata was checked for versions, engines, licenses, and compatibility. Runtime packages are MIT licensed (Playwright tooling is Apache-2.0). `npm audit` reported no known vulnerabilities at installation. PlayCanvas is imported dynamically so the form can initialize independently of the engine; production bundle measurements belong in the verification record. No additional runtime asset downloads or physics, identity, Redis, or orchestration services were introduced.
+- Toolchain: Node 24.18.0 / npm 11.17.0; exact package versions and transitive dependencies are pinned in `package-lock.json`. React/Vite/Three.js, Colyseus core + WebSocket transport + SDK + schema, Express, and node-postgres implement the selected stack. Express supplies the narrow HTTP routes; native HTTP-only routing was considered but would duplicate body parsing and error handling. `pg` uses parameterized SQL and a small migration runner instead of adding an ORM. Development-only tools are TypeScript, tsx, ESLint, Prettier, Vitest, and Playwright.
+- Dependency review: current npm metadata was checked for versions, engines, licenses, and compatibility. Runtime packages are MIT licensed (Playwright tooling is Apache-2.0). `npm audit` reported no known vulnerabilities at installation. Three.js and its GLTF loader are code-split from the lobby form so session setup can initialize independently of the renderer; production bundle measurements belong in the verification record. No physics, identity, Redis, or orchestration services were introduced.
 - Colyseus 0.18 built-in HTTP matchmaking runs ahead of Express. An HTTP boundary allowlist blocks public create/join/list endpoints, including `joinById`, before dispatch. Initial seat reservations are exclusively issued by the authenticated invite APIs; WebSocket `onAuth` verifies the signed session again. Reconnection remains a capability-based Colyseus endpoint. Origins are checked for HTTP and upgrades; socket payloads are capped at 4 KiB. TLS must terminate at a trusted reverse proxy outside local development, and the raw game port must not be public.
 - Sessions use a versioned HMAC-SHA256 envelope with random UUID player/session identifiers, a sanitized name, and expiration. The signature is timing-safe compared; tokens are not logged or persisted in PostgreSQL. Default lifetime is one hour (configurable 60–86,400 seconds), and authenticated refresh retains identity/name. The browser stores tokens per tab in sessionStorage and discards them on name change. No authentication provider or JWT library is needed for this single-issuer opaque token protocol.
 - Each process owns its explicit invite-code and membership directory. Eight-character invite codes use cryptographically random characters excluding ambiguous glyphs. One guest session may hold one pending/connected seat at a time. Pending seats expire after 15 seconds; disconnected clients retain their player for a configurable 20–30-second reservation (25 by default). Invite entries are removed on disposal. Multi-process discovery remains deferred.
