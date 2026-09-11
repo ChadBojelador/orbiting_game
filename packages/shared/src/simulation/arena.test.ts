@@ -11,9 +11,13 @@ import {
 } from './arena.js';
 
 describe('authored world arena', () => {
-  it('uses the documented 250-unit envelope and five shrinking boundaries', () => {
-    expect(ARENA.halfExtent).toBe(118);
-    expect(ARENA_ROUNDS).toEqual([118, 102, 86, 70, 54]);
+  it('uses the documented expanded envelope and five shrinking boundaries', () => {
+    expect(ARENA.halfExtent).toBe(198);
+    expect(ARENA_ROUNDS).toEqual([198, 160, 120, 86, 54]);
+    expect(isPermanentLand({ x: -180, z: -35 })).toBe(false);
+    expect(isPermanentLand({ x: 132, z: 149 })).toBe(true);
+    expect(isPermanentLand({ x: -145, z: -12 })).toBe(true);
+    expect(isPermanentLand({ x: 20, z: 139 })).toBe(true);
   });
 
   it('keeps the major biome centers on permanent land', () => {
@@ -57,5 +61,17 @@ describe('authored world arena', () => {
     expect(village).toBeLessThan(forest);
     expect(forest).toBeLessThan(summit);
     expect(summit).toBeGreaterThanOrEqual(60);
+  });
+
+  it('keeps the outer network connected through authored routes and crossings', () => {
+    for (const point of [
+      { x: -111, z: 35 },
+      { x: 102, z: -28 },
+      { x: 8, z: 135 },
+      { x: 76, z: 165 },
+      { x: 132, z: 149 },
+    ]) {
+      expect(isWalkable(point, 0.8, ARENA.halfExtent)).toBe(true);
+    }
   });
 });

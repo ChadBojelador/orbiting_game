@@ -4,8 +4,8 @@
 
 ## World frame
 
-- Playable world: approximately 250 x 250 units.
-- Authored coordinate envelope: `X -125..125`, `Z -125..125`, `Y 0..64`.
+- Playable world: approximately 400 x 400 units in round one, with the original dense 250 x 250 inner world preserved.
+- Authored coordinate envelope: `X -200..200`, `Z -200..200`, `Y 0..64`.
 - World center: `(0, 0, 0)`.
 - Axes: `+X` east, `-X` west, `-Z` north, `+Z` south, `+Y` up.
 - Sea level: `Y 1.5`.
@@ -263,18 +263,76 @@ The island remains physically stable across all rounds. The Deep Freeze boundary
 
 | Round | Half-extent | Intended readable area                                                  |
 | ----: | ----------: | ----------------------------------------------------------------------- |
-|     1 |         118 | Entire mainland and southern island loop                                |
-|     2 |         102 | Excludes the farthest islets and summit overlook                        |
-|     3 |          86 | Focuses play on mainland biomes                                         |
+|     1 |         198 | Entire expanded mainland, coast, and outer island loop                  |
+|     2 |         160 | Excludes the farthest outer forest and island edges                     |
+|     3 |         120 | Focuses play on the connected mainland and inner coast                  |
 |     4 |          70 | Pulls play toward village, inner forest, inner valley, and north meadow |
 |     5 |          54 | Final hub-centered confrontation                                        |
 
 The boundary is a magical weather wall, not a terrain wall. Server authority continues to own its active size and movement clamping.
 
+## Version 2 expansion plan
+
+The current 250 x 250 authored world is preserved as the dense inner world. Version 2 expands the authored envelope toward `X -200..200`, `Z -200..200` without scaling the existing layout. New terrain is added as connected outer subregions, with the existing village remaining the orientation hub and the existing landmark coordinates remaining stable.
+
+### Expanded coordinate diagram
+
+```text
+                 NORTH (-Z)
+          FROZEN SUMMIT / SKY RIDGE
+            /       |       \
+        ICE CAVES   CRYSTAL FALLS   UPPER PASS
+          |             |             |
+       ANCIENT FOREST ---- ICE PEAKS ---- CRYSTAL GARDENS
+       /     |       \          |          /       \
+    HIDDEN   FOREST   RAVINE   MOUNTAIN   CRYSTAL   LOWER BASIN
+    GROVE    SHRINE    TRAIL     PASS       CAVE       |
+       \       \       |        |         |        |
+        FOREST EDGE -- VILLAGE -- CRYSTAL VALLEY -- EAST RIDGE
+            |   \          |             \
+          FARMLANDS GRAND MEADOW        FLOWER HILLS
+            |      |       |              |
+            +------RIVERSIDE FIELD-------+
+                 |
+              COASTAL CLIFFS
+                 |
+          BEACH TOWN -- QUIET COVE -- ROCKY SHORE
+            |          |              |
+          TIDE POOLS -- SEA CAVE      ISLAND CHAIN
+                      /        \
+                   FLOWER ISLES   RUINED ISLAND
+                 SOUTH (+Z) / OPEN OCEAN
+```
+
+### Outer subregions and stable landmarks
+
+The outer regions are authored as walkable transition lobes rather than a radial ring:
+
+- `BIO_FARMLANDS` and `BIO_FLOWER_HILLS` deepen the meadow-to-coast transition.
+- `BIO_COASTAL_CLIFFS` and `BIO_BEACH_TOWN` create a stepped descent to the preserved beach.
+- `BIO_ANCIENT_FOREST`, `BIO_FOREST_RAVINE`, and `BIO_FOREST_SHRINE` extend the west route.
+- `BIO_CRYSTAL_GARDENS`, `BIO_LOWER_BASIN`, and `BIO_CRYSTAL_FALLS` extend the east route.
+- `BIO_ICE_CAVES` and `BIO_SKY_RIDGE` create the secondary northern climb.
+- `BIO_OUTER_ISLANDS` and `BIO_RUINED_ISLAND` extend the southern island loop.
+
+New major landmark IDs are `LM_VILLAGE_CLOCKTOWER`, `LM_FOREST_SHRINE`, `LM_FOREST_RAVINE`, `LM_CRYSTAL_GARDENS`, `LM_CRYSTAL_FALLS`, `LM_CRYSTAL_CAVE`, `LM_ICE_CAVE`, `LM_SKY_RIDGE`, `LM_MEADOW_BARN`, `LM_FLOWER_HILL`, `LM_COASTAL_OVERLOOK`, `LM_BEACH_DOCK`, `LM_BEACH_COVE`, and `LM_RUINED_ISLAND`. Existing landmark IDs and positions are unchanged.
+
+### Expanded routes, water, and crossings
+
+New routes are `PATH_FOREST_RAVINE`, `PATH_FOREST_SHRINE`, `PATH_CRYSTAL_GARDENS`, `PATH_CRYSTAL_FALLS`, `PATH_ICE_CAVES`, `PATH_SKY_RIDGE`, `PATH_MEADOW_FARMS`, `PATH_MEADOW_HILLS`, `PATH_MEADOW_CLIFFS`, `PATH_CLIFFS_BEACH`, `PATH_BEACH_COVE`, `PATH_BEACH_TIDEPOOLS`, `PATH_ISLAND_CHAIN`, and `PATH_RUINED_ISLAND`. Together with the preserved routes they form the northern mountain loop, the meadow/coast loop, and the beach/island loop, with forest-to-ravine-to-mountain and crystal-to-basin-to-meadow shortcuts.
+
+The water network gains `STREAM_FOREST_RAVINE`, `STREAM_CRYSTAL_FALLS`, `STREAM_COASTAL`, and `STREAM_ISLAND_TIDE`; these feed two medium waterfalls, several small drops, two ponds, and the existing river/ocean outflow. New crossings are `BR_FOREST_RAVINE`, `BR_CRYSTAL_GARDENS`, `BR_CRYSTAL_FALLS`, `BR_MEADOW_FARMS`, `BR_COASTAL_CLIFFS`, `BR_BEACH_COVE`, `BR_ISLAND_CHAIN`, and `BR_RUINED_ISLAND`.
+
+### Verticality, secrets, and density targets
+
+Outer terrain uses local low/mid/high bands: forest ravine `Y 11..18`, forest ridge `Y 24..34`, lower crystal basin `Y 12..18`, crystal falls `Y 24..38`, coastal cliffs `Y 8..20`, sky ridge `Y 42..58`, and ruined-island center `Y 5..14`. New secrets are `SEC_FOREST_SHRINE`, `SEC_RAVINE_LEDGE`, `SEC_CRYSTAL_CHAMBER`, `SEC_WATERFALL_PASSAGE`, `SEC_ICE_CAVE`, `SEC_SUMMIT_LEDGE`, `SEC_MEADOW_POND`, `SEC_COASTAL_CAVE`, `SEC_TIDEPOOL`, and `SEC_RUINED_ISLAND`.
+
+The implementation target is 12-18 major landmarks and 20-30 small environmental points of interest. Detail is staged as macro land first, then routes/water, then subregion dressing and micro props. Shared geometry, deterministic placement, and grouped decoration remain preferred so the larger authored envelope stays browser-friendly.
+
 ## Blockout acceptance criteria
 
-- An original irregular island silhouette fills the intended coordinate envelope without using a giant terrain plane or rectangular biome platforms.
-- All seven biomes, thirteen permanent landmarks, four bridges, two waterfalls, and ten named routes are recognizable from placeholder geometry.
+- An original irregular island silhouette fills the intended `-200..200` coordinate envelope without using a giant terrain plane or rectangular biome platforms.
+- The preserved biomes and expanded subregions, 27 named landmarks, 12 bridges, five waterfalls, and 24 named routes are recognizable from placeholder geometry.
 - The water network reads continuously from summit spring to ocean.
 - Both mandatory loops can be traversed without jumps, impossible slopes, dead ends, broken bridge approaches, or accidental terrain gaps.
 - The renderer and shared movement rules use the same stable layout constants.

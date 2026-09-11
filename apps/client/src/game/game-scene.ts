@@ -5,11 +5,9 @@ import { GameSession } from '../network/game-session.js';
 import { WorldLayout, WORLD_CAMERA_FAR, worldHeightAt } from '../world/world-layout.js';
 import { loadCharacterModel } from './character-model.js';
 import { PlayerEntityManager } from './player-entity.js';
+import { ThirdPersonCamera } from './third-person-camera.js';
 
-const CAMERA_HEIGHT = 8;
-const CAMERA_DISTANCE = 12;
 const CAMERA_FOV = 52;
-const CAMERA_SMOOTHING = 0.12;
 
 export class GameScene {
   private readonly session: GameSession;
@@ -17,11 +15,10 @@ export class GameScene {
   private readonly camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, WORLD_CAMERA_FAR);
   private readonly renderer: THREE.WebGLRenderer;
   private readonly world: WorldLayout;
+  private readonly followCamera = new ThirdPersonCamera();
   private playerEntities?: PlayerEntityManager;
   private destroyed = false;
   private animationFrame = 0;
-  private cameraYaw = 0;
-  private targetCameraYaw = 0;
   private lastPointer: { x: number; y: number } | null = null;
   private previousFrameTime = performance.now();
   private readonly cleanups: (() => void)[] = [];
@@ -46,7 +43,7 @@ export class GameScene {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene.background = new THREE.Color(0xaeddf0);
-    this.scene.fog = new THREE.Fog(0xc8e9ec, 165, 340);
+    this.scene.fog = new THREE.Fog(0xc8e9ec, 250, 560);
     this.configureLighting();
     this.world = new WorldLayout(this.scene, this.session.view.arenaHalfExtent || ARENA.halfExtent);
     this.bindResize();
@@ -80,12 +77,12 @@ export class GameScene {
     sun.position.set(-85, 135, 75);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -125;
-    sun.shadow.camera.right = 125;
-    sun.shadow.camera.top = 125;
-    sun.shadow.camera.bottom = -125;
+    sun.shadow.camera.left = -220;
+    sun.shadow.camera.right = 220;
+    sun.shadow.camera.top = 220;
+    sun.shadow.camera.bottom = -220;
     sun.shadow.camera.near = 30;
-    sun.shadow.camera.far = 330;
+    sun.shadow.camera.far = 520;
     sun.shadow.bias = -0.0004;
     this.scene.add(sun);
   }
@@ -149,20 +146,20 @@ export class GameScene {
     }
     this.playerEntities?.update(view, positions, this.session.playerId, deltaSeconds);
 
-    this.cameraYaw += (this.targetCameraYaw - this.cameraYaw) * CAMERA_SMOOTHING;
-    this.session.input.cameraYaw = this.cameraYaw;
     const localPosition = localPlayer
       ? (positions.get(localPlayer.playerId) ?? { x: 0, z: 8 })
       : { x: 0, z: 8 };
     const terrainY = worldHeightAt(localPosition.x, localPosition.z);
     const cameraTarget = new THREE.Vector3(localPosition.x, terrainY + 1.35, localPosition.z);
-    const desiredCamera = new THREE.Vector3(
-      localPosition.x + Math.sin(this.cameraYaw) * CAMERA_DISTANCE,
-      terrainY + CAMERA_HEIGHT,
-      localPosition.z + Math.cos(this.cameraYaw) * CAMERA_DISTANCE,
+    const cameraPose = this.followCamera.update(
+      cameraTarget,
+      deltaSeconds,
+      [],
+      (x, z) => worldHeightAt(x, z),
     );
-    this.camera.position.lerp(desiredCamera, 0.18);
-    this.camera.lookAt(cameraTarget);
+    this.session.input.cameraYaw = cameraPose.yaw;
+    this.camera.position.set(cameraPose.position.x, cameraPose.position.y, cameraPose.position.z);
+    this.camera.lookAt(cameraPose.target.x, cameraPose.target.y, cameraPose.target.z);
     this.renderer.render(this.scene, this.camera);
     this.animationFrame = requestAnimationFrame((frameTime) => this.loop(frameTime));
   }
@@ -174,7 +171,10 @@ export class GameScene {
     };
     const onPointerMove = (event: PointerEvent) => {
       if (!this.lastPointer) return;
-      this.targetCameraYaw -= (event.clientX - this.lastPointer.x) * 0.006;
+      this.followCamera.orbit(
+        event.clientX - this.lastPointer.x,
+        -(event.clientY - this.lastPointer.y),
+      );
       this.lastPointer = { x: event.clientX, y: event.clientY };
     };
     const onPointerUp = () => {

@@ -29,8 +29,8 @@ export interface BridgeFootprint extends Position {
 }
 
 export const SEA_LEVEL = 1.5;
-export const WORLD_MIN = -125;
-export const WORLD_MAX = 125;
+export const WORLD_MIN = -200;
+export const WORLD_MAX = 200;
 
 export const LAND_REGIONS: readonly LandRegion[] = [
   { id: 'BIO_VILLAGE', x: 0, z: 0, radiusX: 37, radiusZ: 38, elevation: 12, coreRatio: 0.62 },
@@ -50,6 +50,108 @@ export const LAND_REGIONS: readonly LandRegion[] = [
   { id: 'BIO_ISLAND_W', x: -18, z: 119, radiusX: 11, radiusZ: 8, elevation: 3.2, coreRatio: 0.55 },
   { id: 'BIO_ISLAND_C', x: 10, z: 121, radiusX: 10, radiusZ: 7, elevation: 4, coreRatio: 0.55 },
   { id: 'BIO_ISLAND_E', x: 37, z: 116, radiusX: 12, radiusZ: 9, elevation: 3.4, coreRatio: 0.55 },
+  {
+    id: 'BIO_ANCIENT_FOREST',
+    x: -117,
+    z: -35,
+    radiusX: 31,
+    radiusZ: 42,
+    elevation: 25,
+    coreRatio: 0.52,
+  },
+  {
+    id: 'BIO_FOREST_RAVINE',
+    x: -112,
+    z: 18,
+    radiusX: 25,
+    radiusZ: 30,
+    elevation: 16,
+    coreRatio: 0.5,
+  },
+  {
+    id: 'BIO_FOREST_SHRINE',
+    x: -145,
+    z: -12,
+    radiusX: 20,
+    radiusZ: 22,
+    elevation: 27,
+    coreRatio: 0.54,
+  },
+  {
+    id: 'BIO_CRYSTAL_GARDENS',
+    x: 119,
+    z: -28,
+    radiusX: 34,
+    radiusZ: 34,
+    elevation: 25,
+    coreRatio: 0.53,
+  },
+  {
+    id: 'BIO_LOWER_BASIN',
+    x: 116,
+    z: 18,
+    radiusX: 36,
+    radiusZ: 28,
+    elevation: 16,
+    coreRatio: 0.56,
+  },
+  {
+    id: 'BIO_CRYSTAL_FALLS',
+    x: 83,
+    z: -66,
+    radiusX: 29,
+    radiusZ: 30,
+    elevation: 34,
+    coreRatio: 0.5,
+  },
+  {
+    id: 'BIO_ICE_CAVES',
+    x: -34,
+    z: -122,
+    radiusX: 28,
+    radiusZ: 25,
+    elevation: 43,
+    coreRatio: 0.48,
+  },
+  { id: 'BIO_SKY_RIDGE', x: 47, z: -126, radiusX: 32, radiusZ: 24, elevation: 52, coreRatio: 0.5 },
+  { id: 'BIO_FARMLANDS', x: -65, z: 91, radiusX: 35, radiusZ: 30, elevation: 8, coreRatio: 0.58 },
+  {
+    id: 'BIO_FLOWER_HILLS',
+    x: 61,
+    z: 75,
+    radiusX: 36,
+    radiusZ: 29,
+    elevation: 13,
+    coreRatio: 0.55,
+  },
+  {
+    id: 'BIO_COASTAL_CLIFFS',
+    x: 10,
+    z: 139,
+    radiusX: 57,
+    radiusZ: 25,
+    elevation: 14,
+    coreRatio: 0.5,
+  },
+  { id: 'BIO_BEACH_TOWN', x: -42, z: 163, radiusX: 33, radiusZ: 20, elevation: 4, coreRatio: 0.58 },
+  {
+    id: 'BIO_OUTER_ISLANDS',
+    x: 76,
+    z: 165,
+    radiusX: 52,
+    radiusZ: 30,
+    elevation: 5,
+    coreRatio: 0.48,
+  },
+  {
+    id: 'BIO_RUINED_ISLAND',
+    x: 132,
+    z: 149,
+    radiusX: 24,
+    radiusZ: 24,
+    elevation: 9,
+    coreRatio: 0.5,
+  },
 ] as const;
 
 export const ROUTE_CORRIDORS: readonly RouteCorridor[] = [
@@ -152,6 +254,143 @@ export const ROUTE_CORRIDORS: readonly RouteCorridor[] = [
       { x: 28, z: 57 },
     ],
   },
+  {
+    id: 'PATH_FOREST_RAVINE',
+    width: 8,
+    points: [
+      { x: -76, z: 5 },
+      { x: -92, z: 19 },
+      { x: -111, z: 35 },
+      { x: -126, z: 45 },
+    ],
+  },
+  {
+    id: 'PATH_FOREST_SHRINE',
+    width: 7,
+    points: [
+      { x: -96, z: -22 },
+      { x: -117, z: -26 },
+      { x: -139, z: -15 },
+    ],
+  },
+  {
+    id: 'PATH_CRYSTAL_GARDENS',
+    width: 8,
+    points: [
+      { x: 82, z: -19 },
+      { x: 101, z: -27 },
+      { x: 123, z: -36 },
+      { x: 145, z: -28 },
+    ],
+  },
+  {
+    id: 'PATH_CRYSTAL_FALLS',
+    width: 8,
+    points: [
+      { x: 68, z: -28 },
+      { x: 76, z: -46 },
+      { x: 84, z: -65 },
+      { x: 67, z: -82 },
+    ],
+  },
+  {
+    id: 'PATH_ICE_CAVES',
+    width: 7,
+    points: [
+      { x: 14, z: -83 },
+      { x: -8, z: -101 },
+      { x: -30, z: -119 },
+      { x: -18, z: -143 },
+    ],
+  },
+  {
+    id: 'PATH_SKY_RIDGE',
+    width: 7,
+    points: [
+      { x: 19, z: -84 },
+      { x: 39, z: -102 },
+      { x: 52, z: -124 },
+      { x: 45, z: -146 },
+    ],
+  },
+  {
+    id: 'PATH_MEADOW_FARMS',
+    width: 9,
+    points: [
+      { x: -18, z: 68 },
+      { x: -41, z: 78 },
+      { x: -65, z: 91 },
+      { x: -89, z: 82 },
+    ],
+  },
+  {
+    id: 'PATH_MEADOW_HILLS',
+    width: 8,
+    points: [
+      { x: 18, z: 62 },
+      { x: 39, z: 68 },
+      { x: 61, z: 75 },
+      { x: 79, z: 92 },
+    ],
+  },
+  {
+    id: 'PATH_MEADOW_CLIFFS',
+    width: 8,
+    points: [
+      { x: -44, z: 83 },
+      { x: -23, z: 106 },
+      { x: -5, z: 127 },
+      { x: 8, z: 142 },
+    ],
+  },
+  {
+    id: 'PATH_CLIFFS_BEACH',
+    width: 8,
+    points: [
+      { x: 9, z: 143 },
+      { x: -9, z: 154 },
+      { x: -31, z: 162 },
+      { x: -51, z: 165 },
+    ],
+  },
+  {
+    id: 'PATH_BEACH_COVE',
+    width: 6,
+    points: [
+      { x: -18, z: 158 },
+      { x: 3, z: 166 },
+      { x: 24, z: 156 },
+    ],
+  },
+  {
+    id: 'PATH_BEACH_TIDEPOOLS',
+    width: 6,
+    points: [
+      { x: 21, z: 151 },
+      { x: 45, z: 156 },
+      { x: 63, z: 169 },
+    ],
+  },
+  {
+    id: 'PATH_ISLAND_CHAIN',
+    width: 6,
+    points: [
+      { x: 37, z: 116 },
+      { x: 58, z: 138 },
+      { x: 76, z: 165 },
+      { x: 103, z: 171 },
+      { x: 132, z: 149 },
+    ],
+  },
+  {
+    id: 'PATH_RUINED_ISLAND',
+    width: 7,
+    points: [
+      { x: 113, z: 153 },
+      { x: 132, z: 149 },
+      { x: 145, z: 137 },
+    ],
+  },
 ] as const;
 
 export const BRIDGES: readonly BridgeFootprint[] = [
@@ -159,6 +398,14 @@ export const BRIDGES: readonly BridgeFootprint[] = [
   { id: 'BR_CRYSTAL_01', x: 55, z: -5, width: 6, depth: 12 },
   { id: 'BR_MEADOW_01', x: -5, z: 65, width: 14, depth: 6 },
   { id: 'BR_ISLAND_01', x: 24, z: 118, width: 15, depth: 6 },
+  { id: 'BR_FOREST_RAVINE', x: -111, z: 35, width: 6, depth: 12 },
+  { id: 'BR_CRYSTAL_GARDENS', x: 102, z: -28, width: 12, depth: 6 },
+  { id: 'BR_CRYSTAL_FALLS', x: 77, z: -57, width: 12, depth: 6 },
+  { id: 'BR_MEADOW_FARMS', x: -42, z: 82, width: 12, depth: 6 },
+  { id: 'BR_COASTAL_CLIFFS', x: 8, z: 135, width: 12, depth: 6 },
+  { id: 'BR_BEACH_COVE', x: 3, z: 164, width: 10, depth: 5 },
+  { id: 'BR_ISLAND_CHAIN', x: 76, z: 165, width: 12, depth: 6 },
+  { id: 'BR_RUINED_ISLAND', x: 132, z: 149, width: 10, depth: 6 },
 ] as const;
 
 export const RIVER_BRANCHES: readonly (readonly Position[])[] = [
@@ -184,10 +431,37 @@ export const RIVER_BRANCHES: readonly (readonly Position[])[] = [
     { x: 10, z: -18 },
     { x: 0, z: -28 },
   ],
+  [
+    { x: -108, z: 3 },
+    { x: -111, z: 18 },
+    { x: -111, z: 35 },
+    { x: -126, z: 47 },
+  ],
+  [
+    { x: 76, z: -58 },
+    { x: 84, z: -65 },
+    { x: 84, z: -82 },
+    { x: 69, z: -91 },
+    { x: 60, z: -105 },
+  ],
+  [
+    { x: 8, z: 127 },
+    { x: 8, z: 142 },
+    { x: -12, z: 155 },
+    { x: -33, z: 163 },
+    { x: -51, z: 165 },
+  ],
+  [
+    { x: 63, z: 169 },
+    { x: 76, z: 165 },
+    { x: 94, z: 169 },
+    { x: 112, z: 160 },
+    { x: 132, z: 149 },
+  ],
 ] as const;
 
 export const ARENA = {
-  halfExtent: 118,
+  halfExtent: 198,
   blocks: [
     { id: 'COVER_VILLAGE_NW', x: -8, z: -8, width: 4, depth: 4, height: 1.8 },
     { id: 'COVER_VILLAGE_NE', x: 8, z: -8, width: 4, depth: 4, height: 1.8 },
@@ -202,7 +476,7 @@ export const ARENA = {
 } as const;
 
 // Approved world boundary: one entry per round, index 0 = round 1.
-export const ARENA_ROUNDS: readonly number[] = [118, 102, 86, 70, 54];
+export const ARENA_ROUNDS: readonly number[] = [198, 160, 120, 86, 54];
 
 export function arenaHalfExtentForRound(round: number): number {
   return (
