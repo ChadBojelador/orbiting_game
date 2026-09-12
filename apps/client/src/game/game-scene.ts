@@ -26,7 +26,6 @@ export class GameScene {
   private playerEntities?: PlayerEntityManager;
   private destroyed = false;
   private animationFrame = 0;
-  private lastPointer: { x: number; y: number } | null = null;
   private previousFrameTime = performance.now();
   private previousPhase = '';
   private readonly cleanups: (() => void)[] = [];
@@ -202,29 +201,18 @@ export class GameScene {
         return;
       }
       if (event.button !== 0) return;
-      this.lastPointer = { x: event.clientX, y: event.clientY };
     };
     const onPointerMove = (event: PointerEvent) => {
-      if (!this.lastPointer) return;
-      this.followCamera.orbit(
-        event.clientX - this.lastPointer.x,
-        -(event.clientY - this.lastPointer.y),
-      );
-      this.lastPointer = { x: event.clientX, y: event.clientY };
-    };
-    const onPointerUp = () => {
-      this.lastPointer = null;
+      this.followCamera.orbit(event.movementX, -event.movementY);
     };
     const onContextMenu = (event: MouseEvent) => event.preventDefault();
     this.canvas.addEventListener('pointerdown', onPointerDown);
+    this.canvas.addEventListener('pointermove', onPointerMove);
     this.canvas.addEventListener('contextmenu', onContextMenu);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
     this.cleanups.push(() => {
       this.canvas.removeEventListener('pointerdown', onPointerDown);
+      this.canvas.removeEventListener('pointermove', onPointerMove);
       this.canvas.removeEventListener('contextmenu', onContextMenu);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
     });
   }
 }
