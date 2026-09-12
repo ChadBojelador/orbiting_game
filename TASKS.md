@@ -59,6 +59,19 @@ No tasks currently in progress.
 |---|---|---|---|---|---|
 | DOC-01 | Establish README, PRD, architecture, agent guide, contribution workflow, environment example, ignore rules, and task tracker | Unassigned | P0 | Foundation | — |
 
+### Completed throwable frost and PC controls (2026-09-12)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-56 | Replace close-range targeting with server-authoritative throwable frost, optimized PC input, and an in-match control guide | Chad Bojelador | P0 | Freezing and controls | MVP-22, MVP-55 |
+
+### Verification and scope (Throwable frost and PC controls)
+
+- Right-click throws frost toward a centered Ice reticle, with `F` as a keyboard fallback. Left-drag remains dedicated to camera look, Space jumps, Water holds `E` to rescue, and frozen players press `H` for help.
+- The server validates normalized three-dimensional aim, role, active status, phase, cooldown, and in-flight capacity. Fixed-step swept collisions freeze the first eligible Water player and stop on static cover, arena bounds, protected players, or expiry.
+- The client synchronizes and renders up to 64 frost shards using two instanced meshes. The desktop HUD shows a compact role-aware control guide; coarse-pointer and narrow layouts keep the existing touch controls instead.
+- Coverage includes malformed and unauthorized throws, cooldowns, hits, cover, airborne misses, protection absorption, input one-shots, and a real-WebSocket authoritative projectile hit.
+
 ### Completed authoritative jumping (2026-09-12)
 
 | ID | Task | Owner | Priority | Related feature | Dependencies |
@@ -69,7 +82,7 @@ No tasks currently in progress.
 
 - Sequenced movement carries a backward-compatible one-shot jump flag; the server owns world-space height, vertical velocity, grounded state, jump eligibility, gravity, and landing.
 - Client prediction and remote interpolation include authoritative vertical motion. Keyboard and touch expose distinct jump controls.
-- Tag and rescue use three-dimensional range plus height-aware line of sight. Airborne players retain horizontal static collision and cannot vault through walls.
+- Frost-projectile hits and rescue use authoritative three-dimensional positions. Airborne players retain horizontal static collision and cannot vault through walls.
 - Unit coverage includes jump validation, grounded-only initiation, landing, prediction/reconciliation, vertical interaction range, rescue cancellation, and low-cover line of sight; real-WebSocket coverage verifies jump intent reaches authoritative state.
 - Local verification passed 117 non-database tests, strict type checking, changed-file ESLint, the production build, and both existing Playwright scenarios. The configured PostgreSQL migration test could not connect to port 55432, and the Playwright command required termination after its assertions because of the documented Windows child-process cleanup hang.
 
@@ -93,9 +106,9 @@ No tasks currently in progress.
 
 ### Verification and scope (Room security and lifecycle)
 
-- Real Colyseus clients verify malformed movement and target payload rejection, unknown-message rejection, stale movement sequences, and the 12-action-per-second gameplay limit without permitting client-forged state or excess movement.
+- Real Colyseus clients verify malformed movement and action payload rejection, unknown-message rejection, stale movement sequences, and the 12-action-per-second gameplay limit without permitting client-forged state or excess movement.
 - Integration flows cover late joins, intentional and expired host departure, reconnect-token expiry, membership release, host transfer, and invite removal after room disposal.
-- A controlled authoritative room tick receives tag and movement intent through real WebSockets, preserves eligible pre-deadline input, eliminates disconnected frozen Water atomically at the exact Deep Freeze deadline, and rejects post-deadline gameplay.
+- A controlled authoritative room tick receives frost-throw and movement intent through real WebSockets, preserves eligible pre-deadline input, eliminates disconnected frozen Water atomically at the exact Deep Freeze deadline, and rejects post-deadline gameplay.
 
 ### Completed baseline stabilization and development bots (2026-09-11)
 
@@ -150,7 +163,7 @@ No tasks currently in progress.
 | MVP-19 | Add local prediction and remote-player interpolation | Unassigned | P0 | Networking | MVP-18 |
 | MVP-20 | Render distinct Ice, Water, protected, and frozen states | Unassigned | P0 | Player states | MVP-14, MVP-16, MVP-19 |
 | MVP-21 | Implement spatial-grid nearby-player queries | Unassigned | P0 | Performance | MVP-18 |
-| MVP-22 | Implement validated Ice tag and temporary freeze | Unassigned | P0 | Freezing | MVP-20, MVP-21 |
+| MVP-22 | Implement validated Ice freezing and temporary freeze | Unassigned | P0 | Freezing | MVP-20, MVP-21 |
 | MVP-23 | Implement hold-to-rescue with server-owned progress | Unassigned | P0 | Rescue | MVP-22 |
 | MVP-24 | Add two-second post-rescue protection | Unassigned | P0 | Rescue | MVP-23 |
 | MVP-25 | Add rate-limited frozen-player help ping | Unassigned | P1 | Rescue | MVP-22 |
@@ -167,12 +180,12 @@ No tasks currently in progress.
 
 | ID | Task | Owner | Priority | Related feature | Dependencies |
 |---|---|---|---|---|---|
-| MVP-38 | Add direct unit coverage for movement, tag range and line-of-sight, cooldowns, rescue range and leases, multiple rescuers, protection, help pings, exact phase deadlines, and win rules | Unassigned | P0 | Quality | MVP-22, MVP-24, MVP-32 |
+| MVP-38 | Add direct unit coverage for movement, frost collisions and cooldowns, rescue range and leases, multiple rescuers, protection, help pings, exact phase deadlines, and win rules | Unassigned | P0 | Quality | MVP-22, MVP-24, MVP-32 |
 
 ### Verification and scope (Gameplay loop)
 
-- End-to-end playable 3D match loop: 3D PlayCanvas arena with obstacles, third-person follow camera, per-player entity manager with distinct state materials (Water, Ice, protected, frozen, eliminated statue).
+- End-to-end playable 3D match loop: Three.js arena with obstacles, third-person follow camera, per-player entity manager with distinct state materials (Water, Ice, protected, frozen, eliminated statue).
 - Server-authoritative MatchController: multi-round phase loop (regular 30s -> warning 8s -> deep freeze 30s -> round result 5s -> next round/match result), atomic deadline elimination of frozen Water, arena shrinkage across rounds (28m down to 12m), early Ice win check, and 5-round Water victory.
-- HUD & Controls: phase/round countdown timers, score counters, role banners, touch joystick and contextual action buttons (tag, hold rescue, help ping).
+- HUD & Controls: phase/round countdown timers, score counters, role banners, desktop control guide, touch joystick, and contextual action buttons (throw frost, hold rescue, help ping).
 - Automated tests: 55 unit and integration tests passing (`npm run test`), Playwright browser tests passing (`npm run test:e2e`), strict TypeScript type check passing across all packages (`npm run typecheck`), ESLint and Prettier passing (`npm run lint`), and production build passing (`npm run build`).
 

@@ -15,15 +15,29 @@ export interface MoveInput extends Position {
 export interface TargetIntent {
   targetId: string;
 }
+export interface FrostThrowIntent {
+  directionX: number;
+  directionY: number;
+  directionZ: number;
+}
+export interface FrostProjectileView extends SpatialPosition {
+  projectileId: string;
+  ownerPlayerId: string;
+  velocityX: number;
+  velocityY: number;
+  velocityZ: number;
+  expiresAt: number;
+}
 export type PlayerStatus = 'active' | 'frozen' | 'eliminated' | 'spectator';
 export interface GameplayMessages {
   'input/move': MoveInput;
-  'action/tag': TargetIntent;
+  'action/frost-throw': FrostThrowIntent;
   'action/rescue-start': TargetIntent;
   'action/rescue-stop': Record<string, never>;
   'action/help-ping': Record<string, never>;
 }
 export interface GameplayEvents {
+  'frost/thrown': { projectileId: string; ownerPlayerId: string; serverTime: number };
   'player/frozen': { playerId: string; by: string; serverTime: number };
   'player/rescued': { playerId: string; by: string[]; protectedUntil: number; serverTime: number };
   'player/help-ping': { playerId: string; until: number; serverTime: number };

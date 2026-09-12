@@ -63,7 +63,7 @@ Respect the module responsibilities in `ARCHITECTURE.md`. Do not create alternat
 - Constants: `UPPER_SNAKE_CASE` only for true module-level constants
 - Boolean values: use `is`, `has`, `can`, or `should` prefixes
 - Database tables and columns: `snake_case`
-- Colyseus messages: lowercase `domain/action`, such as `action/tag`
+- Colyseus messages: lowercase `domain/action`, such as `action/frost-throw`
 - Tests: `<unit>.test.ts` for unit/integration tests and `<flow>.spec.ts` for browser tests
 
 ## Architecture rules

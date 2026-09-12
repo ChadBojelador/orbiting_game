@@ -566,14 +566,14 @@ footer {
 /* Game HUD */
 .game-hud {
   position: absolute;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
+  inset: 0;
   z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  box-sizing: border-box;
+  padding: 16px 16px 0;
   pointer-events: none;
 }
 
@@ -682,6 +682,129 @@ footer {
   font-size: 14px;
   font-weight: 600;
   text-align: center;
+}
+
+.pc-control-guide {
+  position: fixed;
+  left: 22px;
+  bottom: 22px;
+  width: min(310px, calc(100vw - 44px));
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 14px 16px 15px;
+  color: #eefcff;
+  background:
+    linear-gradient(135deg, rgba(126, 235, 255, 0.14), transparent 42%), rgba(24, 40, 76, 0.86);
+  border: 1px solid rgba(189, 239, 255, 0.5);
+  border-left: 4px solid #7eebff;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  box-shadow: 0 12px 32px rgba(18, 48, 75, 0.28);
+  backdrop-filter: blur(10px);
+  text-align: left;
+  font-size: 12px;
+}
+
+.pc-control-guide > strong {
+  grid-column: 1 / -1;
+  font-size: 14px;
+  color: #bdf6ff;
+}
+
+.control-pair {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.control-pair--frost {
+  color: #bdf6ff;
+}
+
+.control-pair small {
+  color: #aabbd2;
+  font-size: 10px;
+}
+
+.pc-control-guide kbd {
+  min-width: 25px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-bottom-width: 3px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font:
+    700 10px/1.2 'Trebuchet MS',
+    sans-serif;
+  text-align: center;
+}
+
+.key-cluster {
+  display: grid;
+  grid-template-columns: repeat(3, 20px);
+  gap: 2px;
+}
+
+.key-cluster kbd {
+  min-width: 20px;
+  padding: 2px;
+}
+
+.key-cluster kbd:first-child {
+  grid-column: 2;
+}
+
+.frost-reticle {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 2px 4px rgba(24, 40, 76, 0.55));
+}
+
+.frost-reticle::before,
+.frost-reticle::after,
+.frost-reticle span::before,
+.frost-reticle span::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 2px;
+  width: 2px;
+  height: 22px;
+  border-radius: 2px;
+  background: #d9fbff;
+}
+
+.frost-reticle::after {
+  transform: rotate(90deg);
+}
+
+.frost-reticle span::before {
+  transform: rotate(45deg);
+}
+
+.frost-reticle span::after {
+  transform: rotate(-45deg);
+}
+
+@media (pointer: coarse), (max-width: 800px) {
+  .pc-control-guide,
+  .frost-reticle {
+    display: none;
+  }
+}
+
+@media (pointer: fine) and (min-width: 801px) {
+  .touch-controls {
+    display: none;
+  }
 }
 
 .hud-rescue-locked {

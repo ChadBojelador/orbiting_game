@@ -672,8 +672,11 @@ export function distanceSquared3d(a: SpatialPosition, b: SpatialPosition): numbe
   return (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
 }
 
-/** Tests the interaction ray at character chest height, allowing a jump above low cover. */
-export function hasGameplayLineOfSight(a: SpatialPosition, b: SpatialPosition): boolean {
+function hasSpatialLineOfSight(
+  a: SpatialPosition,
+  b: SpatialPosition,
+  heightOffset: number,
+): boolean {
   return !ARENA.blocks.some((block) => {
     let near = 0;
     let far = 1;
@@ -697,11 +700,21 @@ export function hasGameplayLineOfSight(a: SpatialPosition, b: SpatialPosition): 
       x: a.x + (b.x - a.x) * intersection,
       z: a.z + (b.z - a.z) * intersection,
     };
-    const rayY = a.y + GAMEPLAY.interactionHeight + (b.y - a.y) * intersection;
+    const rayY = a.y + heightOffset + (b.y - a.y) * intersection;
     const blockTop =
       Math.max(terrainHeightAt(block), terrainHeightAt(intersectionPosition)) + block.height;
     return rayY <= blockTop;
   });
+}
+
+/** Tests the interaction ray at character chest height, allowing a jump above low cover. */
+export function hasGameplayLineOfSight(a: SpatialPosition, b: SpatialPosition): boolean {
+  return hasSpatialLineOfSight(a, b, GAMEPLAY.interactionHeight);
+}
+
+/** Tests a projectile segment against the height of authored static cover. */
+export function hasProjectileLineOfSight(a: SpatialPosition, b: SpatialPosition): boolean {
+  return hasSpatialLineOfSight(a, b, 0);
 }
 
 export function hasLineOfSight(a: Position, b: Position): boolean {
