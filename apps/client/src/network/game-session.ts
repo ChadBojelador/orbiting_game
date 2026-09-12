@@ -49,12 +49,12 @@ export class GameSession {
   private receivedAt = performance.now();
   private rescueTarget = '';
   private rescueSentAt = 0;
+  private jumpRequested = false;
   private readonly cleanups: (() => void)[] = [];
 
   constructor(
     private readonly room: LobbyRoom,
     readonly playerId: string,
-    private readonly onJump: () => void,
   ) {
     this.view = snapshot(room.state);
 
@@ -148,6 +148,12 @@ export class GameSession {
     this.stopRescue();
   }
 
+  consumeJumpRequest(): boolean {
+    const requested = this.jumpRequested;
+    this.jumpRequested = false;
+    return requested;
+  }
+
   private stopRescue(): void {
     if (this.rescueTarget && this.isConnected) {
       this.room.send('action/rescue-stop', {});
@@ -158,25 +164,9 @@ export class GameSession {
 
   private tick(): void {
     const local = this.local();
-
-    if (
-      !local ||
-      !this.isConnected ||
-      !isPlayPhase(this.view.phase)
-    ) {
-      return;
-    }
-
-    const input = this.input.sample(
-      GAMEPLAY.tickMs / 1000,
-    );
-
-    // Space = jump
-    if (input.hasJump && !document.hidden) {
-      console.log('JUMP INPUT RECEIVED');
-      this.onJump();
-    }
-
+    if (!local || !this.isConnected || !isPlayPhase(this.view.phase)) return;
+    const input = this.input.sample(GAMEPLAY.tickMs / 1000);
+    this.jumpRequested ||= input.hasJump;
     const now = this.serverNow();
 
     const canMove =

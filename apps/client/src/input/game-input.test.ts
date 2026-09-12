@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraRelative, smoothAxes, touchAxes } from './game-input.js';
+import { cameraRelative, GameInput, smoothAxes, touchAxes } from './game-input.js';
 
 describe('game input', () => {
   it('rotates movement relative to camera yaw', () => {
@@ -22,5 +22,13 @@ describe('game input', () => {
 
     expect(accelerated).toEqual({ x: 0.45, z: 0 });
     expect(stopped).toEqual({ x: 0, z: 0 });
+  });
+
+  it('emits a one-shot jump request', () => {
+    const input = new GameInput();
+    input.pressJump();
+
+    expect(input.sample().hasJump).toBe(true);
+    expect(input.sample().hasJump).toBe(false);
   });
 });

@@ -42,7 +42,7 @@ export class LobbyController {
     }
     this.state.iceCount = iceCountFor(players.length, this.brackets);
     players.forEach((player, index) => {
-      player.team = index < 2 ? 'ice' : 'water';
+      player.team = index < this.state.iceCount ? 'ice' : 'water';
     });
     this.state.round = 0; // MatchController.start() will set this to 1.
     this.state.maxRounds = GAMEPLAY.maxRounds;
