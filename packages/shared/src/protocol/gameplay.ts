@@ -4,8 +4,13 @@ export interface Position {
   x: number;
   z: number;
 }
+export interface SpatialPosition extends Position {
+  y: number;
+}
 export interface MoveInput extends Position {
   sequence: number;
+  /** One-shot jump intent. Optional so a rolling deployment accepts older clients. */
+  jump?: boolean;
 }
 export interface TargetIntent {
   targetId: string;

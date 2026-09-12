@@ -19,8 +19,7 @@ body {
   min-width: 320px;
   background:
     linear-gradient(145deg, rgba(255, 241, 209, 0.7), transparent 38%),
-    linear-gradient(320deg, rgba(64, 86, 216, 0.16), transparent 42%),
-    #bfe8dc;
+    linear-gradient(320deg, rgba(64, 86, 216, 0.16), transparent 42%), #bfe8dc;
 }
 button,
 input {
@@ -766,6 +765,10 @@ footer {
 }
 .touch-btn--tag {
   background: #4056d8;
+}
+.touch-btn--jump {
+  background: rgba(255, 241, 209, 0.92);
+  color: #24314f;
 }
 .touch-btn--rescue {
   background: #48cfe3;

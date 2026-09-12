@@ -1,5 +1,5 @@
 import { GAMEPLAY } from '../constants/gameplay.js';
-import type { Position } from '../protocol/gameplay.js';
+import type { Position, SpatialPosition } from '../protocol/gameplay.js';
 
 export interface ArenaBlock extends Position {
   id: string;
@@ -625,6 +625,83 @@ export function moveKinematic(
   const nextZ = { x, z: clamp(position.z + direction.z * distance) };
   if (isWalkable(nextZ, GAMEPLAY.playerRadius, halfExtent)) z = nextZ.z;
   return { x, z };
+}
+
+export interface VerticalMotion {
+  y: number;
+  verticalVelocity: number;
+  isGrounded: boolean;
+}
+
+/** Advances authoritative/predicted jump motion against the deterministic terrain surface. */
+export function advanceVerticalMotion(
+  motion: VerticalMotion,
+  position: Position,
+  seconds: number,
+  wantsJump = false,
+): VerticalMotion {
+  const groundY = terrainHeightAt(position);
+  const dt = Math.max(0, seconds);
+  let velocity = motion.verticalVelocity;
+  let isGrounded = motion.isGrounded;
+  let y = motion.y;
+
+  if (isGrounded) {
+    y = groundY;
+    velocity = 0;
+    if (wantsJump) {
+      velocity = GAMEPLAY.jumpSpeed;
+      isGrounded = false;
+    }
+  }
+
+  if (!isGrounded) {
+    y += velocity * dt - 0.5 * GAMEPLAY.gravity * dt * dt;
+    velocity -= GAMEPLAY.gravity * dt;
+    if (y <= groundY) {
+      y = groundY;
+      velocity = 0;
+      isGrounded = true;
+    }
+  }
+
+  return { y, verticalVelocity: velocity, isGrounded };
+}
+
+export function distanceSquared3d(a: SpatialPosition, b: SpatialPosition): number {
+  return (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
+}
+
+/** Tests the interaction ray at character chest height, allowing a jump above low cover. */
+export function hasGameplayLineOfSight(a: SpatialPosition, b: SpatialPosition): boolean {
+  return !ARENA.blocks.some((block) => {
+    let near = 0;
+    let far = 1;
+    for (const axis of ['x', 'z'] as const) {
+      const half = (axis === 'x' ? block.width : block.depth) / 2;
+      const min = block[axis] - half;
+      const max = block[axis] + half;
+      const delta = b[axis] - a[axis];
+      if (Math.abs(delta) < 1e-9) {
+        if (a[axis] < min || a[axis] > max) return false;
+      } else {
+        const t1 = (min - a[axis]) / delta;
+        const t2 = (max - a[axis]) / delta;
+        near = Math.max(near, Math.min(t1, t2));
+        far = Math.min(far, Math.max(t1, t2));
+        if (near > far) return false;
+      }
+    }
+    const intersection = (near + far) / 2;
+    const intersectionPosition = {
+      x: a.x + (b.x - a.x) * intersection,
+      z: a.z + (b.z - a.z) * intersection,
+    };
+    const rayY = a.y + GAMEPLAY.interactionHeight + (b.y - a.y) * intersection;
+    const blockTop =
+      Math.max(terrainHeightAt(block), terrainHeightAt(intersectionPosition)) + block.height;
+    return rayY <= blockTop;
+  });
 }
 
 export function hasLineOfSight(a: Position, b: Position): boolean {

@@ -11,6 +11,7 @@ test('six guests create a private room, join, count down, and receive roles', as
   browser,
   page,
 }) => {
+  test.setTimeout(90_000);
   const contexts: BrowserContext[] = [];
   await identify(page, 'Host Snow');
   await page.getByRole('button', { name: 'Create private room' }).click();

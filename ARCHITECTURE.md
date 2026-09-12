@@ -75,6 +75,7 @@ Each match belongs to exactly one Colyseus room on one Node.js process. Moving a
 
 - Initial target: 20 authoritative ticks per second, measured and adjusted through testing.
 - Use simple kinematic movement against static map collision.
+- Simulate vertical jump velocity and gravity at the same fixed step. The server accepts a one-shot jump flag only from an active grounded player and synchronizes authoritative world-space `y`, vertical velocity, and grounded state.
 - Use a spatial grid or equivalent broad phase for nearby tag and rescue candidates.
 - Use squared-distance and line-of-sight checks where required; avoid a general-purpose rigid-body simulation unless profiling proves it necessary.
 - Use server timestamps and deadlines for phases, protection windows, cooldowns, and reconnect reservations.
@@ -112,7 +113,7 @@ Required player state includes:
 - Server-generated player and session identifiers
 - Sanitized display name
 - Team: Ice or Water
-- Position, orientation, and movement sequence
+- Three-dimensional position, orientation, vertical velocity, grounded state, and movement sequence
 - Connection and reconnect-reservation state
 - Active, temporarily frozen, permanently frozen, or spectator state
 - Rescue progress target and contributors
@@ -136,7 +137,7 @@ Private-room joins, room events, and gameplay use Colyseus messages over secure 
 
 ### Client-to-server message families
 
-- `input/move` — sequenced movement intent
+- `input/move` — sequenced horizontal movement plus an optional one-shot jump intent
 - `action/tag` — Ice tag attempt
 - `action/rescue-start` and `action/rescue-stop` — rescue intent
 - `action/help-ping` — rate-limited frozen-player ping
@@ -275,7 +276,7 @@ Client and server must not import directly from one another. Both may depend on 
 
 The game is browser-only. Three.js keeps the runtime browser-native while exposing the low-level geometry control required by the authored multi-biome island. The prior PlayCanvas prototype was functional, but the approved world brief requires Three.js and stable code-defined terrain, river, bridge, and landmark geometry. Migrating the small prototype renderer was lower risk than maintaining two engines or translating every world module across an adapter. The tradeoff is that scene lifecycle, animation mixing, disposal, and future quality tiers remain explicit application responsibilities.
 
-`MAP_SPEC.md` is the source of truth for physical layout. Pure `X/Z` land masks, route corridors, river exclusions, bridge footprints, spawn generation, and terrain-height sampling live in `packages/shared` so authoritative movement and client prediction agree. The server continues synchronizing only `X/Z`; the client derives `Y` deterministically from the authored surface. Routes do not vertically overlap, so this preserves the existing compact protocol. A future overpass, jump, or airborne mechanic would require adding authoritative `Y` and revisiting distance and line-of-sight rules.
+`MAP_SPEC.md` is the source of truth for physical layout. Pure `X/Z` land masks, route corridors, river exclusions, bridge footprints, spawn generation, terrain-height sampling, and jump integration live in `packages/shared` so authoritative movement and client prediction agree. The server synchronizes `X/Y/Z`, vertical velocity, and grounded state. Tag and rescue validation use three-dimensional distance and a height-aware interaction ray, so jumping above low cover can change line of sight. Horizontal static collision remains active while airborne: jumping is an evasion and positioning mechanic, not a way to vault through walls. This adds small per-player schema fields and fixed-step arithmetic, avoiding a general physics-engine dependency while keeping outcomes authoritative.
 
 ### Colyseus instead of raw WebSockets
 
