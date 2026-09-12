@@ -4,6 +4,8 @@ import {
   ARENA_ROUNDS,
   BRIDGES,
   createSpawnPoints,
+  advanceVerticalMotion,
+  hasGameplayLineOfSight,
   isPermanentLand,
   isRiver,
   isWalkable,
@@ -73,5 +75,29 @@ describe('authored world arena', () => {
     ]) {
       expect(isWalkable(point, 0.8, ARENA.halfExtent)).toBe(true);
     }
+  });
+
+  it('advances jumps against terrain and allows sight above low cover', () => {
+    const groundY = terrainHeightAt({ x: 0, z: 0 });
+    const airborne = advanceVerticalMotion(
+      { y: groundY, verticalVelocity: 0, isGrounded: true },
+      { x: 0, z: 0 },
+      0.05,
+      true,
+    );
+    expect(airborne.y).toBeGreaterThan(groundY);
+    expect(airborne.isGrounded).toBe(false);
+
+    const lowCover = ARENA.blocks.find((block) => block.id === 'COVER_VILLAGE_N')!;
+    const pointA = { x: lowCover.x, z: lowCover.z - 3 };
+    const pointB = { x: lowCover.x, z: lowCover.z + 3 };
+    const groundA = terrainHeightAt(pointA);
+    const groundB = terrainHeightAt(pointB);
+    expect(hasGameplayLineOfSight({ ...pointA, y: groundA }, { ...pointB, y: groundB })).toBe(
+      false,
+    );
+    expect(
+      hasGameplayLineOfSight({ ...pointA, y: groundA + 2 }, { ...pointB, y: groundB + 2 }),
+    ).toBe(true);
   });
 });

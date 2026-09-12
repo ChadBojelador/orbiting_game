@@ -108,6 +108,19 @@ export function TouchControls({ input, team, playerStatus, isRescueLocked }: Tou
 
       {/* Right side: action buttons */}
       <div className="touch-action-zone">
+        {playerStatus === 'active' && (
+          <button
+            className="touch-btn touch-btn--jump"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              input?.pressJump();
+            }}
+            aria-label="Jump"
+          >
+            ↑ Jump
+          </button>
+        )}
+
         {/* Tag button — Ice only */}
         {team === 'ice' && playerStatus === 'active' && (
           <button

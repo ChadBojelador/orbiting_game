@@ -144,6 +144,7 @@ export class GameScene {
           this.localPresentation.update(
             {
               x: prediction.position.x,
+              y: prediction.y,
               z: prediction.position.z,
               yaw: prediction.yaw,
             },
@@ -159,20 +160,25 @@ export class GameScene {
       positions.set(
         player.playerId,
         sample
-          ? { x: sample.x, z: sample.z, yaw: sample.yaw }
-          : { x: player.x, z: player.z, yaw: player.yaw },
+          ? { x: sample.x, y: sample.y, z: sample.z, yaw: sample.yaw }
+          : { x: player.x, y: player.y, z: player.z, yaw: player.yaw },
       );
     }
     this.playerEntities?.update(view, positions, this.session.playerId, deltaSeconds);
-    if (this.session.consumeJumpRequest()) {
-      this.playerEntities?.triggerJump(this.session.playerId);
-    }
 
     const localPosition = localPlayer
-      ? (positions.get(localPlayer.playerId) ?? { x: 0, z: 8 })
-      : { x: 0, z: 8 };
-    const terrainY = worldHeightAt(localPosition.x, localPosition.z);
-    const cameraTarget = this.cameraTarget.set(localPosition.x, terrainY + 1.35, localPosition.z);
+      ? (positions.get(localPlayer.playerId) ?? {
+          x: 0,
+          y: worldHeightAt(0, 8),
+          z: 8,
+          yaw: 0,
+        })
+      : { x: 0, y: worldHeightAt(0, 8), z: 8, yaw: 0 };
+    const cameraTarget = this.cameraTarget.set(
+      localPosition.x,
+      localPosition.y + 1.35,
+      localPosition.z,
+    );
     const cameraPose = this.followCamera.update(cameraTarget, deltaSeconds, [], (x, z) =>
       worldHeightAt(x, z),
     );
