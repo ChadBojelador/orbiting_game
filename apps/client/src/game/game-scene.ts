@@ -2,9 +2,11 @@ import { ARENA, GAMEPLAY } from '@ice-water/shared';
 import * as THREE from 'three';
 import type { LobbyRoom } from '../network/lobby-client.js';
 import { GameSession } from '../network/game-session.js';
+import { LocalPresentation, type PresentationMotion } from '../network/player-motion.js';
 import { WorldLayout, WORLD_CAMERA_FAR, worldHeightAt } from '../world/world-layout.js';
 import { loadCharacterModel } from './character-model.js';
 import { PlayerEntityManager } from './player-entity.js';
+import { renderPixelRatio } from './render-performance.js';
 import { ThirdPersonCamera } from './third-person-camera.js';
 
 const CAMERA_FOV = 52;
@@ -16,11 +18,15 @@ export class GameScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly world: WorldLayout;
   private readonly followCamera = new ThirdPersonCamera();
+  private readonly localPresentation = new LocalPresentation();
+  private readonly positions = new Map<string, PresentationMotion>();
+  private readonly cameraTarget = new THREE.Vector3();
   private playerEntities?: PlayerEntityManager;
   private destroyed = false;
   private animationFrame = 0;
   private lastPointer: { x: number; y: number } | null = null;
   private previousFrameTime = performance.now();
+  private previousPhase = '';
   private readonly cleanups: (() => void)[] = [];
 
   constructor(
@@ -40,7 +46,7 @@ export class GameScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.scene.background = new THREE.Color(0xaeddf0);
     this.scene.fog = new THREE.Fog(0xc8e9ec, 250, 560);
@@ -102,7 +108,7 @@ export class GameScene {
       if (!parent) return;
       const width = Math.max(1, parent.clientWidth);
       const height = Math.max(1, parent.clientHeight);
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.renderer.setPixelRatio(renderPixelRatio(width, height, window.devicePixelRatio));
       this.renderer.setSize(width, height, false);
       this.camera.aspect = width / height;
       this.camera.updateProjectionMatrix();
@@ -118,25 +124,38 @@ export class GameScene {
     const deltaSeconds = Math.min(0.05, Math.max(0, (now - this.previousFrameTime) / 1000));
     this.previousFrameTime = now;
     const view = this.session.view;
-    this.onStateChange?.(view.phase);
+    if (view.phase !== this.previousPhase) {
+      this.previousPhase = view.phase;
+      this.onStateChange?.(view.phase);
+    }
     this.world.setHalfExtent(view.arenaHalfExtent || ARENA.halfExtent);
     this.world.update(now / 1000);
 
     const serverNow = this.session.serverNow();
     const renderTime = serverNow - GAMEPLAY.interpolationMs;
-    const positions = new Map<string, { x: number; z: number; yaw: number }>();
+    const positions = this.positions;
+    positions.clear();
     const localPlayer = this.session.local();
     for (const player of view.players) {
       if (player.playerId === this.session.playerId) {
         const prediction = this.session.prediction;
-        positions.set(player.playerId, {
-          x: prediction.position.x,
-          z: prediction.position.z,
-          yaw: prediction.yaw,
-        });
+        positions.set(
+          player.playerId,
+          this.localPresentation.update(
+            {
+              x: prediction.position.x,
+              z: prediction.position.z,
+              yaw: prediction.yaw,
+            },
+            deltaSeconds,
+            !this.session.canMove(player),
+          ),
+        );
         continue;
       }
-      const sample = this.session.remotes.get(player.playerId)?.at(renderTime);
+      const sample = this.session.remotes
+        .get(player.playerId)
+        ?.at(renderTime, view.arenaHalfExtent || ARENA.halfExtent);
       positions.set(
         player.playerId,
         sample
@@ -153,12 +172,9 @@ export class GameScene {
       ? (positions.get(localPlayer.playerId) ?? { x: 0, z: 8 })
       : { x: 0, z: 8 };
     const terrainY = worldHeightAt(localPosition.x, localPosition.z);
-    const cameraTarget = new THREE.Vector3(localPosition.x, terrainY + 1.35, localPosition.z);
-    const cameraPose = this.followCamera.update(
-      cameraTarget,
-      deltaSeconds,
-      [],
-      (x, z) => worldHeightAt(x, z),
+    const cameraTarget = this.cameraTarget.set(localPosition.x, terrainY + 1.35, localPosition.z);
+    const cameraPose = this.followCamera.update(cameraTarget, deltaSeconds, [], (x, z) =>
+      worldHeightAt(x, z),
     );
     this.session.input.cameraYaw = cameraPose.yaw;
     this.camera.position.set(cameraPose.position.x, cameraPose.position.y, cameraPose.position.z);
