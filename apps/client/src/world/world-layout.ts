@@ -552,6 +552,7 @@ function createBlockoutDetails(): THREE.Group {
 export class WorldLayout {
   private readonly root = new THREE.Group();
   private boundary = new THREE.Group();
+  private windmillHub?: THREE.Object3D;
   private readonly waterMaterial = new THREE.MeshPhysicalMaterial({
     color: PALETTE.river,
     transparent: true,
@@ -571,6 +572,8 @@ export class WorldLayout {
     this.root.name = 'WORLD_ROOT';
     this.scene.add(this.root);
     this.build();
+    const windmill = this.root.getObjectByName('LM_MEADOW_WINDMILL');
+    this.windmillHub = windmill?.children.find((child) => child.type === 'Group');
   }
 
   setHalfExtent(halfExtent: number): void {
@@ -584,9 +587,7 @@ export class WorldLayout {
 
   update(elapsedSeconds: number): void {
     this.waterMaterial.opacity = 0.72 + Math.sin(elapsedSeconds * 1.4) * 0.04;
-    const windmill = this.root.getObjectByName('LM_MEADOW_WINDMILL');
-    const hub = windmill?.children.find((child) => child.type === 'Group');
-    if (hub) hub.rotation.z = elapsedSeconds * 0.35;
+    if (this.windmillHub) this.windmillHub.rotation.z = elapsedSeconds * 0.35;
   }
 
   destroy(): void {
