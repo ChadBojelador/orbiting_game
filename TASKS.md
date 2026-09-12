@@ -59,6 +59,20 @@ No tasks currently in progress.
 |---|---|---|---|---|---|
 | DOC-01 | Establish README, PRD, architecture, agent guide, contribution workflow, environment example, ignore rules, and task tracker | Unassigned | P0 | Foundation | — |
 
+### Completed authoritative jumping (2026-09-12)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-55 | Make jumping a server-authoritative mechanic with vertical interaction validation | Chad Bojelador | P0 | Movement | MVP-18, MVP-19, MVP-38 |
+
+### Verification and scope (Authoritative jumping)
+
+- Sequenced movement carries a backward-compatible one-shot jump flag; the server owns world-space height, vertical velocity, grounded state, jump eligibility, gravity, and landing.
+- Client prediction and remote interpolation include authoritative vertical motion. Keyboard and touch expose distinct jump controls.
+- Tag and rescue use three-dimensional range plus height-aware line of sight. Airborne players retain horizontal static collision and cannot vault through walls.
+- Unit coverage includes jump validation, grounded-only initiation, landing, prediction/reconciliation, vertical interaction range, rescue cancellation, and low-cover line of sight; real-WebSocket coverage verifies jump intent reaches authoritative state.
+- Local verification passed 117 non-database tests, strict type checking, changed-file ESLint, the production build, and both existing Playwright scenarios. The configured PostgreSQL migration test could not connect to port 55432, and the Playwright command required termination after its assertions because of the documented Windows child-process cleanup hang.
+
 ### Completed active-match reconnection (2026-09-11)
 
 | ID | Task | Owner | Priority | Related feature | Dependencies |

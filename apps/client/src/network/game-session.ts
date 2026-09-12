@@ -1,8 +1,8 @@
 import {
   GAMEPLAY,
   canRescueInPhase,
-  distanceSquared,
-  hasLineOfSight,
+  distanceSquared3d,
+  hasGameplayLineOfSight,
   isPlayPhase,
   type LobbyView,
   type PlayerView,
@@ -29,13 +29,10 @@ export function nearestTarget(
         (local.team === 'ice'
           ? player.status === 'active' && now >= player.protectedUntil
           : player.status === 'frozen') &&
-        distanceSquared(local, player) <= range * range &&
-        hasLineOfSight(local, player),
+        distanceSquared3d(local, player) <= range * range &&
+        hasGameplayLineOfSight(local, player),
     )
-    .sort(
-      (a, b) =>
-        distanceSquared(local, a) - distanceSquared(local, b),
-    )[0];
+    .sort((a, b) => distanceSquared3d(local, a) - distanceSquared3d(local, b))[0];
 }
 
 export class GameSession {
@@ -49,7 +46,6 @@ export class GameSession {
   private receivedAt = performance.now();
   private rescueTarget = '';
   private rescueSentAt = 0;
-  private jumpRequested = false;
   private readonly cleanups: (() => void)[] = [];
 
   constructor(
@@ -64,10 +60,7 @@ export class GameSession {
 
       for (const player of this.view.players) {
         if (player.playerId === playerId) {
-          this.prediction.reconcile(
-            player,
-            this.canMove(player),
-          );
+          this.prediction.reconcile(player, this.canMove(player));
         } else {
           let motion = this.remotes.get(player.playerId);
 
@@ -106,30 +99,19 @@ export class GameSession {
 
     update();
 
-    const timer = window.setInterval(
-      () => this.tick(),
-      GAMEPLAY.tickMs,
-    );
+    const timer = window.setInterval(() => this.tick(), GAMEPLAY.tickMs);
 
     this.cleanups.push(() => window.clearInterval(timer));
 
-    this.cleanups.push(
-      this.input.bind(window, () => this.stopRescue()),
-    );
+    this.cleanups.push(this.input.bind(window, () => this.stopRescue()));
   }
 
   serverNow(): number {
-    return (
-      this.view.serverTime +
-      performance.now() -
-      this.receivedAt
-    );
+    return this.view.serverTime + performance.now() - this.receivedAt;
   }
 
   local(): PlayerView | undefined {
-    return this.view.players.find(
-      (player) => player.playerId === this.playerId,
-    );
+    return this.view.players.find((player) => player.playerId === this.playerId);
   }
 
   canMove(player: PlayerView): boolean {
@@ -138,20 +120,13 @@ export class GameSession {
       player.isConnected &&
       player.status === 'active' &&
       isPlayPhase(this.view.phase) &&
-      (this.view.phaseDeadline === 0 ||
-        this.serverNow() < this.view.phaseDeadline)
+      (this.view.phaseDeadline === 0 || this.serverNow() < this.view.phaseDeadline)
     );
   }
 
   destroy(): void {
     for (const cleanup of this.cleanups) cleanup();
     this.stopRescue();
-  }
-
-  consumeJumpRequest(): boolean {
-    const requested = this.jumpRequested;
-    this.jumpRequested = false;
-    return requested;
   }
 
   private stopRescue(): void {
@@ -166,15 +141,14 @@ export class GameSession {
     const local = this.local();
     if (!local || !this.isConnected || !isPlayPhase(this.view.phase)) return;
     const input = this.input.sample(GAMEPLAY.tickMs / 1000);
-    this.jumpRequested ||= input.hasJump;
     const now = this.serverNow();
 
-    const canMove =
-      this.canMove(local) && !document.hidden;
+    const canMove = this.canMove(local) && !document.hidden;
 
     const move = this.prediction.predict(
       canMove ? input : { x: 0, z: 0 },
       canMove,
+      canMove && input.hasJump,
     );
 
     // Send only protocol fields; action flags never enter
@@ -183,31 +157,19 @@ export class GameSession {
       x: move.x,
       z: move.z,
       sequence: move.sequence,
+      jump: move.jump,
     });
 
-    const target = nearestTarget(
-      this.view,
-      local,
-      now,
-    );
+    const target = nearestTarget(this.view, local, now);
 
     // Left click = tag
-    if (
-      input.hasTag &&
-      local.team === 'ice' &&
-      target &&
-      now >= local.tagReadyAt
-    ) {
+    if (input.hasTag && local.team === 'ice' && target && now >= local.tagReadyAt) {
       this.room.send('action/tag', {
         targetId: target.playerId,
       });
     }
 
-    if (
-      input.hasPing &&
-      local.status === 'frozen' &&
-      now >= local.helpPingReadyAt
-    ) {
+    if (input.hasPing && local.status === 'frozen' && now >= local.helpPingReadyAt) {
       this.room.send('action/help-ping', {});
     }
 
@@ -216,11 +178,7 @@ export class GameSession {
       input.isRescuing &&
       local.team === 'water' &&
       target &&
-      canRescueInPhase(
-        this.view.phase,
-        this.view.phaseDeadline,
-        now,
-      );
+      canRescueInPhase(this.view.phase, this.view.phaseDeadline, now);
 
     if (!canRescue) {
       this.stopRescue();
@@ -231,10 +189,7 @@ export class GameSession {
       this.stopRescue();
     }
 
-    if (
-      !this.rescueTarget ||
-      now - this.rescueSentAt >= 200
-    ) {
+    if (!this.rescueTarget || now - this.rescueSentAt >= 200) {
       this.room.send('action/rescue-start', {
         targetId: target.playerId,
       });

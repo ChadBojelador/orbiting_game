@@ -101,6 +101,7 @@ export class GameInput {
       'ArrowDown',
       'ArrowRight',
       'KeyE',
+      'KeyF',
       'Space',
       'KeyH',
     ]);
@@ -115,10 +116,8 @@ export class GameInput {
       event.preventDefault();
       this.keys.add(event.code);
       if (event.repeat) return;
-      if (event.code === 'Space') {
-        this.pressTag();
-        this.pressJump();
-      }
+      if (event.code === 'Space') this.pressJump();
+      if (event.code === 'KeyF') this.pressTag();
       if (event.code === 'KeyH') this.pressPing();
     };
     const up = (event: KeyboardEvent) => {

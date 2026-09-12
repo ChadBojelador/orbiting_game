@@ -79,6 +79,7 @@ Players need an accessible multiplayer party game that supports a large crowd, i
 ### Movement and arena
 
 - Players navigate a stylized 3D arena using keyboard or touch controls.
+- Active players may jump. Jumping changes authoritative vertical position and can affect tag and rescue range, but it does not bypass walls or other static collision.
 - Player characters do not physically push or block one another.
 - The playable arena contracts between rounds to discourage hiding.
 
@@ -117,9 +118,10 @@ Players need an accessible multiplayer party game that supports a large crowd, i
 
 ### Gameplay
 
-- **FR-05:** The client supports keyboard movement and a documented mobile touch layout.
-- **FR-06:** The server owns player position, team, freeze status, protection status, and eligibility.
-- **FR-07:** The server rejects impossible movement, out-of-range tags, and invalid rescues.
+- **FR-05:** The client supports keyboard movement and jumping plus a documented mobile touch layout with a jump control.
+- **FR-05A:** An active player may jump only while grounded; frozen, eliminated, and spectator players cannot initiate a jump.
+- **FR-06:** The server owns three-dimensional player position, vertical velocity, grounded state, team, freeze status, protection status, and eligibility.
+- **FR-07:** The server rejects impossible movement, repeated airborne jump attempts, out-of-range tags, and invalid rescues. Tag and rescue range use authoritative three-dimensional distance.
 - **FR-08:** The game displays clear visual distinctions among Ice, active Water, temporarily protected Water, and frozen Water.
 - **FR-09:** Frozen players can request help through a limited visual ping.
 - **FR-10:** Players can see the current phase, phase timer, round number, and team objective.
@@ -199,7 +201,7 @@ Players need an accessible multiplayer party game that supports a large crowd, i
 - Private room creation and invite-code joining
 - Dynamic rooms supporting 6–150 players
 - Ice and Water role assignment
-- Keyboard and basic touch movement
+- Keyboard and basic touch movement with server-authoritative jumping
 - Freeze, rescue, help ping, and post-rescue protection
 - Exactly five rounds, each with 30 seconds of regular play and a 30-second Deep Freeze
 - Permanent freeze, spectator mode, team result, and basic scores

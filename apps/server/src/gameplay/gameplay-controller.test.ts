@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { GAMEPLAY, type GameplayEvent } from '@ice-water/shared';
+import { GAMEPLAY, terrainHeightAt, type GameplayEvent } from '@ice-water/shared';
 import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { GameplayController } from './gameplay-controller.js';
 
@@ -10,6 +10,7 @@ interface PlayerOptions {
   team: 'ice' | 'water';
   status?: 'active' | 'frozen' | 'eliminated' | 'spectator';
   x?: number;
+  y?: number;
   z?: number;
 }
 
@@ -21,6 +22,7 @@ function addPlayer(state: LobbyState, options: PlayerOptions): PlayerState {
   player.isConnected = true;
   player.x = options.x ?? 0;
   player.z = options.z ?? 0;
+  player.y = options.y ?? terrainHeightAt(player);
   state.players.set(player.playerId, player);
   return player;
 }
@@ -42,10 +44,20 @@ function makeFixture(options: PlayerOptions[]) {
     const player = players.get(option.id)!;
     player.x = option.x ?? 0;
     player.z = option.z ?? 0;
+    player.y = option.y ?? terrainHeightAt(player);
+    player.verticalVelocity = 0;
+    player.isGrounded = true;
     player.status = option.status ?? 'active';
   }
   const now = START + GAMEPLAY.tickMs;
   controller.advance(now);
+  for (const option of options) {
+    if (option.y === undefined) continue;
+    const player = players.get(option.id)!;
+    player.y = option.y;
+    player.verticalVelocity = 0;
+    player.isGrounded = false;
+  }
   return { state, players, events, controller, now };
 }
 
@@ -63,6 +75,9 @@ describe('GameplayController', () => {
       expect(controller.handle('water', 'input/move', { x: 1.01, z: 0, sequence: 1 }, now)).toBe(
         'Invalid movement input',
       );
+      expect(
+        controller.handle('water', 'input/move', { x: 0, z: 0, sequence: 1, jump: 'yes' }, now),
+      ).toBe('Invalid movement input');
       expect(controller.handle('water', 'input/move', { x: 1, z: 0, sequence: 1 }, now)).toBeNull();
       expect(controller.handle('water', 'input/move', { x: 1, z: 0, sequence: 1 }, now)).toBe(
         'Stale or invalid input sequence',
@@ -100,6 +115,36 @@ describe('GameplayController', () => {
       expect({ x: player.x, z: player.z }).toEqual({ x: 3, z: 4 });
       expect(player.inputSequence).toBe(1);
     });
+
+    it('starts jumps only from the ground and lands using authoritative gravity', () => {
+      const { controller, players, now } = makeFixture([{ id: 'water', team: 'water' }]);
+      const player = players.get('water')!;
+      const groundY = terrainHeightAt(player);
+
+      expect(
+        controller.handle('water', 'input/move', { x: 0, z: 0, sequence: 1, jump: true }, now),
+      ).toBeNull();
+      controller.advance(now + GAMEPLAY.tickMs);
+      expect(player.y).toBeGreaterThan(groundY);
+      expect(player.isGrounded).toBe(false);
+      const firstVelocity = player.verticalVelocity;
+
+      expect(
+        controller.handle(
+          'water',
+          'input/move',
+          { x: 0, z: 0, sequence: 2, jump: true },
+          now + GAMEPLAY.tickMs,
+        ),
+      ).toBeNull();
+      controller.advance(now + 2 * GAMEPLAY.tickMs);
+      expect(player.verticalVelocity).toBeLessThan(firstVelocity);
+
+      advanceInTicks(controller, now + 2 * GAMEPLAY.tickMs, now + 2_000);
+      expect(player.y).toBe(groundY);
+      expect(player.verticalVelocity).toBe(0);
+      expect(player.isGrounded).toBe(true);
+    });
   });
 
   describe('tag validation and cooldowns', () => {
@@ -127,6 +172,24 @@ describe('GameplayController', () => {
         'Move closer to active Water',
       );
       expect(other.players.get('water')!.status).toBe('active');
+    });
+
+    it('uses authoritative vertical separation for tag range', () => {
+      const { controller, players, now } = makeFixture([
+        { id: 'ice', team: 'ice', x: 0, z: 0 },
+        {
+          id: 'water',
+          team: 'water',
+          x: 0,
+          z: 0,
+          y: terrainHeightAt({ x: 0, z: 0 }) + GAMEPLAY.tagRange + 0.001,
+        },
+      ]);
+
+      expect(controller.handle('ice', 'action/tag', { targetId: 'water' }, now)).toBe(
+        'Move closer to active Water',
+      );
+      expect(players.get('water')!.status).toBe('active');
     });
 
     it('rejects a nearby target when an arena block crosses line of sight', () => {
@@ -209,6 +272,23 @@ describe('GameplayController', () => {
           blocked.now,
         ),
       ).toBe('Move closer to a frozen teammate');
+    });
+
+    it('cancels a rescue when a jump creates too much vertical separation', () => {
+      const { controller, players, now } = makeFixture([
+        { id: 'rescuer', team: 'water', x: 0, z: 0 },
+        { id: 'target', team: 'water', status: 'frozen', x: 1.8, z: 0 },
+      ]);
+      expect(
+        controller.handle('rescuer', 'action/rescue-start', { targetId: 'target' }, now),
+      ).toBeNull();
+      players.get('rescuer')!.y += 2;
+      players.get('rescuer')!.isGrounded = false;
+
+      controller.advance(now + GAMEPLAY.tickMs);
+
+      expect(players.get('rescuer')!.rescuingTarget).toBe('');
+      expect(players.get('target')!.rescueProgress).toBe(0);
     });
 
     it('expires an unrenewed rescue lease and resets its progress', () => {
