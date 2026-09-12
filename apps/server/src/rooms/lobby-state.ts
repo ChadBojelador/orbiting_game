@@ -27,7 +27,7 @@ export const PlayerState = schema(
     protectedUntil: t.number().default(0),
     rescueProgress: t.float32().default(0),
     rescuingTarget: t.string().default(''),
-    tagReadyAt: t.number().default(0),
+    frostReadyAt: t.number().default(0),
     helpPingUntil: t.number().default(0),
     helpPingReadyAt: t.number().default(0),
     tags: t.uint32().default(0),
@@ -36,6 +36,22 @@ export const PlayerState = schema(
   'PlayerState',
 );
 export type PlayerState = SchemaType<typeof PlayerState>;
+
+export const FrostProjectileState = schema(
+  {
+    projectileId: t.string().default(''),
+    ownerPlayerId: t.string().default(''),
+    x: t.float32().default(0),
+    y: t.float32().default(0),
+    z: t.float32().default(0),
+    velocityX: t.float32().default(0),
+    velocityY: t.float32().default(0),
+    velocityZ: t.float32().default(0),
+    expiresAt: t.number().default(0),
+  },
+  'FrostProjectileState',
+);
+export type FrostProjectileState = SchemaType<typeof FrostProjectileState>;
 
 export const LobbyState = schema(
   {
@@ -52,6 +68,7 @@ export const LobbyState = schema(
     arenaHalfExtent: t.float32().default(ARENA.halfExtent),
     matchWinner: t.string<'ice' | 'water' | ''>().default(''),
     players: t.map(PlayerState),
+    projectiles: t.map(FrostProjectileState),
   },
   'LobbyState',
 );

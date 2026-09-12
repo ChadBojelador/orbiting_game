@@ -42,7 +42,7 @@ The desired feeling is a **cozy toy-diorama world interrupted by a playful winte
 
 - Rounded base silhouette interrupted by crystalline corners
 - Frost crown, shard collar, or angular backpack-like accent
-- Avoid aggressive weapons; danger comes from cold aura, speed, and tag effects
+- Frost is hand-cast as a compact glowing shard with a soft cyan halo; avoid aggressive weapons or firearm language
 
 ### Environment
 
@@ -92,6 +92,8 @@ Color must not be the only state signal. Pair it with silhouette changes, icons,
 - Invite codes use large characters, generous spacing, and copy feedback
 - During Deep Freeze, rescue controls visibly lock and show “RESCUE LOCKED”
 - Mobile controls remain translucent and avoid covering the center action
+- Desktop play uses a small lower-left “ice ticket” control guide with tactile keycap shapes; role-specific rows appear only when relevant.
+- Active Ice players receive a restrained snowflake reticle at screen center. It should aid aim without obscuring nearby players or looking like a firearm sight.
 
 ## Asset sourcing
 

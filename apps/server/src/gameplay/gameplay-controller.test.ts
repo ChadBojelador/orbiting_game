@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { GAMEPLAY, terrainHeightAt, type GameplayEvent } from '@ice-water/shared';
 import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { GameplayController } from './gameplay-controller.js';
@@ -147,87 +147,115 @@ describe('GameplayController', () => {
     });
   });
 
-  describe('tag validation and cooldowns', () => {
-    let fixture: ReturnType<typeof makeFixture>;
+  describe('frost projectile validation and cooldowns', () => {
+    const east = { directionX: 1, directionY: 0, directionZ: 0 };
 
-    beforeEach(() => {
-      fixture = makeFixture([
+    it('creates an authoritative projectile that freezes Water on impact', () => {
+      const { controller, players, state, events, now } = makeFixture([
         { id: 'ice', team: 'ice', x: 0, z: 0 },
-        { id: 'water-a', team: 'water', x: GAMEPLAY.tagRange, z: 0 },
-        { id: 'water-b', team: 'water', x: 0, z: GAMEPLAY.tagRange },
+        { id: 'water', team: 'water', x: 3, z: 0 },
       ]);
+
+      expect(controller.handle('ice', 'action/frost-throw', east, now)).toBeNull();
+      expect(state.projectiles.size).toBe(1);
+      expect(players.get('water')!.status).toBe('active');
+
+      advanceInTicks(controller, now, now + 2 * GAMEPLAY.tickMs);
+
+      expect(state.projectiles.size).toBe(0);
+      expect(players.get('water')!.status).toBe('frozen');
+      expect(players.get('ice')!.tags).toBe(1);
+      expect(events.map((event) => event.type)).toContain('frost/thrown');
+      expect(events.at(-1)?.type).toBe('player/frozen');
     });
 
-    it('accepts a target exactly at tag range and rejects one just beyond it', () => {
-      const { controller, players, now } = fixture;
-
-      expect(controller.handle('ice', 'action/tag', { targetId: 'water-a' }, now)).toBeNull();
-      expect(players.get('water-a')!.status).toBe('frozen');
-
-      const other = makeFixture([
-        { id: 'ice', team: 'ice', x: 0, z: 0 },
-        { id: 'water', team: 'water', x: GAMEPLAY.tagRange + 0.001, z: 0 },
+    it('rejects malformed aim, non-Ice throws, and repeat throws before cooldown', () => {
+      const { controller, state, now } = makeFixture([
+        { id: 'ice', team: 'ice' },
+        { id: 'water', team: 'water' },
       ]);
-      expect(other.controller.handle('ice', 'action/tag', { targetId: 'water' }, other.now)).toBe(
-        'Move closer to active Water',
+
+      expect(
+        controller.handle(
+          'ice',
+          'action/frost-throw',
+          { directionX: 2, directionY: 0, directionZ: 0 },
+          now,
+        ),
+      ).toBe('Invalid frost throw');
+      expect(controller.handle('water', 'action/frost-throw', east, now)).toBe(
+        'Only Ice can throw frost',
       );
-      expect(other.players.get('water')!.status).toBe('active');
+      expect(controller.handle('ice', 'action/frost-throw', east, now)).toBeNull();
+      expect(
+        controller.handle(
+          'ice',
+          'action/frost-throw',
+          east,
+          now + GAMEPLAY.frostThrowCooldownMs - 1,
+        ),
+      ).toBe('Frost is cooling down');
+      expect(
+        controller.handle('ice', 'action/frost-throw', east, now + GAMEPLAY.frostThrowCooldownMs),
+      ).toBeNull();
+      expect(state.projectiles.size).toBe(2);
     });
 
-    it('uses authoritative vertical separation for tag range', () => {
-      const { controller, players, now } = makeFixture([
-        { id: 'ice', team: 'ice', x: 0, z: 0 },
-        {
-          id: 'water',
-          team: 'water',
-          x: 0,
-          z: 0,
-          y: terrainHeightAt({ x: 0, z: 0 }) + GAMEPLAY.tagRange + 0.001,
-        },
+    it('stops frost against static cover', () => {
+      const { controller, players, state, now } = makeFixture([
+        { id: 'ice', team: 'ice', x: 5.54, z: -9.3 },
+        { id: 'water', team: 'water', x: 7, z: -10.76 },
       ]);
+      const inverseLength = 1 / Math.sqrt(2);
 
-      expect(controller.handle('ice', 'action/tag', { targetId: 'water' }, now)).toBe(
-        'Move closer to active Water',
-      );
+      expect(
+        controller.handle(
+          'ice',
+          'action/frost-throw',
+          { directionX: inverseLength, directionY: 0, directionZ: -inverseLength },
+          now,
+        ),
+      ).toBeNull();
+      controller.advance(now + GAMEPLAY.tickMs);
+
+      expect(state.projectiles.size).toBe(0);
       expect(players.get('water')!.status).toBe('active');
     });
 
-    it('rejects a nearby target when an arena block crosses line of sight', () => {
-      const blocked = makeFixture([
-        { id: 'ice', team: 'ice', x: 5.54, z: -9.3 },
-        { id: 'water', team: 'water', x: 6.7, z: -10.46 },
+    it('misses an airborne target outside the projectile hit radius', () => {
+      const groundY = terrainHeightAt({ x: 3, z: 0 });
+      const { controller, players, now } = makeFixture([
+        { id: 'ice', team: 'ice', x: 0, z: 0 },
+        { id: 'water', team: 'water', x: 3, y: groundY + 2, z: 0 },
       ]);
 
-      expect(
-        blocked.controller.handle('ice', 'action/tag', { targetId: 'water' }, blocked.now),
-      ).toBe('Move closer to active Water');
-      expect(blocked.players.get('water')!.status).toBe('active');
+      expect(controller.handle('ice', 'action/frost-throw', east, now)).toBeNull();
+      advanceInTicks(controller, now, now + 4 * GAMEPLAY.tickMs);
+
+      expect(players.get('water')!.status).toBe('active');
     });
 
-    it('enforces the tag cooldown until, but not including, its deadline', () => {
-      const { controller, players, now } = fixture;
-
-      expect(controller.handle('ice', 'action/tag', { targetId: 'water-a' }, now)).toBeNull();
-      const readyAt = now + GAMEPLAY.tagCooldownMs;
-      expect(controller.handle('ice', 'action/tag', { targetId: 'water-b' }, readyAt - 1)).toBe(
-        'Tag is cooling down',
-      );
-      expect(controller.handle('ice', 'action/tag', { targetId: 'water-b' }, readyAt)).toBeNull();
-      expect(players.get('water-b')!.status).toBe('frozen');
-      expect(players.get('ice')!.tags).toBe(2);
-    });
-
-    it('rejects a protected target before protection expires and accepts it at expiry', () => {
-      const { controller, players, now } = fixture;
-      const target = players.get('water-a')!;
+    it('dissipates on protected Water and freezes after protection expires', () => {
+      const { controller, players, now } = makeFixture([
+        { id: 'ice', team: 'ice', x: 0, z: 0 },
+        { id: 'water', team: 'water', x: 3, z: 0 },
+      ]);
+      const target = players.get('water')!;
       target.protectedUntil = now + GAMEPLAY.protectionMs;
 
+      expect(controller.handle('ice', 'action/frost-throw', east, now)).toBeNull();
+      advanceInTicks(controller, now, now + 2 * GAMEPLAY.tickMs);
+      expect(target.status).toBe('active');
+
+      advanceInTicks(controller, now + 2 * GAMEPLAY.tickMs, target.protectedUntil);
       expect(
-        controller.handle('ice', 'action/tag', { targetId: 'water-a' }, target.protectedUntil - 1),
-      ).toBe('This player is protected');
-      expect(
-        controller.handle('ice', 'action/tag', { targetId: 'water-a' }, target.protectedUntil),
+        controller.handle('ice', 'action/frost-throw', east, target.protectedUntil),
       ).toBeNull();
+      advanceInTicks(
+        controller,
+        target.protectedUntil,
+        target.protectedUntil + 2 * GAMEPLAY.tickMs,
+      );
       expect(target.status).toBe('frozen');
     });
   });
@@ -395,7 +423,7 @@ describe('GameplayController', () => {
   });
 
   describe('post-rescue protection and help pings', () => {
-    it('protects a rescued player for the exact configured interval', () => {
+    it('protects a rescued player from frost for the exact configured interval', () => {
       const { controller, players, now } = makeFixture([
         { id: 'ice', team: 'ice', x: 0, z: 1 },
         { id: 'rescuer-a', team: 'water', x: 0, z: 0 },
@@ -420,13 +448,28 @@ describe('GameplayController', () => {
       }
       const target = players.get('target')!;
       expect(target.status).toBe('active');
+      const diagonal = 1 / Math.sqrt(2);
+      const direction = { directionX: diagonal, directionY: 0, directionZ: -diagonal };
+      const rescuedAt = now + GAMEPLAY.rescueMs;
+      for (const id of ['rescuer-a', 'rescuer-b']) {
+        players.get(id)!.x = -5;
+        players.get(id)!.z = -5;
+      }
 
+      expect(controller.handle('ice', 'action/frost-throw', direction, rescuedAt)).toBeNull();
+      advanceInTicks(controller, rescuedAt, rescuedAt + 2 * GAMEPLAY.tickMs);
+      expect(target.status).toBe('active');
+
+      advanceInTicks(controller, rescuedAt + 2 * GAMEPLAY.tickMs, target.protectedUntil);
       expect(
-        controller.handle('ice', 'action/tag', { targetId: 'target' }, target.protectedUntil - 1),
-      ).toBe('This player is protected');
-      expect(
-        controller.handle('ice', 'action/tag', { targetId: 'target' }, target.protectedUntil),
+        controller.handle('ice', 'action/frost-throw', direction, target.protectedUntil),
       ).toBeNull();
+      advanceInTicks(
+        controller,
+        target.protectedUntil,
+        target.protectedUntil + 2 * GAMEPLAY.tickMs,
+      );
+      expect(target.status).toBe('frozen');
     });
 
     it('allows only frozen Water to ping and enforces the cooldown boundary', () => {

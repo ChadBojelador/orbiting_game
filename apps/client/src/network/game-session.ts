@@ -8,27 +8,20 @@ import {
   type PlayerView,
 } from '@ice-water/shared';
 
-import { GameInput } from '../input/game-input.js';
+import { cameraRelative, GameInput } from '../input/game-input.js';
 import { snapshot, type LobbyRoom } from './lobby-client.js';
 import { LocalPrediction, RemoteInterpolation } from './player-motion.js';
 
-export function nearestTarget(
-  view: LobbyView,
-  local: PlayerView,
-  now: number,
-): PlayerView | undefined {
-  const range = local.team === 'ice' ? GAMEPLAY.tagRange : GAMEPLAY.rescueRange;
-
-  if (local.status !== 'active') return undefined;
+export function nearestTarget(view: LobbyView, local: PlayerView): PlayerView | undefined {
+  const range = GAMEPLAY.rescueRange;
+  if (local.status !== 'active' || local.team !== 'water') return undefined;
 
   return view.players
     .filter(
       (player) =>
         player.playerId !== local.playerId &&
         player.team === 'water' &&
-        (local.team === 'ice'
-          ? player.status === 'active' && now >= player.protectedUntil
-          : player.status === 'frozen') &&
+        player.status === 'frozen' &&
         distanceSquared3d(local, player) <= range * range &&
         hasGameplayLineOfSight(local, player),
     )
@@ -160,14 +153,18 @@ export class GameSession {
       jump: move.jump,
     });
 
-    const target = nearestTarget(this.view, local, now);
-
-    // Left click = tag
-    if (input.hasTag && local.team === 'ice' && target && now >= local.tagReadyAt) {
-      this.room.send('action/tag', {
-        targetId: target.playerId,
+    if (input.hasFrostThrow && local.team === 'ice' && now >= local.frostReadyAt) {
+      const horizontal = cameraRelative({ x: 0, z: -1 }, this.input.cameraYaw);
+      const directionY = 0.08;
+      const horizontalScale = Math.sqrt(1 - directionY * directionY);
+      this.room.send('action/frost-throw', {
+        directionX: horizontal.x * horizontalScale,
+        directionY,
+        directionZ: horizontal.z * horizontalScale,
       });
     }
+
+    const target = nearestTarget(this.view, local);
 
     if (input.hasPing && local.status === 'frozen' && now >= local.helpPingReadyAt) {
       this.room.send('action/help-ping', {});

@@ -36,12 +36,12 @@ export class GameInput {
   isTouchRescuing = false;
   private readonly keys = new Set<string>();
   private movement: Position = { x: 0, z: 0 };
-  private hasTag = false;
+  private hasFrostThrow = false;
   private hasJump = false;
   private hasPing = false;
 
-  pressTag(): void {
-    this.hasTag = true;
+  pressFrostThrow(): void {
+    this.hasFrostThrow = true;
   }
   pressJump(): void {
     this.hasJump = true;
@@ -54,7 +54,7 @@ export class GameInput {
     this.touch = { x: 0, z: 0 };
     this.movement = { x: 0, z: 0 };
     this.isTouchRescuing = false;
-    this.hasTag = false;
+    this.hasFrostThrow = false;
     this.hasJump = false;
     this.hasPing = false;
   }
@@ -80,11 +80,11 @@ export class GameInput {
     const sample = {
       ...this.movement,
       isRescuing: this.keys.has('KeyE') || this.isTouchRescuing,
-      hasTag: this.hasTag,
+      hasFrostThrow: this.hasFrostThrow,
       hasJump: this.hasJump,
       hasPing: this.hasPing,
     };
-    this.hasTag = false;
+    this.hasFrostThrow = false;
     this.hasJump = false;
     this.hasPing = false;
     return sample;
@@ -117,7 +117,7 @@ export class GameInput {
       this.keys.add(event.code);
       if (event.repeat) return;
       if (event.code === 'Space') this.pressJump();
-      if (event.code === 'KeyF') this.pressTag();
+      if (event.code === 'KeyF') this.pressFrostThrow();
       if (event.code === 'KeyH') this.pressPing();
     };
     const up = (event: KeyboardEvent) => {

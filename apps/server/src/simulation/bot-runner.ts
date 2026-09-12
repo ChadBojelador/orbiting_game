@@ -32,7 +32,7 @@ interface BotMotion {
  * Bots are registered as real PlayerState entries in the Colyseus room so
  * every server rule — spawning, freezing, rescue, phase deadlines, elimination
  * — applies to them exactly as it would to a human player. Their sole
- * behaviour is random movement; they do not tag, rescue, or react to game state.
+ * behaviour is random movement; they do not throw frost, rescue, or react to game state.
  *
  * Only constructed when DEV_BOT_COUNT > 0, which environment.ts forces to zero
  * in production.

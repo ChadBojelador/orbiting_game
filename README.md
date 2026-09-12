@@ -18,6 +18,8 @@ npm run dev
 
 Open **http://localhost:5173**. The game server listens on **127.0.0.1:2567**. `setup:local` creates an ignored `.env` with random credentials and preserves an existing file. Alternatively, copy `.env.example` to `.env` and replace its placeholders. On PowerShell systems that block `npm.ps1`, use `npm.cmd` for these commands.
 
+Keep the terminal running while you play. If the browser says **Cannot reach the game server**, confirm that `npm run dev` shows both the client and server as started, then open `http://127.0.0.1:2567/health`; it should return an `ok` response. Restart `npm run dev` after changing `.env`, and make sure no older process is already using ports 5173 or 2567.
+
 Docker must be running before `db:up`. If Windows reserves port 5432, set `POSTGRES_PORT=55432` and change the port in `DATABASE_URL` to 55432. This workspace uses that override. `db:down` stops the database while retaining its named volume. The lobby works without PostgreSQL; `/ready` reports 503 until the database is reachable.
 
 ## Try a private room
@@ -32,14 +34,14 @@ Host duties transfer to the first connected guest when the host leaves. Unexpect
 
 ### Controls
 
-- Keyboard: WASD or arrow keys to move, Space to jump, F to tag as Ice, E to hold rescue as Water, and H to request help while frozen.
+- PC: WASD or arrow keys move, left-drag turns the camera, Space jumps, and Ice throws frost toward the center reticle with right-click (`F` is a keyboard fallback). Water holds `E` near a frozen teammate to rescue; a frozen player presses `H` for help.
 - Touch: use the left joystick plus the on-screen Jump and role-specific action buttons.
 
-Jumping is server-authoritative and affects three-dimensional tag and rescue range. It cannot pass through static obstacles.
+The in-match HUD shows a compact role-aware PC control guide. Jumping and frost projectiles are server-authoritative. Projectiles can be dodged, stop at cover, and cannot be spammed through the server cooldown; jumping cannot pass through static obstacles.
 
 ### Test locally with bots
 
-Set `DEV_BOT_COUNT=5` in the root `.env`, restart `npm run dev`, and create a room. One human plus five server-side wandering bots satisfies the six-player start minimum. Bots occupy normal room seats and participate in authoritative movement, team assignment, freezing, and elimination, but they do not tag or rescue.
+Set `DEV_BOT_COUNT=5` in the root `.env`, restart `npm run dev`, and create a room. One human plus five server-side wandering bots satisfies the six-player start minimum. Bots occupy normal room seats and participate in authoritative movement, team assignment, freezing, and elimination, but they do not throw frost or rescue.
 
 `DEV_BOT_COUNT` must be between zero and `ROOM_MAX_PLAYERS - 1`, leaving at least one human seat. Human capacity is `ROOM_MAX_PLAYERS - DEV_BOT_COUNT`, so the combined bot and human population cannot exceed the configured room maximum or the global limit of 150. Production always runs with zero bots.
 

@@ -5,6 +5,7 @@ import { GameSession } from '../network/game-session.js';
 import { LocalPresentation, type PresentationMotion } from '../network/player-motion.js';
 import { WorldLayout, WORLD_CAMERA_FAR, worldHeightAt } from '../world/world-layout.js';
 import { loadCharacterModel } from './character-model.js';
+import { FrostProjectileRenderer } from './frost-projectiles.js';
 import { PlayerEntityManager } from './player-entity.js';
 import { renderPixelRatio } from './render-performance.js';
 import { ThirdPersonCamera } from './third-person-camera.js';
@@ -18,6 +19,7 @@ export class GameScene {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly world: WorldLayout;
   private readonly followCamera = new ThirdPersonCamera();
+  private readonly frostProjectiles = new FrostProjectileRenderer(this.scene);
   private readonly localPresentation = new LocalPresentation();
   private readonly positions = new Map<string, PresentationMotion>();
   private readonly cameraTarget = new THREE.Vector3();
@@ -65,6 +67,7 @@ export class GameScene {
     this.session.destroy();
     for (const cleanup of this.cleanups) cleanup();
     this.playerEntities?.destroy();
+    this.frostProjectiles.destroy();
     this.world.destroy();
     this.renderer.dispose();
   }
@@ -165,6 +168,7 @@ export class GameScene {
       );
     }
     this.playerEntities?.update(view, positions, this.session.playerId, deltaSeconds);
+    this.frostProjectiles.update(view.projectiles, serverNow, view.serverTime);
 
     const localPosition = localPlayer
       ? (positions.get(localPlayer.playerId) ?? {
@@ -192,6 +196,12 @@ export class GameScene {
   private bindCameraControls(): void {
     const onPointerDown = (event: PointerEvent) => {
       if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return;
+      if (event.button === 2) {
+        event.preventDefault();
+        this.session.input.pressFrostThrow();
+        return;
+      }
+      if (event.button !== 0) return;
       this.lastPointer = { x: event.clientX, y: event.clientY };
     };
     const onPointerMove = (event: PointerEvent) => {
@@ -205,11 +215,14 @@ export class GameScene {
     const onPointerUp = () => {
       this.lastPointer = null;
     };
+    const onContextMenu = (event: MouseEvent) => event.preventDefault();
     this.canvas.addEventListener('pointerdown', onPointerDown);
+    this.canvas.addEventListener('contextmenu', onContextMenu);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     this.cleanups.push(() => {
       this.canvas.removeEventListener('pointerdown', onPointerDown);
+      this.canvas.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
     });
