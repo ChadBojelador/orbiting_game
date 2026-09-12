@@ -26,14 +26,21 @@ interface PlayerEntity {
   currentStatus: string;
   currentTeam: string;
   isProtected: boolean;
+  isLocal: boolean;
+  castsShadow: boolean;
   lastX: number;
   lastZ: number;
   movingUntil: number;
   recoveryEndsAt: number;
   jumpStartedAt: number;
+  animationElapsed: number;
 }
 
 const MOVEMENT_ANIMATION_HOLD_MS = 180;
+const FULL_ANIMATION_DISTANCE_SQUARED = 45 * 45;
+const REDUCED_ANIMATION_DISTANCE_SQUARED = 90 * 90;
+const SHADOW_ENABLE_DISTANCE_SQUARED = 42 * 42;
+const SHADOW_DISABLE_DISTANCE_SQUARED = 52 * 52;
 
 export class PlayerEntityManager {
   private readonly entities = new Map<string, PlayerEntity>();
@@ -50,6 +57,8 @@ export class PlayerEntityManager {
     deltaSeconds: number,
   ): void {
     const seen = new Set<string>();
+    const localPosition = positions.get(localPlayerId);
+    const now = Date.now();
 
     for (const player of view.players) {
       seen.add(player.playerId);
@@ -68,6 +77,10 @@ export class PlayerEntityManager {
         player,
         position,
         deltaSeconds,
+        localPosition
+          ? (position.x - localPosition.x) ** 2 + (position.z - localPosition.z) ** 2
+          : 0,
+        now,
       );
     }
 
@@ -174,9 +187,13 @@ export class PlayerEntityManager {
     root.add(accent);
     ownedGeometries.push(accentGeometry);
 
-    if (player.playerId === localPlayerId) {
+    const isLocal = player.playerId === localPlayerId;
+
+    if (isLocal) {
       root.scale.setScalar(1.12);
     }
+
+    this.setShadowCasting(root, isLocal);
 
     const entity: PlayerEntity = {
       root,
@@ -189,11 +206,14 @@ export class PlayerEntityManager {
       currentStatus: player.status,
       currentTeam: player.team,
       isProtected: false,
+      isLocal,
+      castsShadow: isLocal,
       lastX: player.x,
       lastZ: player.z,
       movingUntil: 0,
       recoveryEndsAt: 0,
       jumpStartedAt: 0,
+      animationElapsed: 0,
     };
 
     this.entities.set(
@@ -213,6 +233,8 @@ export class PlayerEntityManager {
       yaw: number;
     },
     deltaSeconds: number,
+    distanceSquared: number,
+    now: number,
   ): void {
     const previousStatus =
       entity.currentStatus;
@@ -222,8 +244,6 @@ export class PlayerEntityManager {
 
     const dz =
       position.z - entity.lastZ;
-
-    const now = Date.now();
 
     if (
       dx * dx + dz * dz >
@@ -248,6 +268,15 @@ export class PlayerEntityManager {
       position.z,
     );
     entity.root.rotation.y = position.yaw;
+
+    const shadowThreshold = entity.castsShadow
+      ? SHADOW_DISABLE_DISTANCE_SQUARED
+      : SHADOW_ENABLE_DISTANCE_SQUARED;
+    const shouldCastShadow = entity.isLocal || distanceSquared <= shadowThreshold;
+    if (shouldCastShadow !== entity.castsShadow) {
+      entity.castsShadow = shouldCastShadow;
+      this.setShadowCasting(entity.root, shouldCastShadow);
+    }
 
     const isProtected =
       now < player.protectedUntil;
@@ -341,9 +370,23 @@ export class PlayerEntityManager {
       nextAnimation,
     );
 
-    entity.character?.update(
-      deltaSeconds,
-    );
+    entity.animationElapsed += deltaSeconds;
+    const animationInterval =
+      distanceSquared > REDUCED_ANIMATION_DISTANCE_SQUARED
+        ? 1 / 10
+        : distanceSquared > FULL_ANIMATION_DISTANCE_SQUARED
+          ? 1 / 20
+          : 0;
+    if (animationInterval === 0 || entity.animationElapsed >= animationInterval) {
+      entity.character?.update(Math.min(entity.animationElapsed, 0.1));
+      entity.animationElapsed = 0;
+    }
+  }
+
+  private setShadowCasting(root: THREE.Object3D, shouldCastShadow: boolean): void {
+    root.traverse((object) => {
+      if (object instanceof THREE.Mesh) object.castShadow = shouldCastShadow;
+    });
   }
 
   private destroyEntity(
