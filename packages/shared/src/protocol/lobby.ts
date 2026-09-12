@@ -1,4 +1,9 @@
-import type { GameplayEvents, GameplayMessages, PlayerStatus } from './gameplay.js';
+import type {
+  FrostProjectileView,
+  GameplayEvents,
+  GameplayMessages,
+  PlayerStatus,
+} from './gameplay.js';
 
 export const MIN_PLAYERS = 6;
 export const MAX_PLAYERS = 150;
@@ -27,7 +32,7 @@ export interface PlayerView {
   protectedUntil: number;
   rescueProgress: number;
   rescuingTarget: string;
-  tagReadyAt: number;
+  frostReadyAt: number;
   helpPingUntil: number;
   helpPingReadyAt: number;
   tags: number;
@@ -47,6 +52,7 @@ export interface LobbyView {
   maxRounds: number;
   arenaHalfExtent: number;
   players: PlayerView[];
+  projectiles: FrostProjectileView[];
 }
 
 export interface GuestSession {

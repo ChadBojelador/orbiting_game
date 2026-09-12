@@ -12,7 +12,7 @@ export function ResultsScreen({ view, localPlayerId, result, onLeave }: ResultsS
   const localTeam = localPlayer?.team ?? 'water';
   const didWin = localTeam === result.winner;
 
-  // Sort players: Ice first, then Water; within team by tags/rescues descending.
+  // Sort players: Ice first, then Water; within team by freezes/rescues descending.
   const sorted = [...view.players].sort((a, b) => {
     if (a.team !== b.team) return a.team === 'ice' ? -1 : 1;
     const scoreA = a.team === 'ice' ? a.tags : a.rescues;
@@ -43,7 +43,7 @@ export function ResultsScreen({ view, localPlayerId, result, onLeave }: ResultsS
             <tr>
               <th scope="col">Player</th>
               <th scope="col">Team</th>
-              <th scope="col">Tags</th>
+              <th scope="col">Freezes</th>
               <th scope="col">Rescues</th>
               <th scope="col">Outcome</th>
             </tr>

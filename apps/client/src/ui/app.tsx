@@ -113,6 +113,10 @@ export function App() {
       setMatchResult(result);
     });
     next.onMessage('arena/boundary-changed', () => {});
+    next.onMessage('frost/thrown', () => {});
+    next.onMessage('player/frozen', () => {});
+    next.onMessage('player/rescued', () => {});
+    next.onMessage('player/help-ping', () => {});
     next.onMessage('player/permanently-frozen', () => {});
     next.onError((_code, message) => setError(message ?? 'Room connection failed'));
     next.onDrop(() => setConnection('Reconnecting…'));

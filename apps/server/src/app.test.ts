@@ -68,6 +68,7 @@ async function enter(
   room.onMessage('match/phase-changed', () => {});
   room.onMessage('arena/boundary-changed', () => {});
   room.onMessage('player/frozen', () => {});
+  room.onMessage('frost/thrown', () => {});
   room.onMessage('player/permanently-frozen', () => {});
   await waitFor(() => !!room.state?.players);
   return { room, code: reservation.inviteCode };
@@ -261,11 +262,13 @@ describe('HTTP and real WebSocket room flow', () => {
       }),
     ).toMatchObject({ code: 'invalid-action', message: 'Invalid movement input' });
     expect(
-      await sendForError(actor.room, actorErrors, 'action/tag', {
-        targetId: participants[1]!.identity.playerId,
+      await sendForError(actor.room, actorErrors, 'action/frost-throw', {
+        directionX: 1,
+        directionY: 0,
+        directionZ: 0,
         status: 'eliminated',
       }),
-    ).toMatchObject({ code: 'invalid-action', message: 'Invalid target' });
+    ).toMatchObject({ code: 'invalid-action', message: 'Invalid frost throw' });
     expect(
       await sendForError(actor.room, actorErrors, 'match/result', {
         winner: 'water',
@@ -353,7 +356,14 @@ describe('HTTP and real WebSocket room flow', () => {
     const frozen = new Promise<{ playerId: string }>((resolve) =>
       observer.room.onMessage('player/frozen', resolve),
     );
-    ice.room.send('action/tag', { targetId: target.identity.playerId });
+    const throwAt = Date.now();
+    ice.room.send('action/frost-throw', {
+      directionX: 1,
+      directionY: 0,
+      directionZ: 0,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    advanceRoom(serverRoom, throwAt + 2 * GAMEPLAY.tickMs);
     expect((await frozen).playerId).toBe(target.identity.playerId);
     serverRoom.broadcastPatch();
     await waitFor(

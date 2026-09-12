@@ -15,6 +15,7 @@ The founders have confirmed the following:
 - Every round has 30 seconds of regular play followed by a 30-second Deep Freeze.
 - The MVP uses guest display names and temporary sessions; permanent player accounts are out of scope.
 - Water players may rescue teammates during regular play but cannot rescue anyone during Deep Freeze.
+- Ice players freeze Water by throwing a visible frost projectile; on PC, right-click is the primary throw control and `F` is the keyboard fallback.
 - Initial hosting must fit within an available free tier; the provider remains to be selected after validating persistent WebSocket and sleep limits.
 
 ## Product overview
@@ -79,13 +80,14 @@ Players need an accessible multiplayer party game that supports a large crowd, i
 ### Movement and arena
 
 - Players navigate a stylized 3D arena using keyboard or touch controls.
-- Active players may jump. Jumping changes authoritative vertical position and can affect tag and rescue range, but it does not bypass walls or other static collision.
+- Active players may jump. Jumping changes authoritative vertical position and can affect frost-projectile hits and rescue range, but it does not bypass walls or other static collision.
 - Player characters do not physically push or block one another.
 - The playable arena contracts between rounds to discourage hiding.
 
 ### Freezing and rescue
 
-- An Ice player freezes a Water player with a validated close-range tag.
+- An Ice player throws a visible frost projectile in the camera's forward direction. A server-validated projectile collision freezes an active Water player.
+- Frost projectiles stop on static cover or the arena boundary, expire after a short lifetime, and are rate-limited by a server-owned cooldown. A protected Water player absorbs the projectile without being frozen.
 - A frozen Water player cannot move.
 - An active Water player rescues a frozen teammate by holding the rescue action nearby for approximately 1.5 seconds.
 - Multiple rescuers may reduce rescue time, subject to balancing.
@@ -118,10 +120,11 @@ Players need an accessible multiplayer party game that supports a large crowd, i
 
 ### Gameplay
 
-- **FR-05:** The client supports keyboard movement and jumping plus a documented mobile touch layout with a jump control.
+- **FR-05:** The client supports camera-relative keyboard movement, mouse camera control, right-click frost throwing for Ice, keyboard jumping and action fallbacks, plus a documented mobile touch layout with jump and role-specific action controls.
 - **FR-05A:** An active player may jump only while grounded; frozen, eliminated, and spectator players cannot initiate a jump.
+- **FR-05B:** During play, desktop players see a compact on-screen guide for the controls relevant to their current role; active Ice players also see a centered frost aiming reticle.
 - **FR-06:** The server owns three-dimensional player position, vertical velocity, grounded state, team, freeze status, protection status, and eligibility.
-- **FR-07:** The server rejects impossible movement, repeated airborne jump attempts, out-of-range tags, and invalid rescues. Tag and rescue range use authoritative three-dimensional distance.
+- **FR-07:** The server rejects impossible movement, repeated airborne jump attempts, malformed frost aim, frost throws from ineligible players, throws during cooldown, and invalid rescues. Projectile collision and rescue range use authoritative three-dimensional positions.
 - **FR-08:** The game displays clear visual distinctions among Ice, active Water, temporarily protected Water, and frozen Water.
 - **FR-09:** Frozen players can request help through a limited visual ping.
 - **FR-10:** Players can see the current phase, phase timer, round number, and team objective.
@@ -202,7 +205,7 @@ Players need an accessible multiplayer party game that supports a large crowd, i
 - Dynamic rooms supporting 6–150 players
 - Ice and Water role assignment
 - Keyboard and basic touch movement with server-authoritative jumping
-- Freeze, rescue, help ping, and post-rescue protection
+- Throwable frost, rescue, help ping, and post-rescue protection
 - Exactly five rounds, each with 30 seconds of regular play and a 30-second Deep Freeze
 - Permanent freeze, spectator mode, team result, and basic scores
 - Reconnection grace period

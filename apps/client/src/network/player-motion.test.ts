@@ -18,7 +18,7 @@ function player(overrides: Partial<PlayerView> = {}): PlayerView {
     y: 0,
     verticalVelocity: 0,
     isGrounded: true,
-    tagReadyAt: 0,
+    frostReadyAt: 0,
     helpPingUntil: 0,
     helpPingReadyAt: 0,
     rescueProgress: 0,

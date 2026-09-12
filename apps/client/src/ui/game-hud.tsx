@@ -104,6 +104,51 @@ export function GameHud({ view, localPlayerId, serverNow }: GameHudProps) {
         {isFrozen && <span className="hud-status-note"> · 🧊 You're frozen!</span>}
       </div>
 
+      <aside className="pc-control-guide" aria-label="PC controls">
+        <strong>Controls</strong>
+        <span className="control-pair">
+          <span className="key-cluster" aria-hidden="true">
+            <kbd>W</kbd>
+            <kbd>A</kbd>
+            <kbd>S</kbd>
+            <kbd>D</kbd>
+          </span>
+          Move
+        </span>
+        <span className="control-pair">
+          <kbd>Drag</kbd>
+          Look
+        </span>
+        <span className="control-pair">
+          <kbd>Space</kbd>
+          Jump
+        </span>
+        {team === 'ice' && !isFrozen && !isEliminated && (
+          <span className="control-pair control-pair--frost">
+            <kbd>RMB</kbd>
+            Throw frost <small>F also works</small>
+          </span>
+        )}
+        {team === 'water' && !isFrozen && !isEliminated && !isDeepFreeze && (
+          <span className="control-pair">
+            <kbd>E</kbd>
+            Hold to rescue
+          </span>
+        )}
+        {isFrozen && (
+          <span className="control-pair">
+            <kbd>H</kbd>
+            Ask for help
+          </span>
+        )}
+      </aside>
+
+      {team === 'ice' && !isFrozen && !isEliminated && (
+        <div className="frost-reticle" aria-hidden="true">
+          <span />
+        </div>
+      )}
+
       {/* Rescue-locked banner during deep-freeze */}
       {isDeepFreeze && (
         <div className="hud-rescue-locked" role="alert">

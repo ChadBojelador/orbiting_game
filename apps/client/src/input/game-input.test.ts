@@ -31,4 +31,12 @@ describe('game input', () => {
     expect(input.sample().hasJump).toBe(true);
     expect(input.sample().hasJump).toBe(false);
   });
+
+  it('emits a one-shot frost throw request', () => {
+    const input = new GameInput();
+    input.pressFrostThrow();
+
+    expect(input.sample().hasFrostThrow).toBe(true);
+    expect(input.sample().hasFrostThrow).toBe(false);
+  });
 });

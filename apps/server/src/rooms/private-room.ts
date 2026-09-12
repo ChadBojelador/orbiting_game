@@ -61,7 +61,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       this.patchRate = GAMEPLAY.tickMs;
       const gameplayMessages: (keyof GameplayMessages)[] = [
         'input/move',
-        'action/tag',
+        'action/frost-throw',
         'action/rescue-start',
         'action/rescue-stop',
         'action/help-ping',

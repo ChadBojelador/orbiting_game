@@ -5,7 +5,9 @@ import {
   createSpawnPoints,
   distanceSquared3d,
   hasGameplayLineOfSight,
+  hasProjectileLineOfSight,
   isEmptyPayload,
+  isFrostThrowIntent,
   isMoveInput,
   isPlayPhase,
   isTargetIntent,
@@ -14,8 +16,9 @@ import {
   type GameplayEvent,
   type GameplayMessages,
   type MoveInput,
+  type SpatialPosition,
 } from '@ice-water/shared';
-import type { LobbyState, PlayerState } from '../rooms/lobby-state.js';
+import { FrostProjectileState, type LobbyState, type PlayerState } from '../rooms/lobby-state.js';
 import { SpatialGrid } from '../simulation/spatial-grid.js';
 
 interface PendingInput {
@@ -33,6 +36,36 @@ interface MessageBudget {
   resetsAt: number;
 }
 
+function distanceToSegmentSquared(
+  start: SpatialPosition,
+  end: SpatialPosition,
+  point: SpatialPosition,
+): { distanceSquared: number; time: number } {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dz = end.z - start.z;
+  const lengthSquared = dx * dx + dy * dy + dz * dz;
+  const time =
+    lengthSquared === 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(
+            1,
+            ((point.x - start.x) * dx + (point.y - start.y) * dy + (point.z - start.z) * dz) /
+              lengthSquared,
+          ),
+        );
+  const closestX = start.x + dx * time;
+  const closestY = start.y + dy * time;
+  const closestZ = start.z + dz * time;
+  return {
+    distanceSquared:
+      (point.x - closestX) ** 2 + (point.y - closestY) ** 2 + (point.z - closestZ) ** 2,
+    time,
+  };
+}
+
 export class GameplayController {
   private readonly grid = new SpatialGrid<PlayerState>();
   private readonly inputs = new Map<string, PendingInput[]>();
@@ -42,6 +75,7 @@ export class GameplayController {
   private readonly budgets = new Map<string, MessageBudget>();
   private lastTick = 0;
   private hasStarted = false;
+  private projectileSequence = 0;
 
   constructor(
     private readonly state: LobbyState,
@@ -56,6 +90,7 @@ export class GameplayController {
     this.inputs.clear();
     this.rescues.clear();
     this.progress.clear();
+    this.state.projectiles.clear();
     // Respawn every non-eliminated player.
     const spawns = createSpawnPoints();
     let index = 0;
@@ -145,9 +180,13 @@ export class GameplayController {
       });
       return null;
     }
+    if (type === 'action/frost-throw') {
+      if (!isFrostThrowIntent(payload)) return 'Invalid frost throw';
+      if (player.status !== 'active') return 'Frozen or eliminated players cannot act';
+      return this.throwFrost(player, payload, now);
+    }
     if (!isTargetIntent(payload)) return 'Invalid target';
     if (player.status !== 'active') return 'Frozen or eliminated players cannot act';
-    if (type === 'action/tag') return this.tag(player, payload.targetId, now);
     if (!canRescueInPhase(this.state.phase, this.state.phaseDeadline, now))
       return 'Rescue is locked';
     if (player.team !== 'water') return 'Only Water can rescue';
@@ -195,35 +234,71 @@ export class GameplayController {
       );
   }
 
-  private tag(player: PlayerState, targetId: string, now: number): string | null {
-    if (player.team !== 'ice') return 'Only Ice can tag';
-    if (now < player.tagReadyAt) return 'Tag is cooling down';
-    const target = this.nearbyTarget(player, targetId, GAMEPLAY.tagRange);
-    if (!target || target.team !== 'water' || target.status !== 'active')
-      return 'Move closer to active Water';
-    if (now < target.protectedUntil) return 'This player is protected';
+  private throwFrost(
+    player: PlayerState,
+    direction: { directionX: number; directionY: number; directionZ: number },
+    now: number,
+  ): string | null {
+    if (player.team !== 'ice') return 'Only Ice can throw frost';
+    if (now < player.frostReadyAt) return 'Frost is cooling down';
+    if (this.state.projectiles.size >= GAMEPLAY.maxFrostProjectiles)
+      return 'Too much frost is already in flight';
+
+    const magnitude = Math.hypot(direction.directionX, direction.directionY, direction.directionZ);
+    const x = direction.directionX / magnitude;
+    const y = direction.directionY / magnitude;
+    const z = direction.directionZ / magnitude;
+    const projectile = new FrostProjectileState();
+    projectile.projectileId = `frost-${++this.projectileSequence}`;
+    projectile.ownerPlayerId = player.playerId;
+    const offset = GAMEPLAY.playerRadius + GAMEPLAY.frostProjectileRadius + 0.1;
+    projectile.x = player.x + x * offset;
+    projectile.y = player.y + GAMEPLAY.interactionHeight + y * offset;
+    projectile.z = player.z + z * offset;
+    projectile.velocityX = x * GAMEPLAY.frostProjectileSpeed;
+    projectile.velocityY = y * GAMEPLAY.frostProjectileSpeed;
+    projectile.velocityZ = z * GAMEPLAY.frostProjectileSpeed;
+    projectile.expiresAt = now + GAMEPLAY.frostProjectileLifetimeMs;
+    this.state.projectiles.set(projectile.projectileId, projectile);
+    player.frostReadyAt = now + GAMEPLAY.frostThrowCooldownMs;
+    this.emit({
+      type: 'frost/thrown',
+      payload: {
+        projectileId: projectile.projectileId,
+        ownerPlayerId: player.playerId,
+        serverTime: now,
+      },
+    });
+    return null;
+  }
+
+  private freezeTarget(
+    owner: PlayerState,
+    target: PlayerState,
+    velocityX: number,
+    velocityZ: number,
+    now: number,
+  ): boolean {
+    if (target.team !== 'water' || target.status !== 'active' || now < target.protectedUntil)
+      return false;
     target.status = 'frozen';
     target.protectedUntil = 0;
-    // Knock the Water player away from the Ice player.
-    const dx = target.x - player.x;
-    const dz = target.z - player.z;
-    const distance = Math.hypot(dx, dz);
+    const distance = Math.hypot(velocityX, velocityZ);
     if (distance > 0.001) {
-      target.knockbackX = (dx / distance) * GAMEPLAY.knockbackSpeed;
-      target.knockbackZ = (dz / distance) * GAMEPLAY.knockbackSpeed;
+      target.knockbackX = (velocityX / distance) * GAMEPLAY.knockbackSpeed;
+      target.knockbackZ = (velocityZ / distance) * GAMEPLAY.knockbackSpeed;
       target.verticalVelocity = GAMEPLAY.knockbackVerticalSpeed;
       target.isGrounded = false;
     }
     target.rescueProgress = 0;
     this.clearInput(target.playerId);
     this.stopRescue(target.playerId);
-    player.tagReadyAt = now + GAMEPLAY.tagCooldownMs;
-    player.tags++;
+    owner.tags++;
     this.emit({
       type: 'player/frozen',
-      payload: { playerId: targetId, by: player.playerId, serverTime: now },
+      payload: { playerId: target.playerId, by: owner.playerId, serverTime: now },
     });
-    return null;
+    return true;
   }
 
   private clearInput(playerId: string): void {
@@ -241,6 +316,7 @@ export class GameplayController {
   private step(now: number): void {
     const canPlay = this.canPlay(now);
     const dt = GAMEPLAY.tickMs / 1000;
+    if (!canPlay) this.state.projectiles.clear();
     for (const player of this.state.players.values()) {
       if (player.status === 'eliminated' || player.status === 'spectator') {
         this.clearInput(player.playerId);
@@ -294,6 +370,7 @@ export class GameplayController {
     }
 
     this.grid.rebuild(this.state.players.values());
+    if (canPlay) this.advanceProjectiles(now, dt);
 
     const contributors = new Map<string, { ids: string[]; elapsed: number }>();
 
@@ -366,6 +443,84 @@ export class GameplayController {
           serverTime: now,
         },
       });
+    }
+  }
+
+  private advanceProjectiles(now: number, seconds: number): void {
+    for (const projectile of this.state.projectiles.values()) {
+      if (now >= projectile.expiresAt) {
+        this.state.projectiles.delete(projectile.projectileId);
+        continue;
+      }
+
+      const start = { x: projectile.x, y: projectile.y, z: projectile.z };
+      const end = {
+        x: start.x + projectile.velocityX * seconds,
+        y: start.y + projectile.velocityY * seconds,
+        z: start.z + projectile.velocityZ * seconds,
+      };
+      const midpoint = { x: (start.x + end.x) / 2, z: (start.z + end.z) / 2 };
+      const searchRadius =
+        Math.hypot(end.x - start.x, end.z - start.z) / 2 + GAMEPLAY.frostProjectileHitRadius;
+      let collision: { target: PlayerState; time: number } | undefined;
+      for (const target of this.grid.nearby(midpoint, searchRadius)) {
+        if (
+          target.playerId === projectile.ownerPlayerId ||
+          target.team !== 'water' ||
+          target.status !== 'active'
+        ) {
+          continue;
+        }
+        const result = distanceToSegmentSquared(start, end, {
+          x: target.x,
+          y: target.y + GAMEPLAY.interactionHeight,
+          z: target.z,
+        });
+        if (
+          result.distanceSquared > GAMEPLAY.frostProjectileHitRadius ** 2 ||
+          (collision && collision.time <= result.time)
+        ) {
+          continue;
+        }
+        collision = { target, time: result.time };
+      }
+
+      if (collision) {
+        const owner = this.state.players.get(projectile.ownerPlayerId);
+        const impact = {
+          x: start.x + (end.x - start.x) * collision.time,
+          y: start.y + (end.y - start.y) * collision.time,
+          z: start.z + (end.z - start.z) * collision.time,
+        };
+        if (
+          owner &&
+          impact.y > terrainHeightAt(impact) + GAMEPLAY.frostProjectileRadius &&
+          hasProjectileLineOfSight(start, impact)
+        ) {
+          this.freezeTarget(
+            owner,
+            collision.target,
+            projectile.velocityX,
+            projectile.velocityZ,
+            now,
+          );
+        }
+        this.state.projectiles.delete(projectile.projectileId);
+        continue;
+      }
+
+      const isOutsideBoundary =
+        Math.abs(end.x) > this.state.arenaHalfExtent ||
+        Math.abs(end.z) > this.state.arenaHalfExtent;
+      const isBelowTerrain = end.y <= terrainHeightAt(end) + GAMEPLAY.frostProjectileRadius;
+      if (isOutsideBoundary || isBelowTerrain || !hasProjectileLineOfSight(start, end)) {
+        this.state.projectiles.delete(projectile.projectileId);
+        continue;
+      }
+
+      projectile.x = end.x;
+      projectile.y = end.y;
+      projectile.z = end.z;
     }
   }
 
