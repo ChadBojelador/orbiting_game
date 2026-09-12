@@ -30,9 +30,7 @@ interface PlayerEntity {
   lastZ: number;
   movingUntil: number;
   recoveryEndsAt: number;
-  verticalVelocity: number;
-  verticalOffset: number;
-  jumping: boolean;
+  jumpStartedAt: number;
 }
 
 const MOVEMENT_ANIMATION_HOLD_MS = 180;
@@ -44,17 +42,6 @@ export class PlayerEntityManager {
     private readonly scene: THREE.Scene,
     private readonly characterModel?: CharacterModelFactory,
   ) {}
-
-  jump(playerId: string): void {
-    const entity = this.entities.get(playerId);
-    if (!entity) return;
-
-    if (entity.verticalOffset > 0.01 || entity.jumping) return;
-
-    entity.verticalVelocity = 7;
-    entity.verticalOffset = 0.01;
-    entity.jumping = true;
-  }
 
   update(
     view: LobbyView,
@@ -100,10 +87,12 @@ export class PlayerEntityManager {
     this.entities.clear();
   }
 
-  private createEntity(
-    player: PlayerView,
-    localPlayerId: string,
-  ): PlayerEntity {
+  triggerJump(playerId: string): void {
+    const entity = this.entities.get(playerId);
+    if (entity && Date.now() - entity.jumpStartedAt > 350) entity.jumpStartedAt = Date.now();
+  }
+
+  private createEntity(player: PlayerView, localPlayerId: string): PlayerEntity {
     const root = new THREE.Group();
     root.name = `player-${player.playerId}`;
     this.scene.add(root);
@@ -204,9 +193,7 @@ export class PlayerEntityManager {
       lastZ: player.z,
       movingUntil: 0,
       recoveryEndsAt: 0,
-      verticalVelocity: 0,
-      verticalOffset: 0,
-      jumping: false,
+      jumpStartedAt: 0,
     };
 
     this.entities.set(
@@ -230,13 +217,6 @@ export class PlayerEntityManager {
     const previousStatus =
       entity.currentStatus;
 
-    if (
-      previousStatus !== 'frozen' &&
-      player.status === 'frozen'
-    ) {
-      entity.verticalVelocity = 3.5;
-    }
-
     const dx =
       position.x - entity.lastX;
 
@@ -258,40 +238,16 @@ export class PlayerEntityManager {
 
     entity.lastX = position.x;
     entity.lastZ = position.z;
-
-    // Handle jumping and frozen-player bounce.
-    if (
-      player.status === 'frozen' ||
-      entity.verticalOffset > 0.01 ||
-      entity.jumping
-    ) {
-      entity.verticalVelocity -=
-        15 * deltaSeconds;
-
-      entity.verticalOffset +=
-        entity.verticalVelocity *
-        deltaSeconds;
-
-      if (entity.verticalOffset <= 0) {
-        entity.verticalOffset = 0;
-        entity.verticalVelocity = 0;
-        entity.jumping = false;
-      }
-    }
-
+    const jumpElapsed = entity.jumpStartedAt === 0 ? 500 : now - entity.jumpStartedAt;
+    const jumpProgress = Math.min(1, Math.max(0, jumpElapsed / 500));
+    const jumpOffset = entity.jumpStartedAt === 0 ? 0 : Math.sin(jumpProgress * Math.PI) * 0.8;
+    if (jumpProgress >= 1) entity.jumpStartedAt = 0;
     entity.root.position.set(
       position.x,
-      worldHeightAt(
-        position.x,
-        position.z,
-      ) +
-        0.08 +
-        entity.verticalOffset,
+      worldHeightAt(position.x, position.z) + 0.08 + jumpOffset,
       position.z,
     );
-
-    entity.root.rotation.y =
-      position.yaw;
+    entity.root.rotation.y = position.yaw;
 
     const isProtected =
       now < player.protectedUntil;

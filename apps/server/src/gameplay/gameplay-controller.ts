@@ -44,10 +44,10 @@ export class GameplayController {
   private lastTick = 0;
   private hasStarted = false;
 
-constructor(
-  private readonly state: LobbyState,
-  private readonly emit: (event: GameplayEvent) => void = () => {},
-) {}
+  constructor(
+    private readonly state: LobbyState,
+    private readonly emit: (event: GameplayEvent) => void = () => {},
+  ) {}
 
   /** Called once per round start. Spawns/respawns active (non-eliminated) players. */
   startRound(now: number, _halfExtent: number): void {
@@ -234,62 +234,47 @@ constructor(
   }
 
   private step(now: number): void {
-  const canPlay = this.canPlay(now);
+    const canPlay = this.canPlay(now);
+    for (const player of this.state.players.values()) {
+      if (!canPlay || !player.isConnected || player.status === 'eliminated') {
+        this.clearInput(player.playerId);
+        continue;
+      }
 
-  for (const player of this.state.players.values()) {
-    if (!canPlay || !player.isConnected || player.status === 'eliminated') {
-      this.clearInput(player.playerId);
-      continue;
-    }
+      const dt = GAMEPLAY.tickMs / 1000;
 
-    const dt = GAMEPLAY.tickMs / 1000;
+      if (player.status === 'frozen') {
+        player.x += player.knockbackX * dt;
+        player.z += player.knockbackZ * dt;
+        player.x = Math.max(
+          -this.state.arenaHalfExtent,
+          Math.min(this.state.arenaHalfExtent, player.x),
+        );
+        player.z = Math.max(
+          -this.state.arenaHalfExtent,
+          Math.min(this.state.arenaHalfExtent, player.z),
+        );
+        player.knockbackX *= KNOCKBACK_DECAY;
+        player.knockbackZ *= KNOCKBACK_DECAY;
+        if (Math.abs(player.knockbackX) < 0.05) player.knockbackX = 0;
+        if (Math.abs(player.knockbackZ) < 0.05) player.knockbackZ = 0;
+        this.clearInput(player.playerId);
+        continue;
+      }
 
-    // Frozen players cannot move normally, but knockback still applies.
-    if (player.status === 'frozen') {
-      player.x += player.knockbackX * dt;
-      player.z += player.knockbackZ * dt;
-
-      player.x = Math.max(
-        -this.state.arenaHalfExtent,
-        Math.min(this.state.arenaHalfExtent, player.x),
+      const queue = this.inputs.get(player.playerId);
+      if (!queue) continue;
+      while (queue[0] && now - queue[0].receivedAt > GAMEPLAY.inputExpiryMs) {
+        player.inputSequence = queue.shift()!.input.sequence;
+      }
+      const next = queue.shift();
+      if (!next) continue;
+      const position = moveKinematic(
+        player,
+        next.input,
+        dt,
+        this.state.arenaHalfExtent,
       );
-
-      player.z = Math.max(
-        -this.state.arenaHalfExtent,
-        Math.min(this.state.arenaHalfExtent, player.z),
-      );
-
-      // Gradually slow the knockback down.
-      player.knockbackX *= KNOCKBACK_DECAY;
-      player.knockbackZ *= KNOCKBACK_DECAY;
-
-      if (Math.abs(player.knockbackX) < 0.05) player.knockbackX = 0;
-      if (Math.abs(player.knockbackZ) < 0.05) player.knockbackZ = 0;
-
-      this.clearInput(player.playerId);
-      continue;
-    }
-
-    // Normal active-player movement.
-    const queue = this.inputs.get(player.playerId);
-    if (!queue) continue;
-
-    while (
-      queue[0] &&
-      now - queue[0].receivedAt > GAMEPLAY.inputExpiryMs
-    ) {
-      player.inputSequence = queue.shift()!.input.sequence;
-    }
-
-    const next = queue.shift();
-    if (!next) continue;
-
-    const position = moveKinematic(
-      player,
-      next.input,
-      dt,
-      this.state.arenaHalfExtent,
-    );
 
     player.x = position.x;
     player.z = position.z;

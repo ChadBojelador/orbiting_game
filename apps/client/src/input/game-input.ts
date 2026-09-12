@@ -37,26 +37,26 @@ export class GameInput {
   private readonly keys = new Set<string>();
   private movement: Position = { x: 0, z: 0 };
   private hasTag = false;
-  private hasPing = false;
   private hasJump = false;
+  private hasPing = false;
 
   pressTag(): void {
     this.hasTag = true;
   }
+  pressJump(): void {
+    this.hasJump = true;
+  }
   pressPing(): void {
     this.hasPing = true;
   }
-  pressJump(): void {
-  this.hasJump = true;
-}
   reset(): void {
     this.keys.clear();
     this.touch = { x: 0, z: 0 };
     this.movement = { x: 0, z: 0 };
     this.isTouchRescuing = false;
     this.hasTag = false;
-    this.hasPing = false;
     this.hasJump = false;
+    this.hasPing = false;
   }
   sample(seconds = 0): ReturnType<GameInput['createSample']> {
     const desired = cameraRelative(
@@ -81,12 +81,12 @@ export class GameInput {
       ...this.movement,
       isRescuing: this.keys.has('KeyE') || this.isTouchRescuing,
       hasTag: this.hasTag,
-      hasPing: this.hasPing,
       hasJump: this.hasJump,
+      hasPing: this.hasPing,
     };
     this.hasTag = false;
-    this.hasPing = false;
     this.hasJump = false;
+    this.hasPing = false;
     return sample;
   }
 
@@ -115,7 +115,10 @@ export class GameInput {
       event.preventDefault();
       this.keys.add(event.code);
       if (event.repeat) return;
-      if (event.code === 'Space') this.pressJump();
+      if (event.code === 'Space') {
+        this.pressTag();
+        this.pressJump();
+      }
       if (event.code === 'KeyH') this.pressPing();
     };
     const up = (event: KeyboardEvent) => {
