@@ -1,6 +1,5 @@
 import {
   GAMEPLAY,
-  ARENA_COLLISION,
   canRescueInPhase,
   createSpawnPoints,
   hasLineOfSight,
@@ -12,7 +11,6 @@ import {
   type GameplayEvent,
   type GameplayMessages,
   type MoveInput,
-  type StaticCollisionGeometry,
 } from '@ice-water/shared';
 import type { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { SpatialGrid } from '../simulation/spatial-grid.js';
@@ -32,6 +30,10 @@ interface MessageBudget {
   resetsAt: number;
 }
 
+const KNOCKBACK_SPEED = 10;
+const KNOCKBACK_VERTICAL = 3;
+const KNOCKBACK_DECAY = 0.85;
+
 export class GameplayController {
   private readonly grid = new SpatialGrid<PlayerState>();
   private readonly inputs = new Map<string, PendingInput[]>();
@@ -42,11 +44,10 @@ export class GameplayController {
   private lastTick = 0;
   private hasStarted = false;
 
-  constructor(
-    private readonly state: LobbyState,
-    private readonly emit: (event: GameplayEvent) => void = () => {},
-    private readonly collision: StaticCollisionGeometry = ARENA_COLLISION,
-  ) {}
+constructor(
+  private readonly state: LobbyState,
+  private readonly emit: (event: GameplayEvent) => void = () => {},
+) {}
 
   /** Called once per round start. Spawns/respawns active (non-eliminated) players. */
   startRound(now: number, _halfExtent: number): void {
@@ -57,7 +58,7 @@ export class GameplayController {
     this.rescues.clear();
     this.progress.clear();
     // Respawn every non-eliminated player.
-    const spawns = createSpawnPoints(this.collision);
+    const spawns = createSpawnPoints();
     let index = 0;
     for (const player of this.state.players.values()) {
       if (player.team === 'unassigned' || player.status === 'eliminated') continue;
@@ -66,6 +67,9 @@ export class GameplayController {
       player.protectedUntil = 0;
       player.rescueProgress = 0;
       player.rescuingTarget = '';
+      player.knockbackX = 0;
+      player.knockbackZ = 0;
+      player.knockbackY = 0;
       const spawn = spawns[index++];
       if (!spawn) throw new Error('Arena does not have enough spawn points');
       player.x = spawn.x;
@@ -183,7 +187,7 @@ export class GameplayController {
     return this.grid
       .nearby(player, range)
       .find(
-        (target) => target.playerId === targetId && hasLineOfSight(player, target, this.collision),
+        (target) => target.playerId === targetId && hasLineOfSight(player, target),
       );
   }
 
@@ -196,6 +200,15 @@ export class GameplayController {
     if (now < target.protectedUntil) return 'This player is protected';
     target.status = 'frozen';
     target.protectedUntil = 0;
+    // Knock the Water player away from the Ice player.
+    const dx = target.x - player.x;
+    const dz = target.z - player.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance > 0.001) {
+      target.knockbackX = (dx / distance) * KNOCKBACK_SPEED;
+      target.knockbackZ = (dz / distance) * KNOCKBACK_SPEED;
+      target.knockbackY = KNOCKBACK_VERTICAL;
+}
     target.rescueProgress = 0;
     this.clearInput(target.playerId);
     this.stopRescue(target.playerId);
@@ -221,87 +234,148 @@ export class GameplayController {
   }
 
   private step(now: number): void {
-    const canPlay = this.canPlay(now);
-    for (const player of this.state.players.values()) {
-      if (!canPlay || !player.isConnected || player.status !== 'active') {
-        this.clearInput(player.playerId);
-        continue;
-      }
-      const queue = this.inputs.get(player.playerId);
-      if (!queue) continue;
-      while (queue[0] && now - queue[0].receivedAt > GAMEPLAY.inputExpiryMs) {
-        player.inputSequence = queue.shift()!.input.sequence;
-      }
-      const next = queue.shift();
-      if (!next) continue;
-      const position = moveKinematic(
-        player,
-        next.input,
-        GAMEPLAY.tickMs / 1000,
-        this.state.arenaHalfExtent,
-        this.collision,
+  const canPlay = this.canPlay(now);
+
+  for (const player of this.state.players.values()) {
+    if (!canPlay || !player.isConnected || player.status === 'eliminated') {
+      this.clearInput(player.playerId);
+      continue;
+    }
+
+    const dt = GAMEPLAY.tickMs / 1000;
+
+    // Frozen players cannot move normally, but knockback still applies.
+    if (player.status === 'frozen') {
+      player.x += player.knockbackX * dt;
+      player.z += player.knockbackZ * dt;
+
+      player.x = Math.max(
+        -this.state.arenaHalfExtent,
+        Math.min(this.state.arenaHalfExtent, player.x),
       );
-      player.x = position.x;
-      player.z = position.z;
-      if (next.input.x || next.input.z) player.yaw = Math.atan2(next.input.x, next.input.z);
-      player.inputSequence = next.input.sequence;
-    }
-    this.grid.rebuild(this.state.players.values());
-    const contributors = new Map<string, { ids: string[]; elapsed: number }>();
-    for (const [id, intent] of this.rescues) {
-      const rescuer = this.state.players.get(id);
-      const target = rescuer && this.nearbyTarget(rescuer, intent.targetId, GAMEPLAY.rescueRange);
-      if (
-        !canRescueInPhase(this.state.phase, this.state.phaseDeadline, now) ||
-        now >= intent.expiresAt ||
-        !rescuer?.isConnected ||
-        rescuer.status !== 'active' ||
-        rescuer.team !== 'water' ||
-        !target ||
-        target.status !== 'frozen' ||
-        target.team !== 'water'
-      ) {
-        this.stopRescue(id);
-        continue;
-      }
-      const group = contributors.get(target.playerId) ?? { ids: [], elapsed: 0 };
-      group.ids.push(id);
-      group.elapsed = Math.max(
-        group.elapsed,
-        Math.min(GAMEPLAY.tickMs, Math.max(0, now - intent.startedAt)),
+
+      player.z = Math.max(
+        -this.state.arenaHalfExtent,
+        Math.min(this.state.arenaHalfExtent, player.z),
       );
-      contributors.set(target.playerId, group);
+
+      // Gradually slow the knockback down.
+      player.knockbackX *= KNOCKBACK_DECAY;
+      player.knockbackZ *= KNOCKBACK_DECAY;
+
+      if (Math.abs(player.knockbackX) < 0.05) player.knockbackX = 0;
+      if (Math.abs(player.knockbackZ) < 0.05) player.knockbackZ = 0;
+
+      this.clearInput(player.playerId);
+      continue;
     }
-    for (const player of this.state.players.values()) {
-      const group = contributors.get(player.playerId);
-      if (!group) {
-        this.progress.delete(player.playerId);
-        player.rescueProgress = 0;
-        continue;
-      }
-      const elapsed = (this.progress.get(player.playerId) ?? 0) + group.elapsed;
-      this.progress.set(player.playerId, elapsed);
-      player.rescueProgress = Math.min(1, elapsed / GAMEPLAY.rescueMs);
-      if (elapsed < GAMEPLAY.rescueMs) continue;
-      player.status = 'active';
-      player.protectedUntil = now + GAMEPLAY.protectionMs;
-      player.helpPingUntil = 0;
-      player.rescueProgress = 0;
-      this.progress.delete(player.playerId);
-      for (const id of group.ids) {
-        const rescuer = this.state.players.get(id);
-        if (rescuer) rescuer.rescues++;
-        this.stopRescue(id);
-      }
-      this.emit({
-        type: 'player/rescued',
-        payload: {
-          playerId: player.playerId,
-          by: group.ids,
-          protectedUntil: player.protectedUntil,
-          serverTime: now,
-        },
-      });
+
+    // Normal active-player movement.
+    const queue = this.inputs.get(player.playerId);
+    if (!queue) continue;
+
+    while (
+      queue[0] &&
+      now - queue[0].receivedAt > GAMEPLAY.inputExpiryMs
+    ) {
+      player.inputSequence = queue.shift()!.input.sequence;
     }
+
+    const next = queue.shift();
+    if (!next) continue;
+
+    const position = moveKinematic(
+      player,
+      next.input,
+      dt,
+      this.state.arenaHalfExtent,
+    );
+
+    player.x = position.x;
+    player.z = position.z;
+
+    if (next.input.x || next.input.z) {
+      player.yaw = Math.atan2(next.input.x, next.input.z);
+    }
+
+    player.inputSequence = next.input.sequence;
   }
-}
+
+  this.grid.rebuild(this.state.players.values());
+
+  const contributors = new Map<string, { ids: string[]; elapsed: number }>();
+
+  for (const [id, intent] of this.rescues) {
+    const rescuer = this.state.players.get(id);
+    const target =
+      rescuer &&
+      this.nearbyTarget(rescuer, intent.targetId, GAMEPLAY.rescueRange);
+
+    if (
+      !canRescueInPhase(this.state.phase, this.state.phaseDeadline, now) ||
+      now >= intent.expiresAt ||
+      !rescuer?.isConnected ||
+      rescuer.status !== 'active' ||
+      rescuer.team !== 'water' ||
+      !target ||
+      target.status !== 'frozen' ||
+      target.team !== 'water'
+    ) {
+      this.stopRescue(id);
+      continue;
+    }
+
+    const group = contributors.get(target.playerId) ?? {
+      ids: [],
+      elapsed: 0,
+    };
+
+    group.ids.push(id);
+    group.elapsed = Math.max(
+      group.elapsed,
+      Math.min(GAMEPLAY.tickMs, Math.max(0, now - intent.startedAt)),
+    );
+
+    contributors.set(target.playerId, group);
+  }
+
+  for (const player of this.state.players.values()) {
+    const group = contributors.get(player.playerId);
+
+    if (!group) {
+      this.progress.delete(player.playerId);
+      player.rescueProgress = 0;
+      continue;
+    }
+
+    const elapsed =
+      (this.progress.get(player.playerId) ?? 0) + group.elapsed;
+
+    this.progress.set(player.playerId, elapsed);
+    player.rescueProgress = Math.min(1, elapsed / GAMEPLAY.rescueMs);
+
+    if (elapsed < GAMEPLAY.rescueMs) continue;
+
+    player.status = 'active';
+    player.protectedUntil = now + GAMEPLAY.protectionMs;
+    player.helpPingUntil = 0;
+    player.rescueProgress = 0;
+    this.progress.delete(player.playerId);
+
+    for (const id of group.ids) {
+      const rescuer = this.state.players.get(id);
+      if (rescuer) rescuer.rescues++;
+      this.stopRescue(id);
+    }
+
+    this.emit({
+      type: 'player/rescued',
+      payload: {
+        playerId: player.playerId,
+        by: group.ids,
+        protectedUntil: player.protectedUntil,
+        serverTime: now,
+      },
+    });
+  }
+}}

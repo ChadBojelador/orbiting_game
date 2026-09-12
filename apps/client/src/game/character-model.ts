@@ -29,7 +29,7 @@ export class CharacterModelFactory {
   instantiate(color: string, initialAnimation: CharacterAnimation): CharacterInstance {
     const root = cloneSkeleton(this.source);
     root.name = 'character-model';
-    root.scale.setScalar(0.2);
+    root.scale.setScalar(0.15);
     const material = new THREE.MeshStandardMaterial({ color, roughness: 0.58, metalness: 0 });
     root.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
