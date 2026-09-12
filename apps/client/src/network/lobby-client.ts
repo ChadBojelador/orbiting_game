@@ -7,8 +7,9 @@ import {
   type RoomReservation,
 } from '@ice-water/shared';
 
-interface WireLobby extends Omit<LobbyView, 'players'> {
+interface WireLobby extends Omit<LobbyView, 'players' | 'projectiles'> {
   players: { values(): IterableIterator<PlayerView> };
+  projectiles: { values(): IterableIterator<LobbyView['projectiles'][number]> };
 }
 export type LobbyRoom = Room<unknown, WireLobby>;
 const endpoint = new URL(import.meta.env.VITE_GAME_SERVER_URL || 'ws://localhost:2567');
@@ -115,6 +116,17 @@ export function snapshot(state: WireLobby): LobbyView {
     round: state.round ?? 0,
     maxRounds: state.maxRounds ?? 0,
     arenaHalfExtent: state.arenaHalfExtent ?? 28,
+    projectiles: [...state.projectiles.values()].map((projectile) => ({
+      projectileId: projectile.projectileId,
+      ownerPlayerId: projectile.ownerPlayerId,
+      x: projectile.x,
+      y: projectile.y,
+      z: projectile.z,
+      velocityX: projectile.velocityX,
+      velocityY: projectile.velocityY,
+      velocityZ: projectile.velocityZ,
+      expiresAt: projectile.expiresAt,
+    })),
     players: [...state.players.values()].map((player) => ({
       playerId: player.playerId,
       displayName: player.displayName,
@@ -132,7 +144,7 @@ export function snapshot(state: WireLobby): LobbyView {
       protectedUntil: player.protectedUntil,
       rescueProgress: player.rescueProgress,
       rescuingTarget: player.rescuingTarget,
-      tagReadyAt: player.tagReadyAt,
+      frostReadyAt: player.frostReadyAt,
       helpPingUntil: player.helpPingUntil,
       helpPingReadyAt: player.helpPingReadyAt,
       tags: player.tags,
