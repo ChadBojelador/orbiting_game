@@ -1,6 +1,6 @@
 import type { PlayerView } from '@ice-water/shared';
 import { describe, expect, it } from 'vitest';
-import { LocalPresentation, RemoteInterpolation } from './player-motion.js';
+import { LocalPrediction, LocalPresentation, RemoteInterpolation } from './player-motion.js';
 
 function player(overrides: Partial<PlayerView> = {}): PlayerView {
   return {
@@ -15,6 +15,9 @@ function player(overrides: Partial<PlayerView> = {}): PlayerView {
     isConnected: true,
     reconnectDeadline: 0,
     protectedUntil: 0,
+    y: 0,
+    verticalVelocity: 0,
+    isGrounded: true,
     tagReadyAt: 0,
     helpPingUntil: 0,
     helpPingReadyAt: 0,
@@ -30,8 +33,8 @@ describe('LocalPresentation', () => {
   it('smooths fixed-tick movement using frame-rate-independent damping', () => {
     const fastFrames = new LocalPresentation();
     const slowFrames = new LocalPresentation();
-    const start = { x: 0, z: 0, yaw: 0 };
-    const target = { x: 0.3, z: 0, yaw: Math.PI / 2 };
+    const start = { x: 0, y: 0, z: 0, yaw: 0 };
+    const target = { x: 0.3, y: 0.2, z: 0, yaw: Math.PI / 2 };
 
     fastFrames.update(start, 0);
     slowFrames.update(start, 0);
@@ -40,6 +43,7 @@ describe('LocalPresentation', () => {
     const fast = fastFrames.update(target, 0);
 
     expect(fast.x).toBeCloseTo(slow.x, 5);
+    expect(fast.y).toBeCloseTo(slow.y, 5);
     expect(fast.yaw).toBeCloseTo(slow.yaw, 5);
     expect(fast.x).toBeGreaterThan(0);
     expect(fast.x).toBeLessThan(target.x);
@@ -47,15 +51,17 @@ describe('LocalPresentation', () => {
 
   it('snaps teleports and explicit authoritative stops', () => {
     const presentation = new LocalPresentation();
-    presentation.update({ x: 0, z: 0, yaw: 0 }, 0);
+    presentation.update({ x: 0, y: 0, z: 0, yaw: 0 }, 0);
 
-    expect(presentation.update({ x: 8, z: 0, yaw: Math.PI }, 1 / 60)).toEqual({
+    expect(presentation.update({ x: 8, y: 2, z: 0, yaw: Math.PI }, 1 / 60)).toEqual({
       x: 8,
+      y: 2,
       z: 0,
       yaw: Math.PI,
     });
-    expect(presentation.update({ x: 8.2, z: 0, yaw: 0 }, 1 / 60, true)).toEqual({
+    expect(presentation.update({ x: 8.2, y: 0, z: 0, yaw: 0 }, 1 / 60, true)).toEqual({
       x: 8.2,
+      y: 0,
       z: 0,
       yaw: 0,
     });
@@ -79,5 +85,18 @@ describe('RemoteInterpolation', () => {
     motion.push(player({ x: 0.3, status: 'frozen' }), 1_050);
 
     expect(motion.at(1_100)?.x).toBe(0.3);
+  });
+
+  it('predicts a jump and reconciles its authoritative vertical state', () => {
+    const prediction = new LocalPrediction();
+    prediction.reconcile(player(), true);
+    prediction.predict({ x: 0, z: 0 }, true, true);
+
+    expect(prediction.y).toBeGreaterThan(0);
+    expect(prediction.verticalVelocity).toBeGreaterThan(0);
+    expect(prediction.isGrounded).toBe(false);
+
+    prediction.reconcile(player({ y: 0.3, verticalVelocity: 5, isGrounded: false }), true);
+    expect(prediction.y).toBeGreaterThan(0.3);
   });
 });

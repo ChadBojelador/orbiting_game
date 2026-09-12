@@ -17,8 +17,11 @@ export interface PlayerView {
   isConnected: boolean;
   reconnectDeadline: number;
   x: number;
+  y: number;
   z: number;
   yaw: number;
+  verticalVelocity: number;
+  isGrounded: boolean;
   inputSequence: number;
   status: PlayerStatus;
   protectedUntil: number;

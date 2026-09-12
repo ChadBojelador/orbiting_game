@@ -1,6 +1,7 @@
 import type { ArenaBlock } from '@ice-water/shared';
-import type { RockVariant } from './rock-factory.js';
-import type { TreeVariant } from './tree-factory.js';
+
+type RockVariant = 0 | 1 | 2 | 3;
+type TreeVariant = 0 | 1 | 2 | 3;
 
 interface PlacementBase {
   readonly blockIndex: number;

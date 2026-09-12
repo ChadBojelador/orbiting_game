@@ -1,13 +1,16 @@
 import {
   GAMEPLAY,
+  advanceVerticalMotion,
   canRescueInPhase,
   createSpawnPoints,
-  hasLineOfSight,
+  distanceSquared3d,
+  hasGameplayLineOfSight,
   isEmptyPayload,
   isMoveInput,
   isPlayPhase,
   isTargetIntent,
   moveKinematic,
+  terrainHeightAt,
   type GameplayEvent,
   type GameplayMessages,
   type MoveInput,
@@ -29,10 +32,6 @@ interface MessageBudget {
   actions: number;
   resetsAt: number;
 }
-
-const KNOCKBACK_SPEED = 10;
-const KNOCKBACK_VERTICAL = 3;
-const KNOCKBACK_DECAY = 0.85;
 
 export class GameplayController {
   private readonly grid = new SpatialGrid<PlayerState>();
@@ -69,10 +68,12 @@ export class GameplayController {
       player.rescuingTarget = '';
       player.knockbackX = 0;
       player.knockbackZ = 0;
-      player.knockbackY = 0;
+      player.verticalVelocity = 0;
+      player.isGrounded = true;
       const spawn = spawns[index++];
       if (!spawn) throw new Error('Arena does not have enough spawn points');
       player.x = spawn.x;
+      player.y = terrainHeightAt(spawn);
       player.z = spawn.z;
     }
     this.grid.rebuild(this.state.players.values());
@@ -187,7 +188,10 @@ export class GameplayController {
     return this.grid
       .nearby(player, range)
       .find(
-        (target) => target.playerId === targetId && hasLineOfSight(player, target),
+        (target) =>
+          target.playerId === targetId &&
+          distanceSquared3d(player, target) <= range * range &&
+          hasGameplayLineOfSight(player, target),
       );
   }
 
@@ -205,10 +209,11 @@ export class GameplayController {
     const dz = target.z - player.z;
     const distance = Math.hypot(dx, dz);
     if (distance > 0.001) {
-      target.knockbackX = (dx / distance) * KNOCKBACK_SPEED;
-      target.knockbackZ = (dz / distance) * KNOCKBACK_SPEED;
-      target.knockbackY = KNOCKBACK_VERTICAL;
-}
+      target.knockbackX = (dx / distance) * GAMEPLAY.knockbackSpeed;
+      target.knockbackZ = (dz / distance) * GAMEPLAY.knockbackSpeed;
+      target.verticalVelocity = GAMEPLAY.knockbackVerticalSpeed;
+      target.isGrounded = false;
+    }
     target.rescueProgress = 0;
     this.clearInput(target.playerId);
     this.stopRescue(target.playerId);
@@ -235,13 +240,17 @@ export class GameplayController {
 
   private step(now: number): void {
     const canPlay = this.canPlay(now);
+    const dt = GAMEPLAY.tickMs / 1000;
     for (const player of this.state.players.values()) {
-      if (!canPlay || !player.isConnected || player.status === 'eliminated') {
+      if (player.status === 'eliminated' || player.status === 'spectator') {
         this.clearInput(player.playerId);
         continue;
       }
-
-      const dt = GAMEPLAY.tickMs / 1000;
+      if (!canPlay) {
+        this.clearInput(player.playerId);
+        this.advanceVertical(player, dt, false);
+        continue;
+      }
 
       if (player.status === 'frozen') {
         player.x += player.knockbackX * dt;
@@ -254,113 +263,116 @@ export class GameplayController {
           -this.state.arenaHalfExtent,
           Math.min(this.state.arenaHalfExtent, player.z),
         );
-        player.knockbackX *= KNOCKBACK_DECAY;
-        player.knockbackZ *= KNOCKBACK_DECAY;
+        player.knockbackX *= GAMEPLAY.knockbackDecay;
+        player.knockbackZ *= GAMEPLAY.knockbackDecay;
         if (Math.abs(player.knockbackX) < 0.05) player.knockbackX = 0;
         if (Math.abs(player.knockbackZ) < 0.05) player.knockbackZ = 0;
         this.clearInput(player.playerId);
+        this.advanceVertical(player, dt, false);
+        continue;
+      }
+
+      if (!player.isConnected) {
+        this.clearInput(player.playerId);
+        this.advanceVertical(player, dt, false);
         continue;
       }
 
       const queue = this.inputs.get(player.playerId);
-      if (!queue) continue;
-      while (queue[0] && now - queue[0].receivedAt > GAMEPLAY.inputExpiryMs) {
+      while (queue?.[0] && now - queue[0].receivedAt > GAMEPLAY.inputExpiryMs) {
         player.inputSequence = queue.shift()!.input.sequence;
       }
-      const next = queue.shift();
-      if (!next) continue;
-      const position = moveKinematic(
-        player,
-        next.input,
-        dt,
-        this.state.arenaHalfExtent,
+      const next = queue?.shift();
+      if (next) {
+        const position = moveKinematic(player, next.input, dt, this.state.arenaHalfExtent);
+        player.x = position.x;
+        player.z = position.z;
+        if (next.input.x || next.input.z) player.yaw = Math.atan2(next.input.x, next.input.z);
+        player.inputSequence = next.input.sequence;
+      }
+      this.advanceVertical(player, dt, next?.input.jump === true);
+    }
+
+    this.grid.rebuild(this.state.players.values());
+
+    const contributors = new Map<string, { ids: string[]; elapsed: number }>();
+
+    for (const [id, intent] of this.rescues) {
+      const rescuer = this.state.players.get(id);
+      const target = rescuer && this.nearbyTarget(rescuer, intent.targetId, GAMEPLAY.rescueRange);
+
+      if (
+        !canRescueInPhase(this.state.phase, this.state.phaseDeadline, now) ||
+        now >= intent.expiresAt ||
+        !rescuer?.isConnected ||
+        rescuer.status !== 'active' ||
+        rescuer.team !== 'water' ||
+        !target ||
+        target.status !== 'frozen' ||
+        target.team !== 'water'
+      ) {
+        this.stopRescue(id);
+        continue;
+      }
+
+      const group = contributors.get(target.playerId) ?? {
+        ids: [],
+        elapsed: 0,
+      };
+
+      group.ids.push(id);
+      group.elapsed = Math.max(
+        group.elapsed,
+        Math.min(GAMEPLAY.tickMs, Math.max(0, now - intent.startedAt)),
       );
 
-    player.x = position.x;
-    player.z = position.z;
-
-    if (next.input.x || next.input.z) {
-      player.yaw = Math.atan2(next.input.x, next.input.z);
+      contributors.set(target.playerId, group);
     }
 
-    player.inputSequence = next.input.sequence;
-  }
+    for (const player of this.state.players.values()) {
+      const group = contributors.get(player.playerId);
 
-  this.grid.rebuild(this.state.players.values());
+      if (!group) {
+        this.progress.delete(player.playerId);
+        player.rescueProgress = 0;
+        continue;
+      }
 
-  const contributors = new Map<string, { ids: string[]; elapsed: number }>();
+      const elapsed = (this.progress.get(player.playerId) ?? 0) + group.elapsed;
 
-  for (const [id, intent] of this.rescues) {
-    const rescuer = this.state.players.get(id);
-    const target =
-      rescuer &&
-      this.nearbyTarget(rescuer, intent.targetId, GAMEPLAY.rescueRange);
+      this.progress.set(player.playerId, elapsed);
+      player.rescueProgress = Math.min(1, elapsed / GAMEPLAY.rescueMs);
 
-    if (
-      !canRescueInPhase(this.state.phase, this.state.phaseDeadline, now) ||
-      now >= intent.expiresAt ||
-      !rescuer?.isConnected ||
-      rescuer.status !== 'active' ||
-      rescuer.team !== 'water' ||
-      !target ||
-      target.status !== 'frozen' ||
-      target.team !== 'water'
-    ) {
-      this.stopRescue(id);
-      continue;
-    }
+      if (elapsed < GAMEPLAY.rescueMs) continue;
 
-    const group = contributors.get(target.playerId) ?? {
-      ids: [],
-      elapsed: 0,
-    };
-
-    group.ids.push(id);
-    group.elapsed = Math.max(
-      group.elapsed,
-      Math.min(GAMEPLAY.tickMs, Math.max(0, now - intent.startedAt)),
-    );
-
-    contributors.set(target.playerId, group);
-  }
-
-  for (const player of this.state.players.values()) {
-    const group = contributors.get(player.playerId);
-
-    if (!group) {
-      this.progress.delete(player.playerId);
+      player.status = 'active';
+      player.protectedUntil = now + GAMEPLAY.protectionMs;
+      player.helpPingUntil = 0;
       player.rescueProgress = 0;
-      continue;
+      this.progress.delete(player.playerId);
+
+      for (const id of group.ids) {
+        const rescuer = this.state.players.get(id);
+        if (rescuer) rescuer.rescues++;
+        this.stopRescue(id);
+      }
+
+      this.emit({
+        type: 'player/rescued',
+        payload: {
+          playerId: player.playerId,
+          by: group.ids,
+          protectedUntil: player.protectedUntil,
+          serverTime: now,
+        },
+      });
     }
-
-    const elapsed =
-      (this.progress.get(player.playerId) ?? 0) + group.elapsed;
-
-    this.progress.set(player.playerId, elapsed);
-    player.rescueProgress = Math.min(1, elapsed / GAMEPLAY.rescueMs);
-
-    if (elapsed < GAMEPLAY.rescueMs) continue;
-
-    player.status = 'active';
-    player.protectedUntil = now + GAMEPLAY.protectionMs;
-    player.helpPingUntil = 0;
-    player.rescueProgress = 0;
-    this.progress.delete(player.playerId);
-
-    for (const id of group.ids) {
-      const rescuer = this.state.players.get(id);
-      if (rescuer) rescuer.rescues++;
-      this.stopRescue(id);
-    }
-
-    this.emit({
-      type: 'player/rescued',
-      payload: {
-        playerId: player.playerId,
-        by: group.ids,
-        protectedUntil: player.protectedUntil,
-        serverTime: now,
-      },
-    });
   }
-}}
+
+  private advanceVertical(player: PlayerState, seconds: number, wantsJump: boolean): void {
+    const next = advanceVerticalMotion(player, player, seconds, wantsJump);
+    player.y = next.y;
+    player.verticalVelocity = next.verticalVelocity;
+    player.isGrounded = next.isGrounded;
+  }
+}

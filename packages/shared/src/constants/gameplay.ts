@@ -3,6 +3,9 @@ export const GAMEPLAY = {
   tickMs: 50,
   moveSpeed: 6,
   playerRadius: 0.45,
+  jumpSpeed: 7,
+  gravity: 18,
+  interactionHeight: 0.9,
   tagRange: 1.8,
   tagCooldownMs: 600,
   rescueRange: 2.4,
@@ -14,6 +17,9 @@ export const GAMEPLAY = {
   inputExpiryMs: 250,
   maxInputQueue: 5,
   interpolationMs: 100,
+  knockbackSpeed: 10,
+  knockbackVerticalSpeed: 3,
+  knockbackDecay: 0.85,
   // Match timing (milliseconds)
   regularMs: 30_000,
   warningMs: 8_000, // warning phase begins this many ms before the regular deadline

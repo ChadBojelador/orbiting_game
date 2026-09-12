@@ -237,13 +237,27 @@ describe('HTTP and real WebSocket room flow', () => {
     const actorErrors = errorInbox(actor.room);
     const rateErrors = errorInbox(rateActor.room);
     const before = actor.room.state.players.get(actor.identity.playerId)!;
-    const original = { x: before.x, z: before.z, team: before.team, status: before.status };
+    const original = {
+      x: before.x,
+      y: before.y,
+      z: before.z,
+      team: before.team,
+      status: before.status,
+    };
 
     expect(
       await sendForError(actor.room, actorErrors, 'input/move', {
         x: 2,
         z: 0,
         sequence: 1,
+      }),
+    ).toMatchObject({ code: 'invalid-action', message: 'Invalid movement input' });
+    expect(
+      await sendForError(actor.room, actorErrors, 'input/move', {
+        x: 0,
+        z: 0,
+        sequence: 1,
+        jump: 'yes',
       }),
     ).toMatchObject({ code: 'invalid-action', message: 'Invalid movement input' });
     expect(
@@ -258,8 +272,9 @@ describe('HTTP and real WebSocket room flow', () => {
       }),
     ).toMatchObject({ code: 'invalid-message' });
 
-    actor.room.send('input/move', { x: 1, z: 0, sequence: 1 });
+    actor.room.send('input/move', { x: 1, z: 0, sequence: 1, jump: true });
     await waitFor(() => actor.room.state.players.get(actor.identity.playerId)?.inputSequence === 1);
+    await waitFor(() => actor.room.state.players.get(actor.identity.playerId)!.y > original.y);
     expect(
       await sendForError(actor.room, actorErrors, 'input/move', {
         x: 1,

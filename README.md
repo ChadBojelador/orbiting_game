@@ -30,6 +30,13 @@ Docker must be running before `db:up`. If Windows reserves port 5432, set `POSTG
 
 Host duties transfer to the first connected guest when the host leaves. Unexpected disconnects reserve the same player for 25 seconds by default; the browser reconnects automatically, and a reload can reclaim the per-tab connection. During a match, reconnecting restores the current authoritative team, position, and freeze/elimination state, including any server-side changes that occurred while disconnected. If the reservation expires, an active or frozen participant forfeits and becomes permanently eliminated, and that match cannot be rejoined. Intentional **Leave room** releases the seat and has the same in-match forfeit outcome. Fresh joins close when countdown begins.
 
+### Controls
+
+- Keyboard: WASD or arrow keys to move, Space to jump, F to tag as Ice, E to hold rescue as Water, and H to request help while frozen.
+- Touch: use the left joystick plus the on-screen Jump and role-specific action buttons.
+
+Jumping is server-authoritative and affects three-dimensional tag and rescue range. It cannot pass through static obstacles.
+
 ### Test locally with bots
 
 Set `DEV_BOT_COUNT=5` in the root `.env`, restart `npm run dev`, and create a room. One human plus five server-side wandering bots satisfies the six-player start minimum. Bots occupy normal room seats and participate in authoritative movement, team assignment, freezing, and elimination, but they do not tag or rescue.

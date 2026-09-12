@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { BufferGeometry } from 'three';
 
 export function LobbyPreview() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,7 +49,7 @@ export function LobbyPreview() {
 
         const prop = (
           name: string,
-          geometry: THREE.BufferGeometry,
+          geometry: BufferGeometry,
           color: string,
           position: [number, number, number],
           scale: [number, number, number] = [1, 1, 1],
@@ -75,7 +76,11 @@ export function LobbyPreview() {
         prop('rock-b', new THREE.DodecahedronGeometry(0.16, 0), '#70968A', [1.8, 0.2, 0.8]);
 
         const addTree = (position: [number, number, number], scale: number) => {
-          prop('tree-trunk', new THREE.CylinderGeometry(0.1, 0.14, 0.65, 8), '#A96F56', position, [scale, scale, scale]);
+          prop('tree-trunk', new THREE.CylinderGeometry(0.1, 0.14, 0.65, 8), '#A96F56', position, [
+            scale,
+            scale,
+            scale,
+          ]);
           prop(
             'tree-crown',
             new THREE.IcosahedronGeometry(0.48, 1),
@@ -88,25 +93,27 @@ export function LobbyPreview() {
         addTree([2.1, 0.32, -0.55], 0.72);
 
         const addCrystal = (position: [number, number, number], scale: number) => {
-          prop(
-            'frost-crystal',
-            new THREE.ConeGeometry(0.25, 0.85, 6),
-            '#7EEBFF',
-            position,
-            [scale, scale, scale],
-          );
+          prop('frost-crystal', new THREE.ConeGeometry(0.25, 0.85, 6), '#7EEBFF', position, [
+            scale,
+            scale,
+            scale,
+          ]);
         };
         addCrystal([1.55, 0.55, -0.35], 0.8);
         addCrystal([1.86, 0.42, -0.18], 0.52);
 
         const addFlower = (position: [number, number, number], color: string) => {
-          prop('flower-stem', new THREE.CylinderGeometry(0.025, 0.025, 0.28, 6), '#3E9A6B', position);
           prop(
-            'flower-head',
-            new THREE.SphereGeometry(0.11, 10, 6),
-            color,
-            [position[0], position[1] + 0.17, position[2]],
+            'flower-stem',
+            new THREE.CylinderGeometry(0.025, 0.025, 0.28, 6),
+            '#3E9A6B',
+            position,
           );
+          prop('flower-head', new THREE.SphereGeometry(0.11, 10, 6), color, [
+            position[0],
+            position[1] + 0.17,
+            position[2],
+          ]);
         };
         addFlower([-1.45, 0.35, 0.9], '#FF8D7A');
         addFlower([-1.7, 0.35, 0.72], '#FFF1D1');
