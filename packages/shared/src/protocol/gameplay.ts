@@ -1,4 +1,7 @@
 import type { MatchPhase } from './lobby.js';
+import type { WeaponId } from '../constants/weapons.js';
+
+// ── Geometry primitives ──
 
 export interface Position {
   x: number;
@@ -7,50 +10,122 @@ export interface Position {
 export interface SpatialPosition extends Position {
   y: number;
 }
+
+// ── Input ──
+
 export interface MoveInput extends Position {
   sequence: number;
-  /** One-shot jump intent. Optional so a rolling deployment accepts older clients. */
+  /** Vertical look angle in radians (up is negative). */
+  pitch?: number;
+  /** One-shot jump intent. */
   jump?: boolean;
+  /** Slide intent. */
+  slide?: boolean;
 }
-export interface TargetIntent {
-  targetId: string;
+
+export interface ShootIntent {
+  /** Yaw angle of the shot (radians). */
+  yaw: number;
+  /** Pitch angle of the shot (radians). */
+  pitch: number;
 }
-export interface FrostThrowIntent {
-  directionX: number;
-  directionY: number;
-  directionZ: number;
+
+export interface ReloadIntent {
+  // empty — just signals "reload now"
 }
-export interface FrostProjectileView extends SpatialPosition {
-  projectileId: string;
-  ownerPlayerId: string;
-  velocityX: number;
-  velocityY: number;
-  velocityZ: number;
-  expiresAt: number;
+
+export interface WeaponSwitchIntent {
+  slot: number; // 0 = primary, 1 = secondary, 2 = melee
 }
-export type PlayerStatus = 'active' | 'frozen' | 'eliminated' | 'spectator';
+
+// ── Player ──
+
+export type PlayerStatus = 'alive' | 'dead' | 'spectator';
+
+export type GameMode = 'ffa' | 'tdm' | 'duel';
+
+export type Team = 'none' | 'ice' | 'water';
+
+// ── Messages ──
+
 export interface GameplayMessages {
   'input/move': MoveInput;
-  'action/frost-throw': FrostThrowIntent;
-  'action/rescue-start': TargetIntent;
-  'action/rescue-stop': Record<string, never>;
-  'action/help-ping': Record<string, never>;
+  'action/shoot': ShootIntent;
+  'action/reload': ReloadIntent;
+  'action/switch-weapon': WeaponSwitchIntent;
 }
+
 export interface GameplayEvents {
-  'frost/thrown': { projectileId: string; ownerPlayerId: string; serverTime: number };
-  'player/frozen': { playerId: string; by: string; serverTime: number };
-  'player/rescued': { playerId: string; by: string[]; protectedUntil: number; serverTime: number };
-  'player/help-ping': { playerId: string; until: number; serverTime: number };
-  'player/permanently-frozen': { playerId: string; serverTime: number };
-  'arena/boundary-changed': { halfExtent: number; round: number; serverTime: number };
+  'player/hit': {
+    attackerId: string;
+    victimId: string;
+    damage: number;
+    isHeadshot: boolean;
+    weaponId: WeaponId;
+    serverTime: number;
+  };
+  'player/killed': {
+    killerId: string;
+    victimId: string;
+    weaponId: WeaponId;
+    isHeadshot: boolean;
+    serverTime: number;
+  };
+  'player/respawned': {
+    playerId: string;
+    x: number;
+    y: number;
+    z: number;
+    serverTime: number;
+  };
 }
+
 export type GameplayEvent = {
   [K in keyof GameplayEvents]: { type: K; payload: GameplayEvents[K] };
 }[keyof GameplayEvents];
 
+// ── Phase helpers ──
+
 export function isPlayPhase(phase: MatchPhase): boolean {
-  return phase === 'regular' || phase === 'warning' || phase === 'deep-freeze';
+  return phase === 'playing';
 }
-export function canRescueInPhase(phase: MatchPhase, deadline: number, now: number): boolean {
-  return (phase === 'regular' || phase === 'warning') && (deadline === 0 || now < deadline);
+
+// ── Validation ──
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isMoveInput(value: unknown): value is MoveInput {
+  if (!isRecord(value)) return false;
+  if (typeof value.x !== 'number' || typeof value.z !== 'number') return false;
+  if (!Number.isFinite(value.x) || !Number.isFinite(value.z)) return false;
+  if (typeof value.sequence !== 'number' || !Number.isInteger(value.sequence)) return false;
+  if (value.pitch !== undefined && (typeof value.pitch !== 'number' || !Number.isFinite(value.pitch))) return false;
+  if (value.jump !== undefined && typeof value.jump !== 'boolean') return false;
+  if (value.slide !== undefined && typeof value.slide !== 'boolean') return false;
+  return true;
+}
+
+export function isShootIntent(value: unknown): value is ShootIntent {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.yaw === 'number' &&
+    Number.isFinite(value.yaw) &&
+    typeof value.pitch === 'number' &&
+    Number.isFinite(value.pitch)
+  );
+}
+
+export function isReloadIntent(value: unknown): value is ReloadIntent {
+  return isRecord(value);
+}
+
+export function isWeaponSwitchIntent(value: unknown): value is WeaponSwitchIntent {
+  if (!isRecord(value)) return false;
+  return typeof value.slot === 'number' && Number.isInteger(value.slot) && value.slot >= 0 && value.slot <= 3;
+}
+
+export function isEmptyPayload(value: unknown): boolean {
+  return isRecord(value) && Object.keys(value).length === 0;
 }
