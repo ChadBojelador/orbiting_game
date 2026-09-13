@@ -203,7 +203,7 @@ export class GameScene {
       if (event.button !== 0) return;
     };
     const onPointerMove = (event: PointerEvent) => {
-      this.followCamera.orbit(event.movementX, -event.movementY);
+      this.followCamera.orbit(event.movementX, event.movementY);
     };
     const onContextMenu = (event: MouseEvent) => event.preventDefault();
     this.canvas.addEventListener('pointerdown', onPointerDown);
