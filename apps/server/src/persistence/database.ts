@@ -1,7 +1,12 @@
 import pg from 'pg';
+import {
+  saveMatchSummary,
+  type MatchSummary,
+} from './match-summary-repository.js';
 
 export interface Database {
   isReady(): Promise<boolean>;
+  saveMatchSummary(summary: MatchSummary): Promise<boolean>;
   close(): Promise<void>;
 }
 
@@ -21,6 +26,10 @@ export function createDatabase(connectionString?: string): Database {
       } catch {
         return false;
       }
+    },
+    async saveMatchSummary(summary) {
+      if (!pool) throw new Error('Database is unavailable');
+      return saveMatchSummary(pool, summary);
     },
     async close() {
       await pool?.end();
