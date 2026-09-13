@@ -219,7 +219,6 @@ describe('PrivateRoom active-match reconnection', () => {
     const water = new PlayerState();
     water.playerId = 'water-player';
     water.team = 'water';
-    water.status = 'frozen';
     water.rescues = 2;
     room.state.players.set(ice.playerId, ice);
     room.state.players.set(water.playerId, water);
@@ -227,6 +226,7 @@ describe('PrivateRoom active-match reconnection', () => {
     const match = Reflect.get(room, 'match') as MatchController;
 
     match.start(NOW);
+    water.status = 'frozen';
     match.tick(NOW + 1);
     await vi.waitFor(() => expect(error).toHaveBeenCalledOnce());
     match.tick(NOW + 2);

@@ -1,6 +1,12 @@
 import { Room, ServerError, type AuthContext, type Client } from '@colyseus/core';
 import { randomUUID } from 'node:crypto';
-import { GAMEPLAY, isEmptyPayload, isRecord, type GameplayMessages } from '@ice-water/shared';
+import {
+  GAMEPLAY,
+  isEmptyPayload,
+  isRecord,
+  type GameplayMessages,
+  type MatchResult,
+} from '@ice-water/shared';
 import type { GuestIdentity, GuestSessions } from '../auth/guest-session.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
 import type { ServerConfig } from '../config/environment.js';
@@ -12,7 +18,6 @@ import { MatchController } from '../gameplay/match-controller.js';
 import { advanceAuthoritativeTick } from '../gameplay/authoritative-tick.js';
 import { BotRunner } from '../simulation/bot-runner.js';
 import type { Database } from '../persistence/database.js';
-import type { MatchResult } from '@ice-water/shared';
 
 type GuestClient = Client<{ auth: GuestIdentity }>;
 export interface RoomDependencies {
