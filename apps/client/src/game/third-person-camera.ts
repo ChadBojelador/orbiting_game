@@ -40,7 +40,7 @@ const DEFAULT_OPTIONS: ThirdPersonCameraOptions = {
   defaultPitch: Math.PI / 6,
   minPitch: Math.PI / 12,
   maxPitch: Math.PI * 0.42,
-  orbitSensitivity: 0.006,
+  orbitSensitivity: 0.01,
   rotationDamping: 14,
   returnDamping: 7,
   collisionPadding: 0.25,

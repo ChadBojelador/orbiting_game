@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { BufferGeometry } from 'three';
+import * as THREE from 'three';
+import { loadCharacterModel } from './character-model.js';
 
 export function LobbyPreview() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -11,8 +12,8 @@ export function LobbyPreview() {
     let isDisposed = false;
     let destroy: (() => void) | undefined;
 
-    void Promise.all([import('three'), import('./character-model.js')])
-      .then(async ([THREE, { loadCharacterModel }]) => {
+    void Promise.resolve()
+      .then(async () => {
         if (isDisposed) return;
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
         renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -49,7 +50,7 @@ export function LobbyPreview() {
 
         const prop = (
           name: string,
-          geometry: BufferGeometry,
+          geometry: THREE.BufferGeometry,
           color: string,
           position: [number, number, number],
           scale: [number, number, number] = [1, 1, 1],

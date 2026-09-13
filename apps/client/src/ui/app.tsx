@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   canRescueInPhase,
   isPlayPhase,
@@ -20,10 +20,14 @@ import {
   snapshot,
   type LobbyRoom,
 } from '../network/lobby-client.js';
-import { LobbyPreview } from '../game/lobby-preview.js';
 import { GameHud } from './game-hud.js';
 import { TouchControls } from './touch-controls.js';
 import { ResultsScreen } from './results-screen.js';
+import { ServerClock } from '../network/server-clock.js';
+
+const LobbyPreview = lazy(() =>
+  import('../game/lobby-preview.js').then((module) => ({ default: module.LobbyPreview })),
+);
 
 export function App() {
   const [guest, setGuest] = useState<GuestSession | null>(readGuest);
@@ -38,7 +42,7 @@ export function App() {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [now, setNow] = useState(0);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
-  const clock = useRef({ server: 0, received: 0 });
+  const clock = useRef(new ServerClock());
   const roomRef = useRef<LobbyRoom | null>(null);
   const gameCanvasRef = useRef<HTMLCanvasElement>(null);
   const gameSceneRef = useRef<import('../game/game-scene.js').GameScene | null>(null);
@@ -62,7 +66,10 @@ export function App() {
     const music = musicRef.current;
     if (!music) return;
     if (music.paused) {
-      void music.play().then(() => setIsMusicPlaying(true)).catch(() => setIsMusicPlaying(false));
+      void music
+        .play()
+        .then(() => setIsMusicPlaying(true))
+        .catch(() => setIsMusicPlaying(false));
     } else {
       music.pause();
       setIsMusicPlaying(false);
@@ -101,8 +108,8 @@ export function App() {
       if (!next.state?.players) return;
       const value = snapshot(next.state);
       setLobby(value);
-      clock.current = { server: value.serverTime, received: performance.now() };
-      setNow(value.serverTime);
+      clock.current.update(value.serverTime);
+      setNow(clock.current.now());
     };
     next.onStateChange(update);
     next.onMessage<SessionError>('session/error', (message) => setError(message.message));
@@ -154,10 +161,7 @@ export function App() {
       .finally(() => {
         if (isActive) setIsBusy(false);
       });
-    const timer = window.setInterval(
-      () => setNow(clock.current.server + performance.now() - clock.current.received),
-      100,
-    );
+    const timer = window.setInterval(() => setNow(clock.current.now()), 100);
     return () => {
       isActive = false;
       window.clearInterval(timer);
@@ -212,6 +216,7 @@ export function App() {
   }
 
   const count = lobby?.players.filter((player) => player.isConnected).length ?? 0;
+  const isReadyToStart = lobby !== null && count >= lobby.minPlayers;
   const isHost = lobby?.hostPlayerId === guest?.playerId;
   const seconds = Math.max(0, Math.ceil(((lobby?.phaseDeadline ?? 0) - now) / 1000));
   const currentPlayer = lobby?.players.find((player) => player.playerId === guest?.playerId);
@@ -219,7 +224,7 @@ export function App() {
   const isInGame =
     lobby &&
     (isPlayPhase(lobby.phase) || lobby.phase === 'round-result' || lobby.phase === 'match-result');
-  const serverNow = clock.current.server + performance.now() - clock.current.received;
+  const serverNow = clock.current.now();
   const isRescueLocked = !canRescueInPhase(
     lobby?.phase ?? 'lobby',
     lobby?.phaseDeadline ?? 0,
@@ -316,7 +321,12 @@ export function App() {
           <span aria-hidden="true">❄</span> Ice Ice Water!
         </a>
         <div className="topbar-actions">
-          <button className="music-toggle" type="button" onClick={toggleMusic} aria-pressed={isMusicPlaying}>
+          <button
+            className="music-toggle"
+            type="button"
+            onClick={toggleMusic}
+            aria-pressed={isMusicPlaying}
+          >
             <span aria-hidden="true">{isMusicPlaying ? '♫' : '♪'}</span>
             {isMusicPlaying ? 'Sound on' : 'Play soundtrack'}
           </button>
@@ -325,13 +335,22 @@ export function App() {
       </header>
       <div className="layout">
         <section className="intro" aria-labelledby="game-title">
-          <p className="eyebrow"><span aria-hidden="true">✦</span> A cozy freeze-tag adventure</p>
-          <h1 id="game-title">A little chill.<br />A lot of friends.</h1>
+          <p className="eyebrow">
+            <span aria-hidden="true">✦</span> A cozy freeze-tag adventure
+          </p>
+          <h1 id="game-title">
+            A little chill.
+            <br />A lot of friends.
+          </h1>
           <p className="lede">
             Gather your crew for a game of freeze tag. Keep moving, stick together, and don't get
             left on ice.
           </p>
-          <LobbyPreview />
+          <Suspense
+            fallback={<div className="lobby-preview preview preview-fallback">Loading arena…</div>}
+          >
+            <LobbyPreview />
+          </Suspense>
           <div className="rule-strip">
             <p>
               <span aria-hidden="true">◉</span>
@@ -428,11 +447,23 @@ export function App() {
             <p role="status">Joining your room…</p>
           ) : (
             <>
-              <div className="room-heading">
-                <h2>Your gathering place</h2>
-                <span className="connection">{connection}</span>
+              <div className="room-kicker">
+                <span className="room-kicker-mark" aria-hidden="true">
+                  ●
+                </span>
+                <span>Private match lobby</span>
+                <span className={`connection ${connection === 'Connected' ? 'is-connected' : ''}`}>
+                  <span className="connection-dot" aria-hidden="true" />
+                  {connection}
+                </span>
               </div>
-              <p>Share this code. Bring the whole crew.</p>
+              <div className="room-heading">
+                <div>
+                  <p className="room-label">ROOM CODE</p>
+                  <h2>Assemble your crew</h2>
+                </div>
+              </div>
+              <p className="room-intro">Share the code, then watch the roster fill up.</p>
               <output className="invite-output" aria-label="Room invite code">
                 {lobby.inviteCode}
               </output>
@@ -450,8 +481,14 @@ export function App() {
               <div className="roster-title">
                 <h3>In the room</h3>
                 <span role="status" aria-label="Connected players">
-                  {count} / {lobby.maxPlayers} connected
+                  {isReadyToStart ? 'Ready to start' : `${count} / ${lobby.minPlayers} to start`}
                 </span>
+              </div>
+              <div
+                className="player-meter"
+                aria-label={`${count} of ${lobby.minPlayers} players needed to start`}
+              >
+                <span style={{ width: `${Math.min(100, (count / lobby.minPlayers) * 100)}%` }} />
               </div>
               <ul className="roster">
                 {lobby.players.map((player) => (

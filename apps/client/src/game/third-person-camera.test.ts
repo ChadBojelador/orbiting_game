@@ -33,6 +33,26 @@ describe('ThirdPersonCamera', () => {
     expect(fast.pitch).toBeCloseTo(slow.pitch, 8);
   });
 
+  it('looks upward when pointer movement is upward', () => {
+    const camera = new ThirdPersonCamera({ rotationDamping: 100 });
+    const initial = camera.update({ x: 0, y: 1, z: 0 }, 0, []);
+
+    camera.orbit(0, -20);
+    const upward = camera.update({ x: 0, y: 1, z: 0 }, 1, []);
+
+    expect(upward.pitch).toBeLessThan(initial.pitch);
+    expect(upward.position.y).toBeLessThan(initial.position.y);
+  });
+
+  it('uses a responsive default mouse sensitivity', () => {
+    const camera = new ThirdPersonCamera({ rotationDamping: 100 });
+
+    camera.orbit(50, 0);
+    const pose = camera.update({ x: 0, y: 1, z: 0 }, 1, []);
+
+    expect(pose.yaw).toBeCloseTo(-0.5);
+  });
+
   it('pulls in when obstructed and smoothly restores its configured distance', () => {
     const camera = new ThirdPersonCamera({ returnDamping: 5 });
     const target = { x: 0, y: 1.2, z: 0 };

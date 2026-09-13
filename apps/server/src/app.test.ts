@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { matchMaker, type Room as ServerRoom } from '@colyseus/core';
 import { Client, type Room } from '@colyseus/sdk';
 import {
@@ -15,6 +15,7 @@ import { readConfig } from './config/environment.js';
 interface TestState {
   phase: MatchPhase;
   phaseDeadline: number;
+  serverTime: number;
   hostPlayerId: string;
   players: Map<string, PlayerView>;
   iceCount: number;
@@ -29,6 +30,7 @@ let app: Awaited<ReturnType<typeof startServer>>;
 let url: string;
 const rooms: TestRoom[] = [];
 let isDatabaseReady = true;
+const saveMatchSummary = vi.fn(async () => true);
 const config = {
   ...readConfig({
     GUEST_SESSION_SIGNING_SECRET: 'test-secret-with-at-least-32-characters',
@@ -118,7 +120,11 @@ async function sendForError(
 }
 
 beforeAll(async () => {
-  app = await startServer(config, { isReady: async () => isDatabaseReady, close: async () => {} });
+  app = await startServer(config, {
+    isReady: async () => isDatabaseReady,
+    saveMatchSummary,
+    close: async () => {},
+  });
   url = `http://127.0.0.1:${app.port}`;
 });
 afterAll(async () => {
@@ -421,6 +427,33 @@ describe('HTTP and real WebSocket room flow', () => {
       reconnected.leave(),
       ...participants.filter(({ room }) => room !== target.room).map(({ room }) => room.leave()),
     ]);
+  });
+  it('keeps match results through their deadline, then disposes the room and invite once', async () => {
+    const { participants, code } = await startMatch('Cleanup');
+    const observer = participants[0]!;
+    const serverRoom = authoritativeRoom(observer.room);
+    serverRoom.setTimestep(() => {}, 60_000);
+    const reconnectToken = observer.room.reconnectionToken;
+    for (const player of serverRoom.state.players.values()) {
+      if (player.team === 'water') player.status = 'frozen';
+    }
+    const completedAt = Date.now();
+    advanceRoom(serverRoom, completedAt);
+    await waitFor(() => observer.room.state.phase === 'match-result');
+    await vi.waitFor(() => expect(saveMatchSummary).toHaveBeenCalled());
+    const deadline = serverRoom.state.phaseDeadline;
+
+    advanceRoom(serverRoom, deadline - 1);
+    expect(matchMaker.getLocalRoomById(observer.room.roomId)).toBe(serverRoom);
+    expect(serverRoom.state.serverTime).toBe(deadline - 1);
+
+    advanceRoom(serverRoom, deadline);
+    await waitFor(() => !matchMaker.getLocalRoomById(observer.room.roomId));
+    expect(saveMatchSummary).toHaveBeenCalledTimes(1);
+    await expect(new Client(url).reconnect<TestState>(reconnectToken)).rejects.toThrow();
+    expect(
+      (await post('/api/rooms/join', { inviteCode: code }, (await guest()).token)).status,
+    ).toBe(404);
   });
   it('rate-limits repeated room operations by authenticated guest', async () => {
     const identity = await guest('Rate Guest');

@@ -222,7 +222,7 @@ export async function startServer(
       app.use(errors);
     },
   });
-  server.define(ROOM_NAME, createPrivateRoom({ config, sessions, directory }));
+  server.define(ROOM_NAME, createPrivateRoom({ config, sessions, directory, database }));
   await server.listen(config.port, config.host);
   // Colyseus routes precede Express in 0.18. Guard the HTTP boundary, including
   // built-in matchmaking, rather than relying on Express middleware ordering.

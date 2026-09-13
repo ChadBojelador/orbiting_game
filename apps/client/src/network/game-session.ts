@@ -11,6 +11,7 @@ import {
 import { cameraRelative, GameInput } from '../input/game-input.js';
 import { snapshot, type LobbyRoom } from './lobby-client.js';
 import { LocalPrediction, RemoteInterpolation } from './player-motion.js';
+import { ServerClock } from './server-clock.js';
 
 export function nearestTarget(view: LobbyView, local: PlayerView): PlayerView | undefined {
   const range = GAMEPLAY.rescueRange;
@@ -36,7 +37,7 @@ export class GameSession {
   view: LobbyView;
   isConnected = true;
 
-  private receivedAt = performance.now();
+  private readonly clock = new ServerClock();
   private rescueTarget = '';
   private rescueSentAt = 0;
   private readonly cleanups: (() => void)[] = [];
@@ -46,10 +47,11 @@ export class GameSession {
     readonly playerId: string,
   ) {
     this.view = snapshot(room.state);
+    this.clock.update(this.view.serverTime);
 
     const update = () => {
       this.view = snapshot(room.state);
-      this.receivedAt = performance.now();
+      this.clock.update(this.view.serverTime);
 
       for (const player of this.view.players) {
         if (player.playerId === playerId) {
@@ -100,7 +102,7 @@ export class GameSession {
   }
 
   serverNow(): number {
-    return this.view.serverTime + performance.now() - this.receivedAt;
+    return this.clock.now();
   }
 
   local(): PlayerView | undefined {
