@@ -29,6 +29,8 @@ When startup finishes, open:
 http://localhost:5173
 ```
 
+`http://127.0.0.1:5173` is also supported for local development.
+
 Keep the terminal running while playing. The browser client uses port `5173`, and the game server uses `127.0.0.1:2567`.
 
 > On Windows, if PowerShell blocks `npm.ps1`, use `npm.cmd` instead, such as `npm.cmd run dev`.

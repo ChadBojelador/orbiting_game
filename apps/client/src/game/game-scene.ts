@@ -197,6 +197,8 @@ export class GameScene {
       if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return;
       if (event.button === 2) {
         event.preventDefault();
+        this.canvas.setPointerCapture(event.pointerId);
+        this.session.input.isFrostHeld = true;
         this.session.input.pressFrostThrow();
         return;
       }
@@ -205,13 +207,18 @@ export class GameScene {
     const onPointerMove = (event: PointerEvent) => {
       this.followCamera.orbit(event.movementX, event.movementY);
     };
+    const onPointerUp = (event: PointerEvent) => {
+      if (event.button === 2) this.session.input.isFrostHeld = false;
+    };
     const onContextMenu = (event: MouseEvent) => event.preventDefault();
     this.canvas.addEventListener('pointerdown', onPointerDown);
     this.canvas.addEventListener('pointermove', onPointerMove);
+    this.canvas.addEventListener('pointerup', onPointerUp);
     this.canvas.addEventListener('contextmenu', onContextMenu);
     this.cleanups.push(() => {
       this.canvas.removeEventListener('pointerdown', onPointerDown);
       this.canvas.removeEventListener('pointermove', onPointerMove);
+      this.canvas.removeEventListener('pointerup', onPointerUp);
       this.canvas.removeEventListener('contextmenu', onContextMenu);
     });
   }
