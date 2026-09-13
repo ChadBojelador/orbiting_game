@@ -19,12 +19,6 @@ This file is the source of truth for current development work. The PRD defines w
 
 ## To Do
 
-### Rounds and results
-
-| ID | Task | Owner | Priority | Related feature | Dependencies |
-|---|---|---|---|---|---|
-| MVP-33 | Store match summary and contribution totals transactionally | Unassigned | P1 | Persistence | MVP-07, MVP-32 |
-
 ### Reliability, quality, and release
 
 | ID | Task | Owner | Priority | Related feature | Dependencies |
@@ -58,6 +52,19 @@ No tasks currently in progress.
 | ID | Task | Owner | Priority | Related feature | Dependencies |
 |---|---|---|---|---|---|
 | DOC-01 | Establish README, PRD, architecture, agent guide, contribution workflow, environment example, ignore rules, and task tracker | Unassigned | P0 | Foundation | — |
+
+### Completed authoritative clock, room cleanup, and match persistence (2026-09-14)
+
+| ID | Task | Owner | Priority | Related feature | Dependencies |
+|---|---|---|---|---|---|
+| MVP-33 | Store match summary and contribution totals transactionally | Unassigned | P1 | Persistence | MVP-07, MVP-32 |
+
+### Verification and scope (Clock, cleanup, persistence, and bundles)
+
+- Active rooms synchronize current server time on every authoritative tick. The shared client clock keeps gameplay and HUD estimates monotonic across delayed patches while retaining server-owned phase deadlines.
+- Match results remain available for the configured result duration, after which the room releases its invite/memberships and disposes exactly once; completed reconnects and invite joins are rejected.
+- Migration `002-match-summaries.sql` and the match-summary repository transactionally store one idempotent UUID-keyed result and all player contribution rows without live state, tokens, or display names.
+- Production builds force production dependency resolution and lazily load tree-shaken Three.js presentation. JavaScript output decreased from approximately 1,425 kB to 1,080 kB uncompressed; the remaining approximately 633 kB renderer/GLTF chunk is lazy and tracked as an optimization advisory.
 
 ### Completed throwable frost and PC controls (2026-09-12)
 

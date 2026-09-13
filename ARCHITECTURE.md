@@ -335,6 +335,13 @@ Initial private playtests should target a free hosting tier. Because free offeri
 - Playwright always launches its own server and client with `DEV_BOT_COUNT=0`, preventing a developer's root `.env` or an already-running bot-enabled server from changing browser-test population and expectations.
 - Authoritative room ticks now apply eligible fixed gameplay steps before match deadline resolution, matching the controller contract. Boundary coverage fixes the semantics: a rescue may complete on the last step strictly before the Regular deadline, queued movement may apply on the last step strictly before the Deep Freeze deadline, and no gameplay step at the deadline itself is accepted.
 
+### Clock, completed-room lifecycle, persistence, and client loading (2026-09-14)
+
+- Every 20 Hz room tick updates synchronized `serverTime`, including Regular play, warning, Deep Freeze, round results, and match results. Clients extrapolate from the latest server value using a monotonic clock anchor so delayed patches cannot move HUD deadlines backward; clients do not author deadlines or outcomes.
+- Match results remain synchronized for the configured 10-second result deadline. At the deadline the room releases its invite and memberships once, disconnects clients, and disposes; later invite joins and reconnect capabilities are rejected.
+- Completed matches receive a server-generated UUID. The persistence repository inserts the winner, reason, final/max round, UTC start/completion times, and player identifiers, teams, final statuses, tags, and rescues in one PostgreSQL transaction. The UUID primary key makes duplicate completion handling idempotent. Live positions, timers, tokens, and display names are not persisted. A write failure emits metadata-only structured logging and does not alter the in-memory result lifecycle.
+- Production client builds explicitly use the production dependency condition even though the root local server environment is development. The lobby preview and game scene are lazy entry points, and named Three.js imports allow tree-shaking. The measured production JavaScript decreased from approximately 1,425 kB to 1,080 kB uncompressed; the remaining approximately 633 kB lazy renderer/GLTF chunk is intentionally deferred and still triggers Vite's 500 kB advisory pending asset/render profiling.
+
 ## Deployment stages
 
 1. **Local:** client, one game server, and PostgreSQL.

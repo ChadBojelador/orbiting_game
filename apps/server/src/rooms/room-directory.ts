@@ -42,7 +42,10 @@ export class RoomDirectory {
     if (this.memberships.get(sessionId)?.roomId === roomId) this.memberships.delete(sessionId);
   }
   dispose(code: string, roomId: string): void {
-    this.codes.delete(code);
+    const registeredRoom = this.codes.get(code);
+    if (registeredRoom === roomId || (roomId === 'unused' && registeredRoom === '')) {
+      this.codes.delete(code);
+    }
     for (const [id, membership] of this.memberships)
       if (membership.roomId === roomId) this.memberships.delete(id);
   }

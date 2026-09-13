@@ -20,4 +20,17 @@ describe('ServerClock', () => {
     expect(clock.now(200)).toBe(10_500);
     expect(clock.now(275)).toBe(10_575);
   });
+
+  it('keeps a HUD countdown decreasing across delayed patches', () => {
+    const clock = new ServerClock();
+    const deadline = 20_000;
+    clock.update(10_000, 100);
+    const beforePatch = deadline - clock.now(175);
+
+    clock.update(10_050, 200);
+    const afterPatch = deadline - clock.now(200);
+
+    expect(afterPatch).toBeLessThanOrEqual(beforePatch);
+    expect(afterPatch).toBe(9_900);
+  });
 });
