@@ -126,7 +126,7 @@ export function GameHud({ view, localPlayerId, serverNow }: GameHudProps) {
         {team === 'ice' && !isFrozen && !isEliminated && (
           <span className="control-pair control-pair--frost">
             <kbd>RMB</kbd>
-            Throw frost <small>F also works</small>
+            Fire frost launcher <small>F also works</small>
           </span>
         )}
         {team === 'water' && !isFrozen && !isEliminated && !isDeepFreeze && (
