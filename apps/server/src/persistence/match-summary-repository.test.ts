@@ -41,7 +41,9 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('match summary repository', () =
       expect(await saveMatchSummary(pool, value)).toBe(true);
       expect(await saveMatchSummary(pool, value)).toBe(false);
 
-      const matches = await pool.query('SELECT * FROM matches WHERE match_id = $1', [value.matchId]);
+      const matches = await pool.query('SELECT * FROM matches WHERE match_id = $1', [
+        value.matchId,
+      ]);
       const players = await pool.query(
         'SELECT player_id, team, final_status, tags, rescues FROM match_players WHERE match_id = $1 ORDER BY player_id',
         [value.matchId],
@@ -81,7 +83,9 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('match summary repository', () =
     try {
       await runMigrations(pool);
       await expect(saveMatchSummary(pool, value)).rejects.toThrow();
-      const matches = await pool.query('SELECT 1 FROM matches WHERE match_id = $1', [value.matchId]);
+      const matches = await pool.query('SELECT 1 FROM matches WHERE match_id = $1', [
+        value.matchId,
+      ]);
       expect(matches.rowCount).toBe(0);
     } finally {
       await pool.end();

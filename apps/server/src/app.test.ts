@@ -451,9 +451,9 @@ describe('HTTP and real WebSocket room flow', () => {
     await waitFor(() => !matchMaker.getLocalRoomById(observer.room.roomId));
     expect(saveMatchSummary).toHaveBeenCalledTimes(1);
     await expect(new Client(url).reconnect<TestState>(reconnectToken)).rejects.toThrow();
-    expect((await post('/api/rooms/join', { inviteCode: code }, (await guest()).token)).status).toBe(
-      404,
-    );
+    expect(
+      (await post('/api/rooms/join', { inviteCode: code }, (await guest()).token)).status,
+    ).toBe(404);
   });
   it('rate-limits repeated room operations by authenticated guest', async () => {
     const identity = await guest('Rate Guest');

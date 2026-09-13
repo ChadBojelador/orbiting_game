@@ -233,11 +233,7 @@ describe('MatchController', () => {
     lifecycleController.tick(2_000);
 
     expect(onResult).toHaveBeenCalledOnce();
-    expect(onResult).toHaveBeenCalledWith(
-      { winner: 'ice', reason: 'all-frozen' },
-      1_000,
-      1_250,
-    );
+    expect(onResult).toHaveBeenCalledWith({ winner: 'ice', reason: 'all-frozen' }, 1_000, 1_250);
   });
 
   it('Ice wins immediately when all Water are frozen', () => {

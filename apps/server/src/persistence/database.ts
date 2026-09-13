@@ -1,8 +1,5 @@
 import pg from 'pg';
-import {
-  saveMatchSummary,
-  type MatchSummary,
-} from './match-summary-repository.js';
+import { saveMatchSummary, type MatchSummary } from './match-summary-repository.js';
 
 export interface Database {
   isReady(): Promise<boolean>;

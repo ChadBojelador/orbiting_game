@@ -252,7 +252,9 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         })),
       };
       void database.saveMatchSummary(summary).catch(() => {
-        console.error(JSON.stringify({ event: 'match-summary/write-failed', matchId: this.matchId }));
+        console.error(
+          JSON.stringify({ event: 'match-summary/write-failed', matchId: this.matchId }),
+        );
       });
     }
     private cleanupCompletedMatch(): void {
