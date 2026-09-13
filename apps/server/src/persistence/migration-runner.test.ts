@@ -16,6 +16,10 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
         name: '001-foundation.sql',
         checksum: expect.stringMatching(/^[a-f0-9]{64}$/),
       });
+      expect(result.rows).toContainEqual({
+        name: '002-match-summaries.sql',
+        checksum: expect.stringMatching(/^[a-f0-9]{64}$/),
+      });
       const columns = await pool.query<{ data_type: string }>(
         "SELECT data_type FROM information_schema.columns WHERE table_name = 'service_metadata' AND column_name = 'created_at'",
       );
