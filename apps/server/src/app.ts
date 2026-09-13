@@ -12,7 +12,7 @@ import {
 } from '@ice-water/shared';
 import { GuestSessions, type GuestIdentity } from './auth/guest-session.js';
 import { RateLimiter } from './auth/rate-limiter.js';
-import type { ServerConfig } from './config/environment.js';
+import { isAllowedClientOrigin, type ServerConfig } from './config/environment.js';
 import { createDatabase, type Database } from './persistence/database.js';
 import { createPrivateRoom } from './rooms/private-room.js';
 import { RoomDirectory } from './rooms/room-directory.js';
@@ -36,7 +36,7 @@ export async function startServer(
     verifyClient({ req }: { req: IncomingMessage }) {
       const origin = req.headers.origin;
       return (
-        (!origin || origin === config.clientOrigin) &&
+          (!origin || isAllowedClientOrigin(origin, config)) &&
         upgradeRate.take(req.socket.remoteAddress ?? 'unknown')
       );
     },
@@ -52,11 +52,11 @@ export async function startServer(
         response.setHeader('X-Content-Type-Options', 'nosniff');
         response.setHeader('Referrer-Policy', 'no-referrer');
         const origin = request.headers.origin;
-        if (origin && origin !== config.clientOrigin) {
+        if (origin && !isAllowedClientOrigin(origin, config)) {
           response.status(403).json({ message: 'Origin not allowed' });
           return;
         }
-        response.setHeader('Access-Control-Allow-Origin', config.clientOrigin);
+        response.setHeader('Access-Control-Allow-Origin', origin ?? config.clientOrigin);
         response.setHeader('Vary', 'Origin');
         response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
         response.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -232,7 +232,7 @@ export async function startServer(
   http.removeAllListeners('request');
   http.on('request', (request, response) => {
     const origin = request.headers.origin;
-    if (origin && origin !== config.clientOrigin) {
+    if (origin && !isAllowedClientOrigin(origin, config)) {
       response.writeHead(403);
       response.end();
       return;

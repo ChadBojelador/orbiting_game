@@ -16,7 +16,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Open **http://localhost:5173**. The game server listens on **127.0.0.1:2567**. `setup:local` creates an ignored `.env` with random credentials and preserves an existing file. Alternatively, copy `.env.example` to `.env` and replace its placeholders. On PowerShell systems that block `npm.ps1`, use `npm.cmd` for these commands.
+Open **http://localhost:5173** (or **http://127.0.0.1:5173**). The game server listens on **127.0.0.1:2567**. `setup:local` creates an ignored `.env` with random credentials and preserves an existing file. Alternatively, copy `.env.example` to `.env` and replace its placeholders. On PowerShell systems that block `npm.ps1`, use `npm.cmd` for these commands.
 
 Keep the terminal running while you play. If the browser says **Cannot reach the game server**, confirm that `npm run dev` shows both the client and server as started, then open `http://127.0.0.1:2567/health`; it should return an `ok` response. Restart `npm run dev` after changing `.env`, and make sure no older process is already using ports 5173 or 2567.
 
@@ -75,7 +75,7 @@ The load harness verifies connection count, synchronized lobby state, and role a
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `VITE_GAME_SERVER_URL`                  | `ws://localhost:2567`; public browser configuration                                                                          |
 | `GAME_SERVER_HOST` / `GAME_SERVER_PORT` | `127.0.0.1` / `2567`                                                                                                         |
-| `CLIENT_ORIGIN`                         | `http://localhost:5173`; exact allowed origin                                                                                |
+| `CLIENT_ORIGIN`                         | `http://localhost:5173`; local development also accepts the equivalent `127.0.0.1` origin                                  |
 | `GUEST_SESSION_SIGNING_SECRET`          | Required random secret, at least 32 characters                                                                               |
 | `GUEST_SESSION_TTL_SECONDS`             | 3600; range 60–86400                                                                                                         |
 | `ROOM_MAX_PLAYERS`                      | 150; range 6–150; total humans plus development bots; start minimum always six                                               |
