@@ -18,9 +18,11 @@ const COLORS = {
 interface PlayerEntity {
   root: THREE.Group;
   accent: THREE.Mesh;
+  frostLauncher: THREE.Group;
   bodyMaterial: THREE.MeshStandardMaterial;
   accentMaterial: THREE.MeshStandardMaterial;
   ownedGeometries: THREE.BufferGeometry[];
+  ownedMaterials: THREE.Material[];
   character?: CharacterInstance;
   currentStatus: string;
   currentTeam: string;
@@ -111,6 +113,7 @@ export class PlayerEntityManager {
     });
 
     const ownedGeometries: THREE.BufferGeometry[] = [];
+    const ownedMaterials: THREE.Material[] = [];
 
     let character: CharacterInstance | undefined;
 
@@ -150,6 +153,39 @@ export class PlayerEntityManager {
     root.add(accent);
     ownedGeometries.push(accentGeometry);
 
+    const frostLauncher = new THREE.Group();
+    frostLauncher.name = 'frost-launcher';
+    frostLauncher.position.set(0.58, 1.05, 0.18);
+    const launcherBodyMaterial = new THREE.MeshStandardMaterial({
+      color: COLORS.ice,
+      emissive: COLORS.iceAccent,
+      emissiveIntensity: 0.18,
+      roughness: 0.42,
+    });
+    const launcherAccentMaterial = new THREE.MeshStandardMaterial({
+      color: COLORS.iceAccent,
+      emissive: COLORS.iceAccent,
+      emissiveIntensity: 0.7,
+      roughness: 0.2,
+    });
+    const launcherBodyGeometry = new THREE.BoxGeometry(0.34, 0.28, 0.72);
+    const launcherBarrelGeometry = new THREE.CylinderGeometry(0.1, 0.14, 0.62, 8);
+    const launcherTipGeometry = new THREE.OctahedronGeometry(0.16, 0);
+    const launcherBody = new THREE.Mesh(launcherBodyGeometry, launcherBodyMaterial);
+    launcherBody.name = 'frost-launcher-body';
+    const launcherBarrel = new THREE.Mesh(launcherBarrelGeometry, launcherAccentMaterial);
+    launcherBarrel.name = 'frost-launcher-barrel';
+    launcherBarrel.rotation.x = Math.PI / 2;
+    launcherBarrel.position.z = 0.54;
+    const launcherTip = new THREE.Mesh(launcherTipGeometry, launcherAccentMaterial);
+    launcherTip.name = 'frost-launcher-tip';
+    launcherTip.position.z = 0.86;
+    frostLauncher.add(launcherBody, launcherBarrel, launcherTip);
+    root.add(frostLauncher);
+    ownedGeometries.push(launcherBodyGeometry, launcherBarrelGeometry, launcherTipGeometry);
+    ownedMaterials.push(launcherBodyMaterial, launcherAccentMaterial);
+    frostLauncher.visible = player.team === 'ice' && player.status === 'active';
+
     const isLocal = player.playerId === localPlayerId;
 
     if (isLocal) {
@@ -161,9 +197,11 @@ export class PlayerEntityManager {
     const entity: PlayerEntity = {
       root,
       accent,
+      frostLauncher,
       bodyMaterial: character?.material ?? fallbackMaterial,
       accentMaterial,
       ownedGeometries,
+      ownedMaterials,
       character,
       currentStatus: player.status,
       currentTeam: player.team,
@@ -262,6 +300,9 @@ export class PlayerEntityManager {
 
       entity.accent.visible = player.status !== 'eliminated' && player.status !== 'spectator';
 
+      entity.frostLauncher.visible =
+        player.team === 'ice' && player.status === 'active' && !isProtected;
+
       entity.root.visible = player.status !== 'spectator';
 
       if (previousStatus === 'frozen' && player.status === 'active') {
@@ -306,6 +347,10 @@ export class PlayerEntityManager {
 
     for (const geometry of entity.ownedGeometries) {
       geometry.dispose();
+    }
+
+    for (const material of entity.ownedMaterials) {
+      material.dispose();
     }
 
     entity.bodyMaterial.dispose();

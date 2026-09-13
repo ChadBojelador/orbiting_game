@@ -121,7 +121,7 @@ export function TouchControls({ input, team, playerStatus, isRescueLocked }: Tou
           </button>
         )}
 
-        {/* Frost throw button — Ice only */}
+        {/* Frost launcher button — Ice only */}
         {team === 'ice' && playerStatus === 'active' && (
           <button
             className="touch-btn touch-btn--tag"
@@ -129,9 +129,9 @@ export function TouchControls({ input, team, playerStatus, isRescueLocked }: Tou
               e.currentTarget.setPointerCapture(e.pointerId);
               input?.pressFrostThrow();
             }}
-            aria-label="Throw frost"
+            aria-label="Fire frost launcher"
           >
-            ❄ Throw
+            ❄ Fire
           </button>
         )}
 
