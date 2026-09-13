@@ -105,6 +105,31 @@ describe('PrivateRoom active-match reconnection', () => {
     expect(room.state.phaseDeadline).toBe(NOW + 10_000);
   });
 
+  it.each(['regular', 'warning', 'deep-freeze', 'round-result', 'match-result'] as const)(
+    'updates authoritative server time during %s ticks',
+    (phase) => {
+      const { room } = setup('active', phase);
+      vi.spyOn(room, 'broadcast').mockImplementation(() => {});
+      const tickAt = NOW + 500;
+
+      Reflect.apply(Reflect.get(room, 'advance') as () => void, room, [tickAt]);
+
+      expect(room.state.serverTime).toBe(tickAt);
+    },
+  );
+
+  it('refreshes server time before a reconnecting client receives state', () => {
+    const { room, client } = setup('active');
+    const player = room.state.players.get(client.auth!.playerId)!;
+    player.isConnected = false;
+    player.reconnectDeadline = NOW + 10_000;
+    room.state.serverTime = NOW - 5_000;
+
+    room.onReconnect(client);
+
+    expect(room.state.serverTime).toBe(NOW);
+  });
+
   it.each<PlayerStatus>(['active', 'frozen'])(
     'permanently eliminates a %s participant when the reservation expires',
     async (status) => {
