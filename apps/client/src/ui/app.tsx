@@ -66,7 +66,10 @@ export function App() {
     const music = musicRef.current;
     if (!music) return;
     if (music.paused) {
-      void music.play().then(() => setIsMusicPlaying(true)).catch(() => setIsMusicPlaying(false));
+      void music
+        .play()
+        .then(() => setIsMusicPlaying(true))
+        .catch(() => setIsMusicPlaying(false));
     } else {
       music.pause();
       setIsMusicPlaying(false);
@@ -158,10 +161,7 @@ export function App() {
       .finally(() => {
         if (isActive) setIsBusy(false);
       });
-    const timer = window.setInterval(
-      () => setNow(clock.current.now()),
-      100,
-    );
+    const timer = window.setInterval(() => setNow(clock.current.now()), 100);
     return () => {
       isActive = false;
       window.clearInterval(timer);
@@ -321,7 +321,12 @@ export function App() {
           <span aria-hidden="true">❄</span> Ice Ice Water!
         </a>
         <div className="topbar-actions">
-          <button className="music-toggle" type="button" onClick={toggleMusic} aria-pressed={isMusicPlaying}>
+          <button
+            className="music-toggle"
+            type="button"
+            onClick={toggleMusic}
+            aria-pressed={isMusicPlaying}
+          >
             <span aria-hidden="true">{isMusicPlaying ? '♫' : '♪'}</span>
             {isMusicPlaying ? 'Sound on' : 'Play soundtrack'}
           </button>
@@ -330,13 +335,20 @@ export function App() {
       </header>
       <div className="layout">
         <section className="intro" aria-labelledby="game-title">
-          <p className="eyebrow"><span aria-hidden="true">✦</span> A cozy freeze-tag adventure</p>
-          <h1 id="game-title">A little chill.<br />A lot of friends.</h1>
+          <p className="eyebrow">
+            <span aria-hidden="true">✦</span> A cozy freeze-tag adventure
+          </p>
+          <h1 id="game-title">
+            A little chill.
+            <br />A lot of friends.
+          </h1>
           <p className="lede">
             Gather your crew for a game of freeze tag. Keep moving, stick together, and don't get
             left on ice.
           </p>
-          <Suspense fallback={<div className="lobby-preview preview preview-fallback">Loading arena…</div>}>
+          <Suspense
+            fallback={<div className="lobby-preview preview preview-fallback">Loading arena…</div>}
+          >
             <LobbyPreview />
           </Suspense>
           <div className="rule-strip">
@@ -436,7 +448,9 @@ export function App() {
           ) : (
             <>
               <div className="room-kicker">
-                <span className="room-kicker-mark" aria-hidden="true">●</span>
+                <span className="room-kicker-mark" aria-hidden="true">
+                  ●
+                </span>
                 <span>Private match lobby</span>
                 <span className={`connection ${connection === 'Connected' ? 'is-connected' : ''}`}>
                   <span className="connection-dot" aria-hidden="true" />
@@ -470,7 +484,10 @@ export function App() {
                   {isReadyToStart ? 'Ready to start' : `${count} / ${lobby.minPlayers} to start`}
                 </span>
               </div>
-              <div className="player-meter" aria-label={`${count} of ${lobby.minPlayers} players needed to start`}>
+              <div
+                className="player-meter"
+                aria-label={`${count} of ${lobby.minPlayers} players needed to start`}
+              >
                 <span style={{ width: `${Math.min(100, (count / lobby.minPlayers) * 100)}%` }} />
               </div>
               <ul className="roster">

@@ -198,4 +198,59 @@ describe('PrivateRoom active-match reconnection', () => {
         ),
     ).toBe(true);
   });
+
+  it('logs a summary write failure once without changing the completed room state', async () => {
+    const saveMatchSummary = vi.fn(async () => {
+      throw new Error('database unavailable');
+    });
+    const localDatabase: Database = { ...database, saveMatchSummary };
+    const LocalPrivateRoom = createPrivateRoom({
+      config,
+      sessions: new GuestSessions(config.signingSecret, config.sessionTtlSeconds),
+      directory: new RoomDirectory(),
+      database: localDatabase,
+    });
+    const room = new LocalPrivateRoom();
+    vi.spyOn(room, 'broadcast').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ice = new PlayerState();
+    ice.playerId = 'ice-player';
+    ice.team = 'ice';
+    const water = new PlayerState();
+    water.playerId = 'water-player';
+    water.team = 'water';
+    water.status = 'frozen';
+    water.rescues = 2;
+    room.state.players.set(ice.playerId, ice);
+    room.state.players.set(water.playerId, water);
+    room.state.maxRounds = GAMEPLAY.maxRounds;
+    const match = Reflect.get(room, 'match') as MatchController;
+
+    match.start(NOW);
+    match.tick(NOW + 1);
+    await vi.waitFor(() => expect(error).toHaveBeenCalledOnce());
+    match.tick(NOW + 2);
+
+    expect(room.state.phase).toBe('match-result');
+    expect(room.state.matchWinner).toBe('ice');
+    expect(saveMatchSummary).toHaveBeenCalledOnce();
+    expect(saveMatchSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        winner: 'ice',
+        resultReason: 'all-frozen',
+        finalRound: 1,
+        maxRounds: GAMEPLAY.maxRounds,
+        players: expect.arrayContaining([
+          expect.objectContaining({
+            playerId: water.playerId,
+            team: 'water',
+            finalStatus: 'frozen',
+            rescues: 2,
+          }),
+        ]),
+      }),
+    );
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('match-summary/write-failed'));
+    error.mockRestore();
+  });
 });
