@@ -44,6 +44,15 @@ describe('ThirdPersonCamera', () => {
     expect(upward.position.y).toBeLessThan(initial.position.y);
   });
 
+  it('uses a responsive default mouse sensitivity', () => {
+    const camera = new ThirdPersonCamera({ rotationDamping: 100 });
+
+    camera.orbit(50, 0);
+    const pose = camera.update({ x: 0, y: 1, z: 0 }, 1, []);
+
+    expect(pose.yaw).toBeCloseTo(-0.5);
+  });
+
   it('pulls in when obstructed and smoothly restores its configured distance', () => {
     const camera = new ThirdPersonCamera({ returnDamping: 5 });
     const target = { x: 0, y: 1.2, z: 0 };
