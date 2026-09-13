@@ -26,6 +26,8 @@ export interface BridgeFootprint extends Position {
   id: string;
   width: number;
   depth: number;
+  /** Deck direction in the X/Z plane, measured from +X toward +Z. */
+  heading: number;
 }
 
 export const SEA_LEVEL = 1.5;
@@ -394,18 +396,18 @@ export const ROUTE_CORRIDORS: readonly RouteCorridor[] = [
 ] as const;
 
 export const BRIDGES: readonly BridgeFootprint[] = [
-  { id: 'BR_VILLAGE_NORTH', x: 0, z: -28, width: 12, depth: 6 },
-  { id: 'BR_CRYSTAL_01', x: 55, z: -5, width: 6, depth: 12 },
-  { id: 'BR_MEADOW_01', x: -5, z: 65, width: 14, depth: 6 },
-  { id: 'BR_ISLAND_01', x: 24, z: 118, width: 15, depth: 6 },
-  { id: 'BR_FOREST_RAVINE', x: -111, z: 35, width: 6, depth: 12 },
-  { id: 'BR_CRYSTAL_GARDENS', x: 102, z: -28, width: 12, depth: 6 },
-  { id: 'BR_CRYSTAL_FALLS', x: 77, z: -57, width: 12, depth: 6 },
-  { id: 'BR_MEADOW_FARMS', x: -42, z: 82, width: 12, depth: 6 },
-  { id: 'BR_COASTAL_CLIFFS', x: 8, z: 135, width: 12, depth: 6 },
-  { id: 'BR_BEACH_COVE', x: 3, z: 164, width: 10, depth: 5 },
-  { id: 'BR_ISLAND_CHAIN', x: 76, z: 165, width: 12, depth: 6 },
-  { id: 'BR_RUINED_ISLAND', x: 132, z: 149, width: 10, depth: 6 },
+  { id: 'BR_VILLAGE_NORTH', x: 0, z: -28, width: 12, depth: 6, heading: 0 },
+  { id: 'BR_CRYSTAL_01', x: 55, z: -5, width: 6, depth: 12, heading: Math.PI / 2 },
+  { id: 'BR_MEADOW_01', x: -5, z: 65, width: 14, depth: 6, heading: 0 },
+  { id: 'BR_ISLAND_01', x: 24, z: 118, width: 15, depth: 6, heading: 0 },
+  { id: 'BR_FOREST_RAVINE', x: -111, z: 35, width: 6, depth: 12, heading: (25 * Math.PI) / 180 },
+  { id: 'BR_CRYSTAL_GARDENS', x: 102, z: -28, width: 12, depth: 6, heading: (-22 * Math.PI) / 180 },
+  { id: 'BR_CRYSTAL_FALLS', x: 77, z: -57, width: 12, depth: 6, heading: (49 * Math.PI) / 180 },
+  { id: 'BR_MEADOW_FARMS', x: -42, z: 82, width: 12, depth: 6, heading: (154 * Math.PI) / 180 },
+  { id: 'BR_COASTAL_CLIFFS', x: 8, z: 135, width: 12, depth: 6, heading: 0 },
+  { id: 'BR_BEACH_COVE', x: 3, z: 164, width: 10, depth: 5, heading: (-3 * Math.PI) / 180 },
+  { id: 'BR_ISLAND_CHAIN', x: 76, z: 165, width: 12, depth: 6, heading: Math.PI / 2 },
+  { id: 'BR_RUINED_ISLAND', x: 132, z: 149, width: 10, depth: 6, heading: (61 * Math.PI) / 180 },
 ] as const;
 
 export const RIVER_BRANCHES: readonly (readonly Position[])[] = [
@@ -526,12 +528,37 @@ function isInsideCorridor(position: Position, corridor: RouteCorridor, padding =
   return false;
 }
 
+export function bridgeDimensions(bridge: BridgeFootprint): { length: number; deckWidth: number } {
+  return {
+    length: Math.max(bridge.width, bridge.depth),
+    deckWidth: Math.min(bridge.width, bridge.depth),
+  };
+}
+
+export function bridgeLocalPosition(
+  bridge: BridgeFootprint,
+  position: Position,
+): { along: number; across: number } {
+  const dx = position.x - bridge.x;
+  const dz = position.z - bridge.z;
+  const cos = Math.cos(bridge.heading);
+  const sin = Math.sin(bridge.heading);
+  return {
+    along: dx * cos + dz * sin,
+    across: -dx * sin + dz * cos,
+  };
+}
+
+export function bridgeAt(position: Position, padding = 0): BridgeFootprint | undefined {
+  return BRIDGES.find((bridge) => {
+    const { length, deckWidth } = bridgeDimensions(bridge);
+    const { along, across } = bridgeLocalPosition(bridge, position);
+    return Math.abs(along) <= length / 2 - padding && Math.abs(across) <= deckWidth / 2 - padding;
+  });
+}
+
 function isOnBridge(position: Position, padding = 0): boolean {
-  return BRIDGES.some(
-    (bridge) =>
-      Math.abs(position.x - bridge.x) <= bridge.width / 2 - padding &&
-      Math.abs(position.z - bridge.z) <= bridge.depth / 2 - padding,
-  );
+  return bridgeAt(position, padding) !== undefined;
 }
 
 export function isRiver(position: Position, padding = 0): boolean {
@@ -549,11 +576,12 @@ export function isRiver(position: Position, padding = 0): boolean {
 
 export function isPermanentLand(position: Position, padding = 0): boolean {
   if (!Number.isFinite(position.x) || !Number.isFinite(position.z)) return false;
+  if (isOnBridge(position, padding)) return true;
   const isLand =
     LAND_REGIONS.some((region) => isInsideRegion(position, region, padding)) ||
     ROUTE_CORRIDORS.some((corridor) => isInsideCorridor(position, corridor, padding));
   if (!isLand) return false;
-  return !isRiver(position, padding) || isOnBridge(position, padding);
+  return !isRiver(position, padding);
 }
 
 export function isWalkable(
@@ -591,18 +619,45 @@ function regionElevation(position: Position, region: LandRegion): number {
   return SEA_LEVEL + 0.35 + (region.elevation - SEA_LEVEL - 0.35) * falloff;
 }
 
-/** Deterministic display height for the authored world surface. */
-export function terrainHeightAt(position: Position): number {
-  if (!isPermanentLand(position)) return SEA_LEVEL - 0.45;
+function baseTerrainHeightAt(position: Position): number {
   let height = SEA_LEVEL + 0.45;
   for (const region of LAND_REGIONS) height = Math.max(height, regionElevation(position, region));
 
-  // The summit crown rises above the broad ice plateau without changing route topology.
   const summitDistance = Math.hypot((position.x - 10) / 20, (position.z + 91) / 18);
   if (summitDistance < 1) height = Math.max(height, 48 + 14 * (1 - smoothstep(summitDistance)));
+  return height;
+}
 
-  // Shallow visible channels sit below their banks; bridge decks override this in rendering.
-  if (isRiver(position) && !isOnBridge(position)) height -= 1.15;
+/** Shared visual and collision height for a bridge's continuous deck surface. */
+export function bridgeDeckHeightAt(bridge: BridgeFootprint, position: Position): number {
+  const { length } = bridgeDimensions(bridge);
+  const { along } = bridgeLocalPosition(bridge, position);
+  const cos = Math.cos(bridge.heading);
+  const sin = Math.sin(bridge.heading);
+  const start = {
+    x: bridge.x - cos * (length / 2),
+    z: bridge.z - sin * (length / 2),
+  };
+  const end = {
+    x: bridge.x + cos * (length / 2),
+    z: bridge.z + sin * (length / 2),
+  };
+  const t = Math.max(0, Math.min(1, along / length + 0.5));
+  const height =
+    baseTerrainHeightAt(start) + (baseTerrainHeightAt(end) - baseTerrainHeightAt(start)) * t;
+  return Math.round(height * 20) / 20;
+}
+
+/** Deterministic display height for the authored world surface. */
+export function terrainHeightAt(position: Position): number {
+  if (!isPermanentLand(position)) return SEA_LEVEL - 0.45;
+  const bridge = bridgeAt(position);
+  if (bridge) return bridgeDeckHeightAt(bridge, position);
+
+  let height = baseTerrainHeightAt(position);
+
+  // Shallow visible channels sit below their banks.
+  if (isRiver(position)) height -= 1.15;
   return Math.round(height * 20) / 20;
 }
 
