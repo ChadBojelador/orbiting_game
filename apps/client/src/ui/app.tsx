@@ -428,11 +428,21 @@ export function App() {
             <p role="status">Joining your room…</p>
           ) : (
             <>
-              <div className="room-heading">
-                <h2>Your gathering place</h2>
-                <span className="connection">{connection}</span>
+              <div className="room-kicker">
+                <span className="room-kicker-mark" aria-hidden="true">●</span>
+                <span>Private match lobby</span>
+                <span className={`connection ${connection === 'Connected' ? 'is-connected' : ''}`}>
+                  <span className="connection-dot" aria-hidden="true" />
+                  {connection}
+                </span>
               </div>
-              <p>Share this code. Bring the whole crew.</p>
+              <div className="room-heading">
+                <div>
+                  <p className="room-label">ROOM CODE</p>
+                  <h2>Assemble your crew</h2>
+                </div>
+              </div>
+              <p className="room-intro">Share the code, then watch the roster fill up.</p>
               <output className="invite-output" aria-label="Room invite code">
                 {lobby.inviteCode}
               </output>
@@ -450,8 +460,11 @@ export function App() {
               <div className="roster-title">
                 <h3>In the room</h3>
                 <span role="status" aria-label="Connected players">
-                  {count} / {lobby.maxPlayers} connected
+                  {count} / {lobby.minPlayers} to start
                 </span>
+              </div>
+              <div className="player-meter" aria-label={`${count} of ${lobby.minPlayers} players needed to start`}>
+                <span style={{ width: `${Math.min(100, (count / lobby.minPlayers) * 100)}%` }} />
               </div>
               <ul className="roster">
                 {lobby.players.map((player) => (
