@@ -197,6 +197,9 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
     }
 
     private advance(now = Date.now()): void {
+      // Every room patch carries a fresh authoritative time, including phases
+      // that are owned by MatchController rather than LobbyController.
+      this.state.serverTime = now;
       if (now - this.createdAt > 15000) this.controller.transferHost();
       // Drive bot movement each tick so they count toward gameplay.
       this.bots?.tick(now);

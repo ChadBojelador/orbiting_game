@@ -24,6 +24,7 @@ import { LobbyPreview } from '../game/lobby-preview.js';
 import { GameHud } from './game-hud.js';
 import { TouchControls } from './touch-controls.js';
 import { ResultsScreen } from './results-screen.js';
+import { ServerClock } from '../network/server-clock.js';
 
 export function App() {
   const [guest, setGuest] = useState<GuestSession | null>(readGuest);
@@ -38,7 +39,7 @@ export function App() {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [now, setNow] = useState(0);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
-  const clock = useRef({ server: 0, received: 0 });
+  const clock = useRef(new ServerClock());
   const roomRef = useRef<LobbyRoom | null>(null);
   const gameCanvasRef = useRef<HTMLCanvasElement>(null);
   const gameSceneRef = useRef<import('../game/game-scene.js').GameScene | null>(null);
@@ -101,8 +102,8 @@ export function App() {
       if (!next.state?.players) return;
       const value = snapshot(next.state);
       setLobby(value);
-      clock.current = { server: value.serverTime, received: performance.now() };
-      setNow(value.serverTime);
+      clock.current.update(value.serverTime);
+      setNow(clock.current.now());
     };
     next.onStateChange(update);
     next.onMessage<SessionError>('session/error', (message) => setError(message.message));
@@ -155,7 +156,7 @@ export function App() {
         if (isActive) setIsBusy(false);
       });
     const timer = window.setInterval(
-      () => setNow(clock.current.server + performance.now() - clock.current.received),
+      () => setNow(clock.current.now()),
       100,
     );
     return () => {
@@ -219,7 +220,7 @@ export function App() {
   const isInGame =
     lobby &&
     (isPlayPhase(lobby.phase) || lobby.phase === 'round-result' || lobby.phase === 'match-result');
-  const serverNow = clock.current.server + performance.now() - clock.current.received;
+  const serverNow = clock.current.now();
   const isRescueLocked = !canRescueInPhase(
     lobby?.phase ?? 'lobby',
     lobby?.phaseDeadline ?? 0,
