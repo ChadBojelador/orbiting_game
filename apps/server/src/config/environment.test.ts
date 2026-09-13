@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { readConfig } from './environment.js';
+import { isAllowedClientOrigin, readConfig } from './environment.js';
 
 const valid = { GUEST_SESSION_SIGNING_SECRET: 'test-only-valid-signing-secret-with-32-characters' };
 it('validates secrets, capacity, reconnection windows, and production transport configuration', () => {
@@ -56,4 +56,16 @@ it('reserves bot seats from room capacity while retaining at least one human sea
       DEV_BOT_COUNT: '6',
     }),
   ).toThrow('DEV_BOT_COUNT must be at most ROOM_MAX_PLAYERS - 1');
+});
+
+it('allows either loopback hostname during local development only', () => {
+  const config = readConfig({ ...valid, CLIENT_ORIGIN: 'http://localhost:5173' });
+  expect(isAllowedClientOrigin('http://localhost:5173', config)).toBe(true);
+  expect(isAllowedClientOrigin('http://127.0.0.1:5173', config)).toBe(true);
+  expect(
+    isAllowedClientOrigin('http://127.0.0.1:5173', {
+      ...config,
+      isProduction: true,
+    }),
+  ).toBe(false);
 });

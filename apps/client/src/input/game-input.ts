@@ -34,6 +34,7 @@ export class GameInput {
   cameraYaw = 0;
   touch: Position = { x: 0, z: 0 };
   isTouchRescuing = false;
+  isFrostHeld = false;
   private readonly keys = new Set<string>();
   private movement: Position = { x: 0, z: 0 };
   private hasFrostThrow = false;
@@ -54,6 +55,7 @@ export class GameInput {
     this.touch = { x: 0, z: 0 };
     this.movement = { x: 0, z: 0 };
     this.isTouchRescuing = false;
+    this.isFrostHeld = false;
     this.hasFrostThrow = false;
     this.hasJump = false;
     this.hasPing = false;
@@ -81,6 +83,7 @@ export class GameInput {
       ...this.movement,
       isRescuing: this.keys.has('KeyE') || this.isTouchRescuing,
       hasFrostThrow: this.hasFrostThrow,
+      isFrostFiring: this.isFrostHeld || this.keys.has('KeyF'),
       hasJump: this.hasJump,
       hasPing: this.hasPing,
     };

@@ -127,7 +127,14 @@ export function TouchControls({ input, team, playerStatus, isRescueLocked }: Tou
             className="touch-btn touch-btn--tag"
             onPointerDown={(e) => {
               e.currentTarget.setPointerCapture(e.pointerId);
+              if (input) input.isFrostHeld = true;
               input?.pressFrostThrow();
+            }}
+            onPointerUp={() => {
+              if (input) input.isFrostHeld = false;
+            }}
+            onPointerCancel={() => {
+              if (input) input.isFrostHeld = false;
             }}
             aria-label="Fire frost launcher"
           >

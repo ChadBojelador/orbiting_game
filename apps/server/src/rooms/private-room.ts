@@ -10,6 +10,7 @@ import {
 import type { GuestIdentity, GuestSessions } from '../auth/guest-session.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
 import type { ServerConfig } from '../config/environment.js';
+import { isAllowedClientOrigin } from '../config/environment.js';
 import { LobbyController } from './lobby-controller.js';
 import { LobbyState, PlayerState } from './lobby-state.js';
 import type { RoomDirectory } from './room-directory.js';
@@ -106,7 +107,10 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
     }
 
     override onAuth(_client: GuestClient, options: unknown, context: AuthContext): GuestIdentity {
-      if (context.headers.get('origin') && context.headers.get('origin') !== config.clientOrigin)
+      if (
+        context.headers.get('origin') &&
+        !isAllowedClientOrigin(context.headers.get('origin')!, config)
+      )
         throw new ServerError(403, 'Origin not allowed');
       if (!isRecord(options)) throw new ServerError(401, 'Guest session required');
       let identity: GuestIdentity;

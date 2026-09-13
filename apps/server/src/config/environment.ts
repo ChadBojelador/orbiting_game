@@ -21,6 +21,18 @@ export interface ServerConfig {
   iceBrackets: readonly IceBracket[];
 }
 
+export function isAllowedClientOrigin(
+  origin: string,
+  config: Pick<ServerConfig, 'clientOrigin' | 'isProduction'>,
+): boolean {
+  if (origin === config.clientOrigin || config.isProduction) return origin === config.clientOrigin;
+  const configured = new URL(config.clientOrigin);
+  if (!['localhost', '127.0.0.1'].includes(configured.hostname)) return false;
+  const alternate = new URL(configured);
+  alternate.hostname = configured.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+  return origin === alternate.origin;
+}
+
 export function loadEnvironment(): void {
   const path = fileURLToPath(new URL('../../../../.env', import.meta.url));
   if (existsSync(path)) process.loadEnvFile(path);
