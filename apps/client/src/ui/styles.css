@@ -1257,7 +1257,7 @@ footer {
   justify-content: center;
   gap: clamp(18px, 3.4vw, 62px);
   min-height: calc(100svh - 82px);
-  padding: 34px clamp(18px, 3vw, 46px) 124px;
+  padding: 18px clamp(18px, 3vw, 46px) 105px;
 }
 
 .hub-board,
@@ -1403,12 +1403,14 @@ footer {
 }
 
 .hub-center {
-  align-self: stretch;
+  align-self: center;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   min-width: 0;
-  min-height: min(680px, calc(100svh - 180px));
+  width: 100%;
+  height: min(570px, calc(100svh - 270px));
+  min-height: 470px;
 }
 
 .hub-title {
@@ -2106,7 +2108,7 @@ footer {
 
   .player-chip,
   .lobby-shell .edition,
-  .music-toggle-label {
+  .lobby-shell .music-toggle .music-toggle-label {
     display: none;
   }
 

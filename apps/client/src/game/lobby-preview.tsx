@@ -220,19 +220,19 @@ export function LobbyPreview() {
         const hero = factory.instantiate('#48cfe3', 'Wave');
         hero.root.position.set(0, 0.18, 0.55);
         hero.root.rotation.y = THREE.MathUtils.degToRad(-8);
-        hero.root.scale.setScalar(1.34);
+        hero.root.scale.multiplyScalar(1.34);
         world.add(hero.root);
 
         const iceFriend = factory.instantiate('#7eebff', 'Idle');
         iceFriend.root.position.set(-2.55, 0.08, -2.05);
         iceFriend.root.rotation.y = THREE.MathUtils.degToRad(24);
-        iceFriend.root.scale.setScalar(0.78);
+        iceFriend.root.scale.multiplyScalar(0.78);
         world.add(iceFriend.root);
 
         const waterFriend = factory.instantiate('#79d49a', 'Idle');
         waterFriend.root.position.set(2.45, 0.08, -2.2);
         waterFriend.root.rotation.y = THREE.MathUtils.degToRad(-18);
-        waterFriend.root.scale.setScalar(0.74);
+        waterFriend.root.scale.multiplyScalar(0.74);
         world.add(waterFriend.root);
 
         const hasReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

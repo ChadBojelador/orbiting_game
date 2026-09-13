@@ -61,7 +61,9 @@ Set `DEV_BOT_COUNT=5` in the root `.env`, restart `npm run dev`, and create a ro
 | `npm run db:migrate`                | Apply transactional, checksummed SQL migrations                       |
 | `npm run db:up` / `npm run db:down` | Start / stop local PostgreSQL                                         |
 
-Install the test browser once with `npx playwright install chromium` (Linux CI uses `--with-deps`). Browser tests always start isolated client and server processes with `DEV_BOT_COUNT=0`; ports 5173 and 2567 must be free. Run them with an account allowed to terminate the child processes they launch; restrictive Windows sandboxes can hang during process-tree cleanup even after assertions pass.
+Install the test browser once with `npx playwright install chromium` (Linux CI uses `--with-deps`). Browser tests always start isolated client and server processes with `DEV_BOT_COUNT=0` on dedicated ports 5174 and 2568, so a normal development session can remain running. Run them with an account allowed to terminate the child processes they launch; restrictive Windows sandboxes can hang during process-tree cleanup even after assertions pass.
+
+If Windows Application Control blocks Playwright's downloaded Chromium, run the same suite with an installed signed browser by setting `PLAYWRIGHT_CHANNEL=chrome` (or `msedge`) for that command. CI and normal local runs leave the variable unset and use the pinned Playwright browser.
 
 Database integration tests require an explicit `TEST_DATABASE_URL` pointing to a disposable test database. They report a skip when it is absent. The local verification uses a separate `icewater_test` database; CI provisions its own PostgreSQL service and runs this check. Never point the test URL at a production database.
 
