@@ -39,4 +39,12 @@ describe('game input', () => {
     expect(input.sample().hasFrostThrow).toBe(true);
     expect(input.sample().hasFrostThrow).toBe(false);
   });
+
+  it('keeps firing while the frost control is held', () => {
+    const input = new GameInput();
+    input.isFrostHeld = true;
+
+    expect(input.sample().isFrostFiring).toBe(true);
+    expect(input.sample().isFrostFiring).toBe(true);
+  });
 });

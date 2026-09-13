@@ -121,17 +121,24 @@ export function TouchControls({ input, team, playerStatus, isRescueLocked }: Tou
           </button>
         )}
 
-        {/* Frost throw button — Ice only */}
+        {/* Frost launcher button — Ice only */}
         {team === 'ice' && playerStatus === 'active' && (
           <button
             className="touch-btn touch-btn--tag"
             onPointerDown={(e) => {
               e.currentTarget.setPointerCapture(e.pointerId);
+              if (input) input.isFrostHeld = true;
               input?.pressFrostThrow();
             }}
-            aria-label="Throw frost"
+            onPointerUp={() => {
+              if (input) input.isFrostHeld = false;
+            }}
+            onPointerCancel={() => {
+              if (input) input.isFrostHeld = false;
+            }}
+            aria-label="Fire frost launcher"
           >
-            ❄ Throw
+            ❄ Fire
           </button>
         )}
 

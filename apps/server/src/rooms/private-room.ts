@@ -1,9 +1,16 @@
 import { Room, ServerError, type AuthContext, type Client } from '@colyseus/core';
 import { randomUUID } from 'node:crypto';
-import { GAMEPLAY, isEmptyPayload, isRecord, type GameplayMessages } from '@ice-water/shared';
+import {
+  GAMEPLAY,
+  isEmptyPayload,
+  isRecord,
+  type GameplayMessages,
+  type MatchResult,
+} from '@ice-water/shared';
 import type { GuestIdentity, GuestSessions } from '../auth/guest-session.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
 import type { ServerConfig } from '../config/environment.js';
+import { isAllowedClientOrigin } from '../config/environment.js';
 import { LobbyController } from './lobby-controller.js';
 import { LobbyState, PlayerState } from './lobby-state.js';
 import type { RoomDirectory } from './room-directory.js';
@@ -12,7 +19,6 @@ import { MatchController } from '../gameplay/match-controller.js';
 import { advanceAuthoritativeTick } from '../gameplay/authoritative-tick.js';
 import { BotRunner } from '../simulation/bot-runner.js';
 import type { Database } from '../persistence/database.js';
-import type { MatchResult } from '@ice-water/shared';
 
 type GuestClient = Client<{ auth: GuestIdentity }>;
 export interface RoomDependencies {
@@ -101,7 +107,10 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
     }
 
     override onAuth(_client: GuestClient, options: unknown, context: AuthContext): GuestIdentity {
-      if (context.headers.get('origin') && context.headers.get('origin') !== config.clientOrigin)
+      if (
+        context.headers.get('origin') &&
+        !isAllowedClientOrigin(context.headers.get('origin')!, config)
+      )
         throw new ServerError(403, 'Origin not allowed');
       if (!isRecord(options)) throw new ServerError(401, 'Guest session required');
       let identity: GuestIdentity;

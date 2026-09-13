@@ -87,6 +87,9 @@ Color must not be the only state signal. Pair it with silhouette changes, icons,
 ## UI direction
 
 - Rounded panels with thick, clean borders
+- The pre-match lobby is an immersive third-person clubhouse hub: the avatar stage remains visible between a left rules/roster board, a right private-room board, one central primary action, and a compact match-format dock.
+- Lobby boards may use clipped ice-facet corners, slim glowing edges, and dark translucent surfaces for depth. Keep the surrounding 3D forms soft and toy-like so the result feels like this world rather than a military or sci-fi shooter interface.
+- Third-party lobby references may inform broad spatial rhythm only. Do not copy their branding, wording, icons, progression systems, characters, weapons, or exact interface graphics.
 - Large phase timer and unmistakable phase label
 - Water-drop and snowflake icons supplement team colors
 - Invite codes use large characters, generous spacing, and copy feedback

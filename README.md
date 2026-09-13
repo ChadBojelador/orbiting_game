@@ -16,7 +16,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Open **http://localhost:5173**. The game server listens on **127.0.0.1:2567**. `setup:local` creates an ignored `.env` with random credentials and preserves an existing file. Alternatively, copy `.env.example` to `.env` and replace its placeholders. On PowerShell systems that block `npm.ps1`, use `npm.cmd` for these commands.
+Open **http://localhost:5173** (or **http://127.0.0.1:5173**). The game server listens on **127.0.0.1:2567**. `setup:local` creates an ignored `.env` with random credentials and preserves an existing file. Alternatively, copy `.env.example` to `.env` and replace its placeholders. On PowerShell systems that block `npm.ps1`, use `npm.cmd` for these commands.
 
 Keep the terminal running while you play. If the browser says **Cannot reach the game server**, confirm that `npm run dev` shows both the client and server as started, then open `http://127.0.0.1:2567/health`; it should return an `ok` response. Restart `npm run dev` after changing `.env`, and make sure no older process is already using ports 5173 or 2567.
 
@@ -61,7 +61,9 @@ Set `DEV_BOT_COUNT=5` in the root `.env`, restart `npm run dev`, and create a ro
 | `npm run db:migrate`                | Apply transactional, checksummed SQL migrations                       |
 | `npm run db:up` / `npm run db:down` | Start / stop local PostgreSQL                                         |
 
-Install the test browser once with `npx playwright install chromium` (Linux CI uses `--with-deps`). Browser tests always start isolated client and server processes with `DEV_BOT_COUNT=0`; ports 5173 and 2567 must be free. Run them with an account allowed to terminate the child processes they launch; restrictive Windows sandboxes can hang during process-tree cleanup even after assertions pass.
+Install the test browser once with `npx playwright install chromium` (Linux CI uses `--with-deps`). Browser tests always start isolated client and server processes with `DEV_BOT_COUNT=0` on dedicated ports 5174 and 2568, so a normal development session can remain running. Run them with an account allowed to terminate the child processes they launch; restrictive Windows sandboxes can hang during process-tree cleanup even after assertions pass.
+
+If Windows Application Control blocks Playwright's downloaded Chromium, run the same suite with an installed signed browser by setting `PLAYWRIGHT_CHANNEL=chrome` (or `msedge`) for that command. CI and normal local runs leave the variable unset and use the pinned Playwright browser.
 
 Database integration tests require an explicit `TEST_DATABASE_URL` pointing to a disposable test database. They report a skip when it is absent. The local verification uses a separate `icewater_test` database; CI provisions its own PostgreSQL service and runs this check. Never point the test URL at a production database.
 
@@ -73,7 +75,7 @@ The load harness verifies connection count, synchronized lobby state, and role a
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `VITE_GAME_SERVER_URL`                  | `ws://localhost:2567`; public browser configuration                                                                          |
 | `GAME_SERVER_HOST` / `GAME_SERVER_PORT` | `127.0.0.1` / `2567`                                                                                                         |
-| `CLIENT_ORIGIN`                         | `http://localhost:5173`; exact allowed origin                                                                                |
+| `CLIENT_ORIGIN`                         | `http://localhost:5173`; local development also accepts the equivalent `127.0.0.1` origin                                  |
 | `GUEST_SESSION_SIGNING_SECRET`          | Required random secret, at least 32 characters                                                                               |
 | `GUEST_SESSION_TTL_SECONDS`             | 3600; range 60–86400                                                                                                         |
 | `ROOM_MAX_PLAYERS`                      | 150; range 6–150; total humans plus development bots; start minimum always six                                               |

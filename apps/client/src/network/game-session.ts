@@ -155,7 +155,11 @@ export class GameSession {
       jump: move.jump,
     });
 
-    if (input.hasFrostThrow && local.team === 'ice' && now >= local.frostReadyAt) {
+    if (
+      (input.hasFrostThrow || input.isFrostFiring) &&
+      local.team === 'ice' &&
+      now >= local.frostReadyAt
+    ) {
       const horizontal = cameraRelative({ x: 0, z: -1 }, this.input.cameraYaw);
       const directionY = 0.08;
       const horizontalScale = Math.sqrt(1 - directionY * directionY);
