@@ -76,7 +76,6 @@ export function App() {
     }
   }
 
-  // Mount/unmount the 3D game scene when entering/leaving play phases.
   useEffect(() => {
     const canvas = gameCanvasRef.current;
     if (!canvas || !room || !guest || !lobby) return;
@@ -87,7 +86,7 @@ export function App() {
       }
       return;
     }
-    if (gameSceneRef.current) return; // already mounted
+    if (gameSceneRef.current) return;
     void import('../game/game-scene.js').then(({ GameScene }) => {
       if (!canvas || !room || !guest) return;
       gameSceneRef.current = new GameScene(canvas, room, guest.playerId);
@@ -113,12 +112,8 @@ export function App() {
     };
     next.onStateChange(update);
     next.onMessage<SessionError>('session/error', (message) => setError(message.message));
-    next.onMessage('match/phase-changed', () => {
-      setError('');
-    });
-    next.onMessage<MatchResult>('match/result', (result) => {
-      setMatchResult(result);
-    });
+    next.onMessage('match/phase-changed', () => setError(''));
+    next.onMessage<MatchResult>('match/result', (result) => setMatchResult(result));
     next.onMessage('arena/boundary-changed', () => {});
     next.onMessage('frost/thrown', () => {});
     next.onMessage('player/frozen', () => {});
@@ -216,7 +211,6 @@ export function App() {
   }
 
   const count = lobby?.players.filter((player) => player.isConnected).length ?? 0;
-  const isReadyToStart = lobby !== null && count >= lobby.minPlayers;
   const isHost = lobby?.hostPlayerId === guest?.playerId;
   const seconds = Math.max(0, Math.ceil(((lobby?.phaseDeadline ?? 0) - now) / 1000));
   const currentPlayer = lobby?.players.find((player) => player.playerId === guest?.playerId);
@@ -242,9 +236,7 @@ export function App() {
           onPlay={() => setIsMusicPlaying(true)}
           onPause={() => setIsMusicPlaying(false)}
         />
-        {/* Full-screen 3D canvas */}
         <canvas ref={gameCanvasRef} className="game-canvas" aria-label="3D game arena" />
-
         <button
           className="game-music-button"
           type="button"
@@ -255,13 +247,9 @@ export function App() {
           <span aria-hidden="true">{isMusicPlaying ? '♫' : '♪'}</span>
           {isMusicPlaying ? 'Sound on' : 'Sound off'}
         </button>
-
-        {/* HUD overlay */}
         {lobby.phase !== 'match-result' && (
           <GameHud view={lobby} localPlayerId={guest.playerId} serverNow={serverNow} />
         )}
-
-        {/* Touch controls */}
         {currentPlayer && lobby.phase !== 'match-result' && (
           <TouchControls
             input={gameSceneRef.current?.getInput()}
@@ -270,8 +258,6 @@ export function App() {
             isRescueLocked={isRescueLocked}
           />
         )}
-
-        {/* In-game Leave room button */}
         <button
           className="text-button game-leave-button"
           onClick={() => void run(leave)}
@@ -280,8 +266,6 @@ export function App() {
         >
           Leave room
         </button>
-
-        {/* Results overlay */}
         {matchResult && lobby.phase === 'match-result' && (
           <ResultsScreen
             view={lobby}
@@ -290,8 +274,6 @@ export function App() {
             onLeave={() => void run(leave)}
           />
         )}
-
-        {/* Connection status */}
         {connection !== 'Connected' && (
           <div className="game-reconnecting" role="status">
             {connection}
@@ -306,8 +288,10 @@ export function App() {
     );
   }
 
+  const lobbyMode = !guest ? 'identify' : !room ? 'choose-room' : !lobby ? 'joining' : 'waiting';
+
   return (
-    <main className="shell">
+    <main className={`lobby-shell lobby-shell--${lobbyMode}`}>
       <audio
         ref={musicRef}
         src="/music/bg1.mp3"
@@ -316,101 +300,259 @@ export function App() {
         onPlay={() => setIsMusicPlaying(true)}
         onPause={() => setIsMusicPlaying(false)}
       />
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Ice Ice Water home">
-          <span aria-hidden="true">❄</span> Ice Ice Water!
+      <Suspense
+        fallback={<div className="lobby-world lobby-world-fallback">Preparing the clubhouse…</div>}
+      >
+        <LobbyPreview />
+      </Suspense>
+      <div className="lobby-atmosphere" aria-hidden="true" />
+
+      <header className="lobby-topbar">
+        <a className="lobby-brand" href="/" aria-label="Ice Ice Water home">
+          <span className="lobby-brand-mark" aria-hidden="true">
+            ❄
+          </span>
+          <span className="lobby-brand-name">
+            Ice Ice <em>Water!</em>
+          </span>
         </a>
-        <div className="topbar-actions">
+        <div className="lobby-topbar-actions">
+          {guest && (
+            <span className="player-chip">
+              <span aria-hidden="true">◉</span>
+              {guest.displayName}
+            </span>
+          )}
           <button
             className="music-toggle"
             type="button"
             onClick={toggleMusic}
             aria-pressed={isMusicPlaying}
+            aria-label={isMusicPlaying ? 'Mute soundtrack' : 'Play soundtrack'}
           >
             <span aria-hidden="true">{isMusicPlaying ? '♫' : '♪'}</span>
-            {isMusicPlaying ? 'Sound on' : 'Play soundtrack'}
+            <span className="music-toggle-label">{isMusicPlaying ? 'Sound on' : 'Sound off'}</span>
           </button>
           <span className="edition">Private playtest</span>
         </div>
       </header>
-      <div className="layout">
-        <section className="intro" aria-labelledby="game-title">
-          <p className="eyebrow">
-            <span aria-hidden="true">✦</span> A cozy freeze-tag adventure
-          </p>
-          <h1 id="game-title">
-            A little chill.
-            <br />A lot of friends.
-          </h1>
-          <p className="lede">
-            Gather your crew for a game of freeze tag. Keep moving, stick together, and don't get
-            left on ice.
-          </p>
-          <Suspense
-            fallback={<div className="lobby-preview preview preview-fallback">Loading arena…</div>}
-          >
-            <LobbyPreview />
-          </Suspense>
-          <div className="rule-strip">
-            <p>
-              <span aria-hidden="true">◉</span>
-              <strong>6–150 friends</strong>One private room
-            </p>
-            <p>
-              <span aria-hidden="true">❄</span>
-              <strong>Ice catches</strong>Water rescues
-            </p>
-            <p>
-              <span aria-hidden="true">◷</span>
-              <strong>Five rounds</strong>30s play + 30s freeze
-            </p>
+
+      <div className="hub-layout">
+        <section className={`hub-board hub-board--left ${lobby ? 'hub-board--roster' : ''}`}>
+          <div className="board-heading">
+            <span>
+              <i aria-hidden="true" /> {lobby ? 'In this room' : 'How to play'}
+            </span>
+            <small>{lobby ? `${count} online` : '5 rounds'}</small>
           </div>
-        </section>
-        <section className="lobby-panel" aria-label="Private room lobby" aria-busy={isBusy}>
-          {!guest ? (
+          {lobby ? (
             <>
-              <span className="panel-icon" aria-hidden="true">
-                ✳
-              </span>
-              <h2>First, what's your name?</h2>
-              <p>Your friends will see this in the room.</p>
-              <form onSubmit={submitGuest}>
-                <label htmlFor="display-name">Display name</label>
-                <input
-                  id="display-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  maxLength={100}
-                  autoComplete="nickname"
-                  placeholder="e.g. Snow day Sam"
-                  required
-                  aria-describedby="name-hint"
-                />
-                <small id="name-hint">
-                  2–20 characters. Letters, numbers, and simple punctuation.
-                </small>
-                <button className="primary" disabled={isBusy} type="submit">
-                  {isBusy ? 'Connecting…' : 'Let’s go'}
-                </button>
-              </form>
-              <p className="quiet">No account needed. Just a name and your friends.</p>
+              <div className="roster-title">
+                <h2>Ready crew</h2>
+                <span role="status" aria-label="Connected players">
+                  {count} / {lobby.maxPlayers} connected
+                </span>
+              </div>
+              <div
+                className="player-meter"
+                aria-label={`${count} of ${lobby.minPlayers} players needed to start`}
+              >
+                <span style={{ width: `${Math.min(100, (count / lobby.minPlayers) * 100)}%` }} />
+              </div>
+              <ul className="roster">
+                {lobby.players.map((player) => (
+                  <li key={player.playerId}>
+                    <span className={`avatar ${player.team}`} aria-hidden="true">
+                      {player.team === 'ice' ? '❄' : '◉'}
+                    </span>
+                    <span className="player-name">
+                      {player.displayName}
+                      {player.playerId === guest?.playerId && <small> (you)</small>}
+                    </span>
+                    <span className="player-badge">
+                      {player.playerId === lobby.hostPlayerId
+                        ? 'Host'
+                        : player.team !== 'unassigned'
+                          ? player.team === 'ice'
+                            ? 'Ice'
+                            : 'Water'
+                          : 'Ready'}
+                      {!player.isConnected && ' · Away'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </>
+          ) : (
+            <div className="rules-list">
+              <div className="rule-row">
+                <span className="rule-icon rule-icon--ice" aria-hidden="true">
+                  ❄
+                </span>
+                <p>
+                  <strong>Ice catches</strong>
+                  Land a frost throw to freeze Water.
+                </p>
+              </div>
+              <div className="rule-row">
+                <span className="rule-icon rule-icon--water" aria-hidden="true">
+                  ◉
+                </span>
+                <p>
+                  <strong>Water rescues</strong>
+                  Stay close and thaw frozen teammates.
+                </p>
+              </div>
+              <div className="rule-row">
+                <span className="rule-icon rule-icon--clock" aria-hidden="true">
+                  30
+                </span>
+                <p>
+                  <strong>Beat Deep Freeze</strong>
+                  Rescue locks when the final 30 seconds begin.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="hub-center" aria-labelledby="game-title">
+          <div className="hub-title">
+            <p>Private browser freeze tag</p>
+            <h1 id="game-title">Ice Ice Water!</h1>
+            <span>Run together. Freeze apart.</span>
+          </div>
+          <section className="hub-action" aria-label="Private room lobby" aria-busy={isBusy}>
+            {!guest ? (
+              <>
+                <p className="action-kicker">Choose your player name</p>
+                <h2>Enter the clubhouse</h2>
+                <form onSubmit={submitGuest}>
+                  <label htmlFor="display-name">Display name</label>
+                  <input
+                    id="display-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    maxLength={100}
+                    autoComplete="nickname"
+                    placeholder="e.g. Snow day Sam"
+                    required
+                    aria-describedby="name-hint"
+                  />
+                  <small id="name-hint">2–20 characters. No account needed.</small>
+                  <button className="primary hub-play-button" disabled={isBusy} type="submit">
+                    {isBusy ? 'Connecting…' : 'Let’s go'}
+                    <small>Enter lobby</small>
+                  </button>
+                </form>
+              </>
+            ) : !room ? (
+              <>
+                <p className="action-kicker">Welcome, {guest.displayName}</p>
+                <h2>Host the next match</h2>
+                <p className="action-copy">Create an invite-only room for up to 150 friends.</p>
+                <button
+                  className="primary hub-play-button"
+                  disabled={isBusy || isExpired}
+                  onClick={() => void run(async () => attach(await reserveRoom(guest)))}
+                >
+                  {isBusy ? 'Connecting…' : 'Create private room'}
+                  <small>Become the host</small>
+                </button>
+                {isExpired && (
+                  <p role="status">Your guest session expired. Choose your name again.</p>
+                )}
+                <button
+                  className="text-button"
+                  disabled={isBusy}
+                  onClick={() => {
+                    forgetGuest();
+                    setGuest(null);
+                    setError('');
+                  }}
+                >
+                  Change name
+                </button>
+              </>
+            ) : !lobby ? (
+              <div className="joining-state" role="status">
+                <span aria-hidden="true">❄</span>
+                <strong>Joining your room…</strong>
+              </div>
+            ) : (
+              <>
+                <p className="action-kicker">
+                  {isHost ? 'You are the host' : 'Waiting for the host'}
+                </p>
+                <div className={`phase-box ${lobby.phase}`} aria-live="polite">
+                  <strong>
+                    {lobby.phase === 'lobby'
+                      ? 'Waiting for friends'
+                      : lobby.phase === 'countdown'
+                        ? `Starting in ${seconds}`
+                        : 'Teams are set!'}
+                  </strong>
+                  <p>
+                    {lobby.phase === 'lobby'
+                      ? count < lobby.minPlayers
+                        ? `${lobby.minPlayers - count} more to start. Send the invite!`
+                        : isHost
+                          ? 'Everyone here? Start when your crew is ready.'
+                          : 'Your host can start the countdown.'
+                      : lobby.phase === 'countdown'
+                        ? 'Ice catches. Water helps teammates thaw.'
+                        : `You're ${currentPlayer?.team === 'ice' ? 'Ice — catch the Water team.' : 'Water — help your teammates.'}`}
+                  </p>
+                </div>
+                {isHost && lobby.phase === 'lobby' && (
+                  <button
+                    className="primary hub-play-button"
+                    disabled={count < lobby.minPlayers || connection !== 'Connected'}
+                    onClick={() => room.send('room/start', {})}
+                  >
+                    Start countdown
+                    <small>
+                      {count < lobby.minPlayers
+                        ? `Need ${lobby.minPlayers - count} more player${lobby.minPlayers - count === 1 ? '' : 's'}`
+                        : 'Launch the match'}
+                    </small>
+                  </button>
+                )}
+                <button className="text-button" onClick={() => void run(leave)} disabled={isBusy}>
+                  Leave room
+                </button>
+              </>
+            )}
+          </section>
+        </section>
+
+        <section className="hub-board hub-board--right">
+          <div className="board-heading">
+            <span>
+              <i aria-hidden="true" /> Private rooms
+            </span>
+            <small>Invite only</small>
+          </div>
+          {!guest ? (
+            <div className="room-promise">
+              <strong>6–150 players</strong>
+              <p>One room, one arena, one last-second rescue.</p>
+              <dl>
+                <div>
+                  <dt>Match</dt>
+                  <dd>5 rounds</dd>
+                </div>
+                <div>
+                  <dt>Round</dt>
+                  <dd>60 sec</dd>
+                </div>
+              </dl>
+            </div>
           ) : !room ? (
             <>
-              <span className="panel-icon" aria-hidden="true">
-                ✳
-              </span>
-              <h2>Hey, {guest.displayName}.</h2>
-              <p>Start a room or hop into your friend's.</p>
-              <button
-                className="primary"
-                disabled={isBusy || isExpired}
-                onClick={() => void run(async () => attach(await reserveRoom(guest)))}
-              >
-                {isBusy ? 'Connecting…' : 'Create private room'}
-              </button>
-              <div className="divider">Have an invite?</div>
-              <form onSubmit={join}>
+              <h2>Join your crew</h2>
+              <p className="board-copy">Enter the room code your host shared.</p>
+              <form className="join-form" onSubmit={join}>
                 <label htmlFor="invite-code">Invite code</label>
                 <input
                   id="invite-code"
@@ -428,42 +570,18 @@ export function App() {
                   Join room
                 </button>
               </form>
-              {isExpired && (
-                <p role="status">Your guest session expired. Choose your name again to continue.</p>
-              )}
-              <button
-                className="text-button"
-                disabled={isBusy}
-                onClick={() => {
-                  forgetGuest();
-                  setGuest(null);
-                  setError('');
-                }}
-              >
-                Change name
-              </button>
             </>
           ) : !lobby ? (
-            <p role="status">Joining your room…</p>
+            <p role="status">Finding the room signal…</p>
           ) : (
             <>
               <div className="room-kicker">
-                <span className="room-kicker-mark" aria-hidden="true">
-                  ●
-                </span>
-                <span>Private match lobby</span>
+                <span>Room code</span>
                 <span className={`connection ${connection === 'Connected' ? 'is-connected' : ''}`}>
                   <span className="connection-dot" aria-hidden="true" />
                   {connection}
                 </span>
               </div>
-              <div className="room-heading">
-                <div>
-                  <p className="room-label">ROOM CODE</p>
-                  <h2>Assemble your crew</h2>
-                </div>
-              </div>
-              <p className="room-intro">Share the code, then watch the roster fill up.</p>
               <output className="invite-output" aria-label="Room invite code">
                 {lobby.inviteCode}
               </output>
@@ -478,83 +596,42 @@ export function App() {
               >
                 {copyLabel}
               </button>
-              <div className="roster-title">
-                <h3>In the room</h3>
-                <span role="status" aria-label="Connected players">
-                  {isReadyToStart ? 'Ready to start' : `${count} / ${lobby.minPlayers} to start`}
-                </span>
-              </div>
-              <div
-                className="player-meter"
-                aria-label={`${count} of ${lobby.minPlayers} players needed to start`}
-              >
-                <span style={{ width: `${Math.min(100, (count / lobby.minPlayers) * 100)}%` }} />
-              </div>
-              <ul className="roster">
-                {lobby.players.map((player) => (
-                  <li key={player.playerId}>
-                    <span className={`avatar ${player.team}`} aria-hidden="true">
-                      {player.team === 'ice' ? '❄' : '◉'}
-                    </span>
-                    <span className="player-name">
-                      {player.displayName}
-                      {player.playerId === guest.playerId && <small> (you)</small>}
-                    </span>
-                    <span className="player-badge">
-                      {player.playerId === lobby.hostPlayerId
-                        ? 'Host'
-                        : player.team !== 'unassigned'
-                          ? player.team === 'ice'
-                            ? 'Ice'
-                            : 'Water'
-                          : 'Ready'}
-                      {!player.isConnected && ' · Away'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className={`phase-box ${lobby.phase}`} aria-live="polite">
-                <strong>
-                  {lobby.phase === 'lobby'
-                    ? 'Waiting for friends'
-                    : lobby.phase === 'countdown'
-                      ? `Starting in ${seconds}`
-                      : 'Teams are set!'}
-                </strong>
-                <p>
-                  {lobby.phase === 'lobby'
-                    ? count < lobby.minPlayers
-                      ? `${lobby.minPlayers - count} more to start. Send out the invite!`
-                      : isHost
-                        ? 'Everyone here? You can start the countdown.'
-                        : 'Your host can start the countdown.'
-                    : lobby.phase === 'countdown'
-                      ? 'Ice catches. Water helps teammates thaw.'
-                      : `You're ${currentPlayer?.team === 'ice' ? 'Ice — catch the Water team.' : 'Water — help your teammates.'}`}
-                </p>
-              </div>
-              {isHost && lobby.phase === 'lobby' && (
-                <button
-                  className="primary"
-                  disabled={count < lobby.minPlayers || connection !== 'Connected'}
-                  onClick={() => room.send('room/start', {})}
-                >
-                  Start countdown
-                </button>
-              )}
-              <button className="text-button" onClick={() => void run(leave)} disabled={isBusy}>
-                Leave room
-              </button>
+              <p className="board-copy">Share this code with friends. The room starts at six.</p>
             </>
-          )}
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
           )}
         </section>
       </div>
-      <footer>Stay close. Thaw a friend. Make it through the freeze.</footer>
+
+      <div className="lobby-dock" aria-label="Match format">
+        <div>
+          <span aria-hidden="true">◎</span>
+          <p>
+            <strong>One arena</strong>
+            Built for a crowd
+          </p>
+        </div>
+        <div>
+          <span aria-hidden="true">❄</span>
+          <p>
+            <strong>Ice vs Water</strong>
+            Freeze or rescue
+          </p>
+        </div>
+        <div>
+          <span aria-hidden="true">◷</span>
+          <p>
+            <strong>30 + 30 seconds</strong>
+            Then the freeze lands
+          </p>
+        </div>
+      </div>
+
+      {error && (
+        <p className="lobby-error" role="alert">
+          {error}
+        </p>
+      )}
+      <footer className="lobby-footer">Stay close. Thaw a friend. Survive the freeze.</footer>
     </main>
   );
 }
