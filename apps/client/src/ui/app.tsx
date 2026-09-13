@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   canRescueInPhase,
   isPlayPhase,
@@ -20,11 +20,14 @@ import {
   snapshot,
   type LobbyRoom,
 } from '../network/lobby-client.js';
-import { LobbyPreview } from '../game/lobby-preview.js';
 import { GameHud } from './game-hud.js';
 import { TouchControls } from './touch-controls.js';
 import { ResultsScreen } from './results-screen.js';
 import { ServerClock } from '../network/server-clock.js';
+
+const LobbyPreview = lazy(() =>
+  import('../game/lobby-preview.js').then((module) => ({ default: module.LobbyPreview })),
+);
 
 export function App() {
   const [guest, setGuest] = useState<GuestSession | null>(readGuest);
@@ -333,7 +336,9 @@ export function App() {
             Gather your crew for a game of freeze tag. Keep moving, stick together, and don't get
             left on ice.
           </p>
-          <LobbyPreview />
+          <Suspense fallback={<div className="lobby-preview preview preview-fallback">Loading arena…</div>}>
+            <LobbyPreview />
+          </Suspense>
           <div className="rule-strip">
             <p>
               <span aria-hidden="true">◉</span>

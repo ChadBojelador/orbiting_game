@@ -192,6 +192,54 @@ describe('MatchController', () => {
     expect(resultEvent?.payload).toEqual({ winner: 'water', reason: 'rounds-complete' });
   });
 
+  it('keeps results available until the deadline and requests cleanup exactly once afterward', () => {
+    const onResultExpired = vi.fn();
+    const lifecycleController = new MatchController(
+      state,
+      (event) => events.push(event),
+      () => {},
+      { onResultExpired },
+    );
+    lifecycleController.start(1_000);
+    for (const player of state.players.values()) {
+      if (player.team === 'water') player.status = 'frozen';
+    }
+    lifecycleController.tick(1_001);
+    const resultDeadline = 1_001 + GAMEPLAY.matchResultMs;
+
+    expect(state.phase).toBe('match-result');
+    expect(lifecycleController.tick(resultDeadline - 1)).toBe(false);
+    expect(onResultExpired).not.toHaveBeenCalled();
+    expect(lifecycleController.tick(resultDeadline)).toBe(true);
+    expect(onResultExpired).toHaveBeenCalledTimes(1);
+    expect(lifecycleController.tick(resultDeadline + 1)).toBe(false);
+    expect(onResultExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports one completed result with authoritative timestamps', () => {
+    const onResult = vi.fn();
+    const lifecycleController = new MatchController(
+      state,
+      (event) => events.push(event),
+      () => {},
+      { onResult },
+    );
+    lifecycleController.start(1_000);
+    for (const player of state.players.values()) {
+      if (player.team === 'water') player.status = 'frozen';
+    }
+
+    lifecycleController.tick(1_250);
+    lifecycleController.tick(2_000);
+
+    expect(onResult).toHaveBeenCalledOnce();
+    expect(onResult).toHaveBeenCalledWith(
+      { winner: 'ice', reason: 'all-frozen' },
+      1_000,
+      1_250,
+    );
+  });
+
   it('Ice wins immediately when all Water are frozen', () => {
     ctrl.start(1000);
     // Freeze all Water players.

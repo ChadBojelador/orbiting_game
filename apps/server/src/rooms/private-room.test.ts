@@ -6,16 +6,23 @@ import type { MatchController } from '../gameplay/match-controller.js';
 import { createPrivateRoom } from './private-room.js';
 import { PlayerState } from './lobby-state.js';
 import { RoomDirectory } from './room-directory.js';
+import type { Database } from '../persistence/database.js';
 
 const NOW = 1_800_000_000_000;
 const config = readConfig({
   GUEST_SESSION_SIGNING_SECRET: 'test-secret-with-at-least-32-characters',
   RECONNECT_SECONDS: '25',
 });
+const database: Database = {
+  isReady: async () => true,
+  saveMatchSummary: async () => true,
+  close: async () => {},
+};
 const PrivateRoom = createPrivateRoom({
   config,
   sessions: new GuestSessions(config.signingSecret, config.sessionTtlSeconds),
   directory: new RoomDirectory(),
+  database,
 });
 type TestRoom = InstanceType<typeof PrivateRoom>;
 type GuestClient = Parameters<TestRoom['onDrop']>[0];
