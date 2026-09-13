@@ -213,6 +213,7 @@ export function App() {
   }
 
   const count = lobby?.players.filter((player) => player.isConnected).length ?? 0;
+  const isReadyToStart = lobby !== null && count >= lobby.minPlayers;
   const isHost = lobby?.hostPlayerId === guest?.playerId;
   const seconds = Math.max(0, Math.ceil(((lobby?.phaseDeadline ?? 0) - now) / 1000));
   const currentPlayer = lobby?.players.find((player) => player.playerId === guest?.playerId);
@@ -461,7 +462,7 @@ export function App() {
               <div className="roster-title">
                 <h3>In the room</h3>
                 <span role="status" aria-label="Connected players">
-                  {count} / {lobby.minPlayers} to start
+                  {isReadyToStart ? 'Ready to start' : `${count} / ${lobby.minPlayers} to start`}
                 </span>
               </div>
               <div className="player-meter" aria-label={`${count} of ${lobby.minPlayers} players needed to start`}>

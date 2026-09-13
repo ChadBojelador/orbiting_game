@@ -17,6 +17,11 @@ type EmitFn = (
     | { type: 'match/result'; payload: MatchResult },
 ) => void;
 
+export interface MatchLifecycle {
+  onResult?: (result: MatchResult, startedAt: number, completedAt: number) => void;
+  onResultExpired?: () => void;
+}
+
 /**
  * MatchController owns the authoritative multi-round phase state machine.
  * It is driven by the room's advance() tick and should be called after
@@ -31,17 +36,21 @@ type EmitFn = (
  */
 export class MatchController {
   private hasStarted = false;
+  private startedAt = 0;
+  private hasExpiredResult = false;
 
   constructor(
     private readonly state: LobbyState,
     private readonly emit: EmitFn,
     private readonly onStartRound: (now: number, halfExtent: number) => void,
+    private readonly lifecycle: MatchLifecycle = {},
   ) {}
 
   /** Called once when the countdown ends and roles are assigned. */
   start(now: number): void {
     if (this.hasStarted) return;
     this.hasStarted = true;
+    this.startedAt = now;
     this.beginRound(1, now);
   }
 
@@ -52,7 +61,19 @@ export class MatchController {
   tick(now: number): boolean {
     if (!this.hasStarted) return false;
     const phase = this.state.phase;
-    if (phase === 'lobby' || phase === 'countdown' || phase === 'match-result') return false;
+    if (phase === 'lobby' || phase === 'countdown') return false;
+    if (phase === 'match-result') {
+      if (
+        !this.hasExpiredResult &&
+        this.state.phaseDeadline !== 0 &&
+        now >= this.state.phaseDeadline
+      ) {
+        this.hasExpiredResult = true;
+        this.lifecycle.onResultExpired?.();
+        return true;
+      }
+      return false;
+    }
 
     // Check Ice-wins-early condition every tick during a play phase.
     if (phase === 'regular' || phase === 'warning' || phase === 'deep-freeze') {
@@ -162,7 +183,8 @@ export class MatchController {
     this.state.phase = 'match-result';
     this.state.phaseDeadline = now + GAMEPLAY.matchResultMs;
     this.state.matchWinner = winner;
-    this.emit({ type: 'match/result', payload: { winner, reason } });
+    const result = { winner, reason } satisfies MatchResult;
+    this.emit({ type: 'match/result', payload: result });
     this.emit({
       type: 'match/phase-changed',
       payload: {
@@ -171,6 +193,7 @@ export class MatchController {
         serverTime: now,
       },
     });
+    this.lifecycle.onResult?.(result, this.startedAt, now);
   }
 
   /** Ice wins immediately when every Water player is frozen or eliminated. */

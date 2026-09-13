@@ -1,4 +1,5 @@
 import { Room, ServerError, type AuthContext, type Client } from '@colyseus/core';
+import { randomUUID } from 'node:crypto';
 import { GAMEPLAY, isEmptyPayload, isRecord, type GameplayMessages } from '@ice-water/shared';
 import type { GuestIdentity, GuestSessions } from '../auth/guest-session.js';
 import { RateLimiter } from '../auth/rate-limiter.js';
@@ -10,15 +11,18 @@ import { GameplayController } from '../gameplay/gameplay-controller.js';
 import { MatchController } from '../gameplay/match-controller.js';
 import { advanceAuthoritativeTick } from '../gameplay/authoritative-tick.js';
 import { BotRunner } from '../simulation/bot-runner.js';
+import type { Database } from '../persistence/database.js';
+import type { MatchResult } from '@ice-water/shared';
 
 type GuestClient = Client<{ auth: GuestIdentity }>;
 export interface RoomDependencies {
   config: ServerConfig;
   sessions: GuestSessions;
   directory: RoomDirectory;
+  database: Database;
 }
 
-export function createPrivateRoom({ config, sessions, directory }: RoomDependencies) {
+export function createPrivateRoom({ config, sessions, directory, database }: RoomDependencies) {
   return class PrivateRoom extends Room<{ state: LobbyState; client: GuestClient }> {
     override state = new LobbyState();
     private readonly controller = new LobbyController(
@@ -27,6 +31,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       config.iceBrackets,
     );
     private readonly actions = new RateLimiter(4, 1000);
+    private readonly matchId = randomUUID();
     private readonly gameplay = new GameplayController(this.state, (event) =>
       this.broadcast(event.type, event.payload),
     );
@@ -34,10 +39,18 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       this.state,
       (event) => this.broadcast(event.type, event.payload as never),
       (now, halfExtent) => this.gameplay.startRound(now, halfExtent),
+      {
+        onResult: (result, startedAt, completedAt) =>
+          this.persistResult(result, startedAt, completedAt),
+        onResultExpired: () => this.cleanupCompletedMatch(),
+      },
     );
     private readonly bots: BotRunner | null =
       config.devBotCount > 0 ? new BotRunner(this.state, this.gameplay, config.devBotCount) : null;
     private createdAt = Date.now();
+    private hasPersistedResult = false;
+    private hasReleasedDirectory = false;
+    private hasRequestedCleanup = false;
 
     override async onCreate(options: unknown): Promise<void> {
       if (
@@ -147,6 +160,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
         return;
       }
       const now = Date.now();
+      this.state.serverTime = now;
       const player = this.state.players.get(client.auth.playerId);
       if (
         !player ||
@@ -193,7 +207,7 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
 
     override onDispose(): void {
       this.bots?.stop();
-      directory.dispose(this.state.inviteCode, this.roomId);
+      this.releaseDirectory();
     }
 
     private advance(now = Date.now()): void {
@@ -217,6 +231,40 @@ export function createPrivateRoom({ config, sessions, directory }: RoomDependenc
       if (advanceAuthoritativeTick(now, this.gameplay, this.match)) {
         // MatchController already emitted the phase-changed event.
       }
+    }
+    private persistResult(result: MatchResult, startedAt: number, completedAt: number): void {
+      if (this.hasPersistedResult) return;
+      this.hasPersistedResult = true;
+      const summary = {
+        matchId: this.matchId,
+        winner: result.winner,
+        resultReason: result.reason,
+        finalRound: this.state.round,
+        maxRounds: this.state.maxRounds,
+        startedAt: new Date(startedAt),
+        completedAt: new Date(completedAt),
+        players: [...this.state.players.values()].map((player) => ({
+          playerId: player.playerId,
+          team: player.team,
+          finalStatus: player.status,
+          tags: player.tags,
+          rescues: player.rescues,
+        })),
+      };
+      void database.saveMatchSummary(summary).catch(() => {
+        console.error(JSON.stringify({ event: 'match-summary/write-failed', matchId: this.matchId }));
+      });
+    }
+    private cleanupCompletedMatch(): void {
+      if (this.hasRequestedCleanup) return;
+      this.hasRequestedCleanup = true;
+      this.releaseDirectory();
+      void this.disconnect(1000);
+    }
+    private releaseDirectory(): void {
+      if (this.hasReleasedDirectory) return;
+      this.hasReleasedDirectory = true;
+      directory.dispose(this.state.inviteCode, this.roomId);
     }
     private phaseChanged(): void {
       this.broadcast('match/phase-changed', {

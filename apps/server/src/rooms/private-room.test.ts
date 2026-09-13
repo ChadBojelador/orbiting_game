@@ -112,7 +112,8 @@ describe('PrivateRoom active-match reconnection', () => {
       vi.spyOn(room, 'broadcast').mockImplementation(() => {});
       const tickAt = NOW + 500;
 
-      Reflect.apply(Reflect.get(room, 'advance') as () => void, room, [tickAt]);
+      const advance = Reflect.get(room, 'advance') as (now: number) => void;
+      advance.call(room, tickAt);
 
       expect(room.state.serverTime).toBe(tickAt);
     },
