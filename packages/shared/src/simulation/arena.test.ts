@@ -3,8 +3,10 @@ import {
   ARENA,
   ARENA_ROUNDS,
   BRIDGES,
-  createSpawnPoints,
   advanceVerticalMotion,
+  bridgeDeckHeightAt,
+  bridgeDimensions,
+  createSpawnPoints,
   hasGameplayLineOfSight,
   isPermanentLand,
   isRiver,
@@ -42,6 +44,69 @@ describe('authored world arena', () => {
 
     for (const bridge of BRIDGES) {
       expect(isPermanentLand(bridge)).toBe(true);
+    }
+  });
+
+  it('covers every bridge deck and approach with authoritative walkable collision', () => {
+    const playerRadius = 0.8;
+    for (const bridge of BRIDGES) {
+      const { length, deckWidth } = bridgeDimensions(bridge);
+      const cos = Math.cos(bridge.heading);
+      const sin = Math.sin(bridge.heading);
+      const safeHalfWidth = deckWidth / 2 - playerRadius - 0.01;
+
+      for (
+        let along = -length / 2 + playerRadius + 0.01;
+        along <= length / 2 - playerRadius - 0.01;
+        along += 0.25
+      ) {
+        for (const across of [-safeHalfWidth, 0, safeHalfWidth]) {
+          const point = {
+            x: bridge.x + cos * along - sin * across,
+            z: bridge.z + sin * along + cos * across,
+          };
+          expect(isWalkable(point, playerRadius), `${bridge.id} has a collision gap`).toBe(true);
+        }
+      }
+
+      for (let along = -length / 2 - 1; along <= length / 2 + 1; along += 0.1) {
+        const approach = {
+          x: bridge.x + cos * along,
+          z: bridge.z + sin * along,
+        };
+        expect(isWalkable(approach, playerRadius), `${bridge.id} has a broken approach`).toBe(true);
+      }
+    }
+  });
+
+  it('keeps bridge slopes and platform seams within the authored step limit', () => {
+    for (const bridge of BRIDGES) {
+      const { length } = bridgeDimensions(bridge);
+      const cos = Math.cos(bridge.heading);
+      const sin = Math.sin(bridge.heading);
+      const pointAt = (along: number) => ({
+        x: bridge.x + cos * along,
+        z: bridge.z + sin * along,
+      });
+
+      for (let along = -length / 2; along < length / 2; along += 0.25) {
+        const next = Math.min(length / 2, along + 0.25);
+        expect(
+          Math.abs(
+            bridgeDeckHeightAt(bridge, pointAt(next)) - bridgeDeckHeightAt(bridge, pointAt(along)),
+          ),
+          `${bridge.id} has an abrupt deck slope`,
+        ).toBeLessThanOrEqual(0.35);
+      }
+
+      for (const side of [-1, 1]) {
+        const deckEnd = pointAt((side * length) / 2);
+        const approach = pointAt(side * (length / 2 + 0.2));
+        expect(
+          Math.abs(terrainHeightAt(deckEnd) - terrainHeightAt(approach)),
+          `${bridge.id} does not meet its platform cleanly`,
+        ).toBeLessThanOrEqual(0.35 + 1e-9);
+      }
     }
   });
 
