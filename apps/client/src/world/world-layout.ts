@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import {
   ARENA,
   BRIDGES,
+  bridgeDeckHeightAt,
+  bridgeDimensions,
   isPermanentLand,
   RIVER_BRANCHES,
   ROUTE_CORRIDORS,
@@ -9,6 +11,7 @@ import {
   terrainHeightAt,
   WORLD_MAX,
   WORLD_MIN,
+  type BridgeFootprint,
   type Position,
 } from '@ice-water/shared';
 
@@ -36,6 +39,8 @@ const PALETTE = {
 
 const TERRAIN_STEP = 3.125;
 const CLIFF_BOTTOM = SEA_LEVEL - 0.55;
+const BRIDGE_DECK_THICKNESS = 0.5;
+const BRIDGE_RAIL_HEIGHT = 1.05;
 
 function addTriangle(
   positions: number[],
@@ -407,41 +412,138 @@ function createLandmarks(): THREE.Group {
   return group;
 }
 
-function createBridge(id: string, x: number, z: number, width: number, depth: number): THREE.Group {
+function bridgePoint(
+  bridge: BridgeFootprint,
+  along: number,
+  across: number,
+  heightOffset = 0,
+): THREE.Vector3 {
+  const cos = Math.cos(bridge.heading);
+  const sin = Math.sin(bridge.heading);
+  const worldPosition = {
+    x: bridge.x + cos * along - sin * across,
+    z: bridge.z + sin * along + cos * across,
+  };
+  return new THREE.Vector3(
+    worldPosition.x - bridge.x,
+    bridgeDeckHeightAt(bridge, worldPosition) + heightOffset,
+    worldPosition.z - bridge.z,
+  );
+}
+
+function addQuad(
+  positions: number[],
+  a: THREE.Vector3,
+  b: THREE.Vector3,
+  c: THREE.Vector3,
+  d: THREE.Vector3,
+): void {
+  positions.push(
+    a.x,
+    a.y,
+    a.z,
+    b.x,
+    b.y,
+    b.z,
+    c.x,
+    c.y,
+    c.z,
+    a.x,
+    a.y,
+    a.z,
+    c.x,
+    c.y,
+    c.z,
+    d.x,
+    d.y,
+    d.z,
+  );
+}
+
+function createBridgeDeckGeometry(bridge: BridgeFootprint): THREE.BufferGeometry {
+  const { length, deckWidth } = bridgeDimensions(bridge);
+  const segmentCount = Math.max(2, Math.ceil(length));
+  const halfLength = length / 2;
+  const halfWidth = deckWidth / 2;
+  const positions: number[] = [];
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const startAlong = -halfLength + (index * length) / segmentCount;
+    const endAlong = -halfLength + ((index + 1) * length) / segmentCount;
+    const startLeft = bridgePoint(bridge, startAlong, -halfWidth);
+    const startRight = bridgePoint(bridge, startAlong, halfWidth);
+    const endLeft = bridgePoint(bridge, endAlong, -halfWidth);
+    const endRight = bridgePoint(bridge, endAlong, halfWidth);
+    const startBottomLeft = startLeft.clone().setY(startLeft.y - BRIDGE_DECK_THICKNESS);
+    const startBottomRight = startRight.clone().setY(startRight.y - BRIDGE_DECK_THICKNESS);
+    const endBottomLeft = endLeft.clone().setY(endLeft.y - BRIDGE_DECK_THICKNESS);
+    const endBottomRight = endRight.clone().setY(endRight.y - BRIDGE_DECK_THICKNESS);
+
+    addQuad(positions, startLeft, startRight, endRight, endLeft);
+    addQuad(positions, startBottomLeft, endBottomLeft, endBottomRight, startBottomRight);
+    addQuad(positions, startLeft, endLeft, endBottomLeft, startBottomLeft);
+    addQuad(positions, startRight, startBottomRight, endBottomRight, endRight);
+
+    if (index === 0) {
+      addQuad(positions, startLeft, startBottomLeft, startBottomRight, startRight);
+    }
+    if (index === segmentCount - 1) {
+      addQuad(positions, endLeft, endRight, endBottomRight, endBottomLeft);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function addBridgeBeam(
+  bridge: THREE.Group,
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  material: THREE.Material,
+  name: string,
+  radius = 0.12,
+): void {
+  const direction = end.clone().sub(start);
+  const beam = mesh(
+    new THREE.CylinderGeometry(radius, radius, direction.length(), 6),
+    material,
+    name,
+  );
+  beam.position.copy(start).add(end).multiplyScalar(0.5);
+  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  bridge.add(beam);
+}
+
+function createBridge(definition: BridgeFootprint): THREE.Group {
   const bridge = new THREE.Group();
-  bridge.name = id;
-  const isHorizontal = width > depth;
-  const length = Math.max(width, depth);
-  const crossWidth = Math.min(width, depth);
-  const y = terrainHeightAt({ x, z }) + 0.36;
-  bridge.position.set(x, y, z);
+  bridge.name = definition.id;
+  bridge.position.set(definition.x, 0, definition.z);
+  const { length, deckWidth } = bridgeDimensions(definition);
   const wood = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.9 });
   const rope = new THREE.MeshStandardMaterial({ color: PALETTE.woodDark, roughness: 1 });
-  const boardCount = Math.max(3, Math.floor(length / 1.2));
-  for (let index = 0; index < boardCount; index += 1) {
-    const offset = -length / 2 + ((index + 0.5) * length) / boardCount;
-    const board = mesh(
-      new THREE.BoxGeometry(
-        isHorizontal ? length / boardCount - 0.08 : crossWidth,
-        0.32,
-        isHorizontal ? crossWidth : length / boardCount - 0.08,
-      ),
-      wood,
-      `${id}-board-${index}`,
-    );
-    board.position.set(isHorizontal ? offset : 0, 0, isHorizontal ? 0 : offset);
-    bridge.add(board);
-  }
+  bridge.add(mesh(createBridgeDeckGeometry(definition), wood, `${definition.id}-deck`));
+
   for (const side of [-1, 1]) {
-    const rail = mesh(new THREE.CylinderGeometry(0.12, 0.12, length, 6), rope, `${id}-rail`);
-    rail.rotation.z = isHorizontal ? Math.PI / 2 : 0;
-    rail.rotation.x = isHorizontal ? 0 : Math.PI / 2;
-    rail.position.set(
-      isHorizontal ? 0 : side * crossWidth * 0.46,
-      0.95,
-      isHorizontal ? side * crossWidth * 0.46 : 0,
+    const across = side * (deckWidth / 2 - 0.18);
+    const railStart = bridgePoint(definition, -length / 2, across, BRIDGE_RAIL_HEIGHT);
+    const railEnd = bridgePoint(definition, length / 2, across, BRIDGE_RAIL_HEIGHT);
+    addBridgeBeam(
+      bridge,
+      railStart,
+      railEnd,
+      rope,
+      `${definition.id}-rail-${side < 0 ? 'left' : 'right'}`,
     );
-    bridge.add(rail);
+    for (const along of [-length / 2, 0, length / 2]) {
+      const postBottom = bridgePoint(definition, along, across);
+      const postTop = bridgePoint(definition, along, across, BRIDGE_RAIL_HEIGHT);
+      addBridgeBeam(bridge, postBottom, postTop, rope, `${definition.id}-post`, 0.1);
+    }
   }
   return bridge;
 }
@@ -646,8 +748,7 @@ export class WorldLayout {
       this.root.add(river);
     }
 
-    for (const bridge of BRIDGES)
-      this.root.add(createBridge(bridge.id, bridge.x, bridge.z, bridge.width, bridge.depth));
+    for (const bridge of BRIDGES) this.root.add(createBridge(bridge));
 
     const waterfallMaterial = this.waterMaterial.clone();
     waterfallMaterial.opacity = 0.84;
