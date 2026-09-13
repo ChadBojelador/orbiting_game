@@ -6,7 +6,7 @@ export default defineConfig({
   workers: 1,
   timeout: 45000,
   use: { baseURL: 'http://localhost:5173', trace: 'retain-on-failure' },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chromium' } }],
   webServer: [
     {
       command: 'node --import tsx apps/server/src/main.ts',
