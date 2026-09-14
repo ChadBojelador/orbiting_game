@@ -1,4 +1,5 @@
 import { PlayerState } from '../rooms/lobby-state.js';
+import { randomUUID } from 'node:crypto';
 import type { LobbyState } from '../rooms/lobby-state.js';
 import type { GameplayController } from '../gameplay/gameplay-controller.js';
 
@@ -52,11 +53,12 @@ export class BotRunner {
     if (this.state.players.size + this.count > this.state.maxPlayers)
       throw new Error('Development bots exceed room capacity');
     for (let i = 0; i < this.count; i++) {
-      const id = `bot-${i}`;
+      const id = randomUUID();
       const player = new PlayerState();
       player.playerId = id;
       player.displayName = BOT_NAMES[i % BOT_NAMES.length] ?? `Bot ${i + 1}`;
       player.isConnected = true;
+      player.isBot = true;
       this.state.players.set(id, player);
       this.botIds.push(id);
     }
@@ -71,7 +73,7 @@ export class BotRunner {
     for (const id of this.botIds) {
       const player = this.state.players.get(id);
       // Skip if eliminated or frozen — bots cannot self-rescue.
-      if (!player || player.status === 'eliminated' || player.status === 'frozen') continue;
+      if (!player || player.status !== 'alive') continue;
       // Pick a new random direction occasionally.
       let motion = this.motions.get(id);
       if (!motion || now >= motion.nextChangeAt) {
@@ -108,6 +110,6 @@ export class BotRunner {
 
   /** True if the given player ID belongs to this runner (not a real player). */
   isBot(playerId: string): boolean {
-    return playerId.startsWith('bot-');
+    return this.botIds.includes(playerId);
   }
 }
