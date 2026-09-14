@@ -36,7 +36,7 @@ export class GameScene {
     this.bindControls();this.loop(performance.now());
   }
   getInput(){return this.session.input;}
-  lock():void {this.audio.unlock();if(!this.isTouch)void this.canvas.requestPointerLock()?.catch(()=>{});}
+  lock():void {this.audio.unlock();this.canvas.tabIndex=0;this.canvas.focus();if(!this.isTouch)void this.canvas.requestPointerLock()?.catch(()=>{});}
   destroy():void{
     if(this.destroyed)return;this.destroyed=true;cancelAnimationFrame(this.frame);
     this.cleanups.forEach(c=>c());if(document.pointerLockElement===this.canvas)document.exitPointerLock();
