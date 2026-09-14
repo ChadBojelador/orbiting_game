@@ -117,7 +117,7 @@ export class LobbyAudio {
     music.gain.cancelScheduledValues(context.currentTime);
     sfx.gain.cancelScheduledValues(context.currentTime);
     master.gain.linearRampToValueAtTime(this.settings.isMuted ? 0 : this.settings.volume, at);
-    music.gain.linearRampToValueAtTime(this.isActive ? this.settings.musicVolume * 0.42 : 0, at);
+    music.gain.linearRampToValueAtTime(this.isActive ? this.settings.musicVolume * 0.65 : 0, at);
     sfx.gain.linearRampToValueAtTime(this.settings.sfxVolume, at);
   }
 

@@ -72,6 +72,7 @@ export class GameScene {
     private readonly canvas: HTMLCanvasElement,
     room: LobbyRoom,
     playerId: string,
+    private readonly onMapStatusChange?: () => void,
   ) {
     this.session = new GameSession(room, playerId);
     this.renderer = new WebGLRenderer({
@@ -86,8 +87,12 @@ export class GameScene {
     const sun = new DirectionalLight(0xfff0d0, 2);
     sun.position.set(-30, 60, 20);
     this.scene.add(sun);
-    if (this.session.view.mapId === 'island') this.island = new IslandMap(this.scene);
-    else this.world = new FrostlineMap(this.scene);
+    if (this.session.view.mapId === 'island') {
+      this.island = new IslandMap(this.scene);
+      void this.island.ready.then(() => {
+        if (!this.destroyed) this.onMapStatusChange?.();
+      });
+    } else this.world = new FrostlineMap(this.scene);
     this.scene.add(this.camera);
     this.weapon = new WeaponRenderer(this.camera);
     this.effects = new HitEffects(this.scene);
@@ -218,7 +223,9 @@ export class GameScene {
       input = session.input;
     input.isEnabled = this.isMapReady && !this.isPaused && (this.isTouch || this.isLocked);
     input.sensitivity = this.settings.sensitivity * 0.002;
-    this.audio.volume = this.settings.isMuted ? 0 : this.settings.volume * this.settings.sfxVolume;
+    this.audio.volume = this.settings.isMuted
+      ? 0
+      : Math.min(1, this.settings.volume * this.settings.sfxVolume * 1.35);
     if (p) {
       const predicted = session.prediction.motion;
       const pos = this.presentation.update(

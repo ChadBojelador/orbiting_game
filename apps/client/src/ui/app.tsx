@@ -43,6 +43,7 @@ export function App() {
   const [scene, setScene] = useState<GameScene | null>(null),
     [now, setNow] = useState(0),
     [settings, setSettings] = useState(readSettings);
+  const [, refreshMapStatus] = useState(0);
   const [isSettings, setIsSettings] = useState(false),
     [feed, setFeed] = useState<KillEntry[]>([]);
   const [hit, setHit] = useState({ until: 0, headshot: false }),
@@ -94,7 +95,9 @@ export function App() {
     void import('../game/game-scene.js').then(({ GameScene }) => {
       if (!active) return;
       try {
-        const next = new GameScene(element, room, guest.playerId);
+        const next = new GameScene(element, room, guest.playerId, () =>
+          refreshMapStatus((value) => value + 1),
+        );
         sceneRef.current = next;
         setScene(next);
       } catch {
