@@ -4,7 +4,7 @@ These instructions apply to all AI coding agents working in this repository. Mor
 
 ## Project overview
 
-Ice Ice Water! is a browser-only first-person arena FPS with keyboard/mouse and mobile touch support. Private invite rooms allow solo practice and up to 150 players; duel caps at two. Frostline hosts FFA, balanced-team TDM, and duel with server-authoritative health, weapons, deaths, respawns, and scores. The 2026-09-14 implementation-plan pivot replaces freeze-tag; archived documents do not define current behavior.
+Ice Ice Water! is a browser-only first-person arena FPS with keyboard/mouse and mobile touch support. Private invite rooms allow solo practice and up to 150 players; duel caps at two. Frostline and Island ? Fort host FFA, balanced-team TDM, and duel with server-authoritative health, weapons, deaths, respawns, and scores. The 2026-09-14 implementation-plan pivot replaces freeze-tag; archived documents do not define current behavior.
 
 ## Sources of truth
 
@@ -13,7 +13,7 @@ Ice Ice Water! is a browser-only first-person arena FPS with keyboard/mouse and 
 - `ART_DIRECTION.md`: visual language, asset sourcing, and generation prompts
 - `TASKS.md`: current work and status
 - `implementation_plan.md`: approved FPS execution status and follow-ups
-- `MAP_SPEC.md`: Frostline layout and shared geometry
+- `MAP_SPEC.md`: Frostline/Island layouts and shared geometry
 - `AGENTS.md`: AI-agent working rules
 
 Read `PRD.md` and `ARCHITECTURE.md` before implementing any major feature. Check `TASKS.md` before starting work and keep the relevant entry accurate when requested to manage task status.
@@ -79,6 +79,8 @@ Respect the module responsibilities in `ARCHITECTURE.md`. Do not create alternat
 - Disable player-to-player physical collision unless the PRD and architecture are intentionally revised.
 - Reject gameplay at/after the match deadline and all actions from dead or spectator players. Reject legacy freeze-tag messages.
 - Keep weapon, movement, respawn and mode balance in shared configuration. Record tuning decisions; TDM balances teams, with no Ice-count brackets.
+- Pass the selected map through movement, prediction, spawn height/visibility, and hitscan. Regenerate Island assets with `npm run assets:island`; never independently rescale the rendered mesh or edit generated triangle data.
+- Preserve original supplied GLBs and asset attribution. Keep documented permission gaps visible until reviewed.
 - Optimize only after measurement, except for established 150-player constraints documented in the architecture.
 - Never change architecture or introduce a major dependency without documenting the reason, alternatives, and consequences in `ARCHITECTURE.md`.
 

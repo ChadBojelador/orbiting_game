@@ -1,6 +1,6 @@
 # Ice Ice Water! Art Direction
 
-The approved FPS pivot replaces the cozy freeze-tag island with **Frostline: a bright frozen research facility**. Previous art direction and concept images are historical in `docs/archive` and `assets/concepts`.
+The approved FPS pivot establishes **Frostline: a bright frozen research facility** and the user-approved **Island ? Fort** arena. Previous art direction and concept images are historical in `docs/archive` and `assets/concepts`.
 
 ## Visual language
 - Crisp, readable low-poly painted metal, polar-white walls, navy structural blocks, cyan ice, amber route paint, and coral opponents.
@@ -13,9 +13,9 @@ The approved FPS pivot replaces the cozy freeze-tag island with **Frostline: a b
 - The lobby may borrow broad staging quality from modern multiplayer games but must not copy any third-party layout, faction, character, weapon, icon set, logo, or progression system. Profile, party, social, and cosmetics surfaces must label unavailable backend services honestly.
 
 ## Production assets
-The retained structured brief is [Frostline production prompt](assets/frostline-production-prompt.md). Map, tools, player geometry, tracer/impact effects, and Web Audio cues are original repository-authored assets. Runtime public asset copying is disabled; old music/models/concepts are retained as source references and are not bundled.
+The retained structured brief is [Frostline production prompt](assets/frostline-production-prompt.md). Frostline facility geometry, weapons, combat players, effects, and synthesized combat cues are repository-authored. The supplied wooden house is an eight-metre closed landmark with a shared conservative collider. Island uses the optimized Fort sector with its original painted sand/stone/wood palette and shallow cyan water. The lobby uses the retained project character model and music. Vite public-directory copying is disabled; assets ship only through explicit imports.
 
-Veck.io is a gameplay/visual reference. The user reports reuse permission, but no source path or permission document has yet been supplied. Import only after inspecting the original files and license/permission; record author, source URL/path, permission scope, attribution, modification, and runtime destination in [asset provenance](assets/asset-provenance.md). Do not infer a reuse license from public game downloads or third-party mirrors.
+Veck.io is a gameplay/visual reference. The user confirmed reuse authorization for both supplied GLBs. Embedded Sketchfab attribution, modifications, hashes, and the unresolved underlying permission evidence are recorded in [asset provenance](assets/asset-provenance.md). The Island source calls itself a reupload; that metadata alone does not establish original-rightsholder permission. No assets were downloaded from Veck.io.
 
 ## Constraints and review
-Share geometry/materials, cap transient effects, and avoid imported models until provenance is recorded. Rendered cover and collision must match `packages/shared/src/simulation/arena.ts`. Decorative paint/trim cannot create misleading cover. Color is supplemented by text, protection labels, damage direction, silhouettes, and sound. Device performance, full crowd readability, and final visual polish require playtesting.
+Share geometry/materials, cap transient effects, and keep recorded attribution with imported models. Rendered cover and collision must match the selected shared map definition. Island uses a reproducible geometry/collision bake; see MAP_SPEC.md. Decorative paint/trim cannot create misleading cover. Color is supplemented by text, protection labels, damage direction, silhouettes, and sound. Device performance, full crowd readability, and final visual polish require playtesting.

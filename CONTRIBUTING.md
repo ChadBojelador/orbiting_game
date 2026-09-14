@@ -32,8 +32,8 @@ Branch prefixes:
 
 Examples:
 
-- `feature/deep-freeze-state-machine`
-- `fix/reconnect-frozen-player`
+- `feature/fps-match-state-machine`
+- `fix/reconnect-dead-player`
 - `refactor/spatial-grid-query`
 - `docs/local-setup`
 
@@ -50,9 +50,9 @@ type(scope): concise imperative summary
 Examples:
 
 ```text
-feat(server): add deep freeze deadline
+feat(server): enforce arena match deadline
 fix(client): reconcile protected player state
-test(server): cover simultaneous rescue deadline
+test(server): cover score-limit deadline ordering
 docs: clarify local database setup
 ```
 

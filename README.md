@@ -2,7 +2,7 @@
 
 A browser arena FPS with desktop and mobile touch controls, private invite rooms, and server-authoritative combat.
 
-The implementation plan's FPS pivot is implemented as a playable prototype: Frostline arena, movement/jump/slide/crouch/sprint, six weapons, reload/ADS/headshots, death/respawn, FFA/TDM/duel scoring, settings, scoreboard, sound cues, and PostgreSQL summaries. Freeze-tag is replaced; historical specifications and superseded sources/tests are retained for reference.
+The implementation plan's FPS pivot is implemented as a playable prototype: Frostline and Island ? Fort arenas, movement/jump/slide/crouch/sprint, six weapons, reload/ADS/headshots, death/respawn, FFA/TDM/duel scoring, settings, scoreboard, sound cues, and PostgreSQL summaries. Freeze-tag is replaced; historical specifications and superseded sources/tests are retained for reference.
 
 ## Run locally
 Use **Node 24.18.0**, **npm 11.17.0**, Docker Desktop with Linux containers, and a WebGL 2 browser.
@@ -17,7 +17,7 @@ npm run dev
 
 Open **http://localhost:5173** (or **http://127.0.0.1:5173**). Server: **127.0.0.1:2567**. Keep the terminal running. On PowerShell, use `npm.cmd` if `npm.ps1` is blocked. Setup creates an ignored `.env` and preserves an existing one. Never put secrets in browser-visible `VITE_` variables.
 
-The existing local database uses port 55432. Docker must be running. If port 5432 is reserved, set both `POSTGRES_PORT` and the port in `DATABASE_URL` to 55432. `db:down` retains data. Gameplay runs without PostgreSQL, but summary writes fail and `/ready` reports 503. The FPS migration adds new tables and preserves freeze-tag history.
+The existing local database uses port 55432. Docker must be running. If port 5432 is reserved, set both `POSTGRES_PORT` and the port in `DATABASE_URL` to 55432. `db:down` retains data. Gameplay runs without PostgreSQL, but summary writes fail and `/ready` reports 503. Migrations 003/004 add FPS tables and map identity while preserving freeze-tag history.
 
 ## Play
 1. Choose a name, select a mode and primary weapon, then create a private room.
@@ -48,6 +48,7 @@ Optional `DEV_BOT_COUNT=5` fills five seats with wandering targets. Bots have no
 | `npm run lint` | ESLint and Prettier |
 | `npm run typecheck` | Strict TypeScript, including tests |
 | `npm run build` | All production packages and SQL migrations |
+| `npm run assets:island` | Rebuild optimized Fort geometry, collision and spawns from supplied source |
 | `npm run db:migrate` | Transactional checksummed migrations |
 
 Playwright starts an isolated Vite on 5174 and a real server inside the test worker on 2568, with zero bots and a test persistence stub. Its test-only server fixture controls poses/deadlines for combat/results assertions; no control endpoint or client-authoritative shortcut ships. Install Chromium with `npx playwright install chromium`, or set `PLAYWRIGHT_CHANNEL=chrome`/`msedge` for an installed signed browser. Restricted Windows runners need permission to terminate test child processes. Touch input is tested through CDP multitouch; this runner may report no touch capability despite emulation.
@@ -77,6 +78,6 @@ Routes remain `/health`, `/ready`, `POST /api/guest-session`, `POST /api/rooms`,
 ## Sources of truth
 [PRD](PRD.md), [architecture](ARCHITECTURE.md), [map specification](MAP_SPEC.md), [art direction](ART_DIRECTION.md), [implementation status](implementation_plan.md), [tasks and verification](TASKS.md), [agent rules](AGENTS.md), [contributing](CONTRIBUTING.md).
 
-`apps/client` renders and captures input; `apps/server` owns outcomes; `packages/shared` holds safe types/constants/pure simulation; `tests` holds browser/load scenarios. Original procedural geometry/audio ships without copied Veck.io assets. User-reported reuse permission is awaiting source files and license inspection; see [asset provenance](assets/asset-provenance.md).
+`apps/client` renders and captures input; `apps/server` owns outcomes; `packages/shared` holds safe types/constants/pure simulation; `tests` holds browser/load scenarios. Original procedural weapons/facility/combat audio ships alongside the authorized Island Fort derivative and wooden house. Lobby character/music are retained project assets. Embedded source/license metadata and outstanding permission evidence are recorded; see [asset provenance](assets/asset-provenance.md).
 
 Contributors: Chad Bojelador and Franco Perez.

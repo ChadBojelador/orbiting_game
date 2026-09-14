@@ -14,23 +14,23 @@ interface LobbyPreviewProps {
 }
 
 const CAMERA_POSES: Record<LobbySection, { position: THREE.Vector3; target: THREE.Vector3 }> = {
-  main: { position: new THREE.Vector3(4.9, 2.9, 7.2), target: new THREE.Vector3(0.65, 1.25, 0) },
-  play: { position: new THREE.Vector3(4.6, 2.75, 6.8), target: new THREE.Vector3(0.62, 1.2, 0) },
+  main: { position: new THREE.Vector3(4.15, 2.7, 6.05), target: new THREE.Vector3(0.55, 1.2, 0) },
+  play: { position: new THREE.Vector3(3.95, 2.6, 5.75), target: new THREE.Vector3(0.52, 1.17, 0) },
   modes: {
-    position: new THREE.Vector3(5.3, 3.15, 7.8),
-    target: new THREE.Vector3(0.45, 1.3, -0.2),
+    position: new THREE.Vector3(4.6, 2.95, 6.65),
+    target: new THREE.Vector3(0.42, 1.25, -0.15),
   },
   loadout: {
-    position: new THREE.Vector3(3.15, 2.05, 4.25),
-    target: new THREE.Vector3(0.35, 1.18, 0.05),
+    position: new THREE.Vector3(2.75, 2.1, 3.75),
+    target: new THREE.Vector3(0.3, 1.25, 0.08),
   },
   customize: {
-    position: new THREE.Vector3(3.75, 2.42, 5.25),
-    target: new THREE.Vector3(0.25, 1.18, 0),
+    position: new THREE.Vector3(3.2, 2.4, 4.65),
+    target: new THREE.Vector3(0.24, 1.18, 0),
   },
-  party: { position: new THREE.Vector3(4.7, 2.82, 6.95), target: new THREE.Vector3(0.62, 1.22, 0) },
-  profile: { position: new THREE.Vector3(3.6, 2.5, 5.5), target: new THREE.Vector3(0.25, 1.38, 0) },
-  settings: { position: new THREE.Vector3(5.2, 3, 7.65), target: new THREE.Vector3(0.55, 1.3, 0) },
+  party: { position: new THREE.Vector3(4.05, 2.65, 5.9), target: new THREE.Vector3(0.54, 1.19, 0) },
+  profile: { position: new THREE.Vector3(3.15, 2.4, 4.7), target: new THREE.Vector3(0.23, 1.38, 0) },
+  settings: { position: new THREE.Vector3(4.55, 2.9, 6.55), target: new THREE.Vector3(0.48, 1.26, 0) },
 };
 
 export function LobbyPreview({ section, weapon, reducedEffects, isRoomActive }: LobbyPreviewProps) {
@@ -209,11 +209,11 @@ class LobbyScene {
     floor.position.y = -0.18;
     floor.receiveShadow = true;
     this.scene.add(floor);
-    const inset = new THREE.Mesh(new THREE.CylinderGeometry(3.25, 3.25, 0.08, 48), darkSteel);
+    const inset = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.7, 0.08, 48), darkSteel);
     inset.position.y = 0.005;
     inset.receiveShadow = true;
     this.scene.add(inset);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(3.03, 0.055, 8, 64), this.ringMaterial);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.52, 0.05, 8, 64), this.ringMaterial);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.075;
     this.scene.add(ring);
@@ -388,8 +388,36 @@ class LobbyScene {
       const factory = await loadCharacterModel();
       if (this.isDestroyed) return;
       this.character = factory.instantiate('#dbeef2', 'Idle');
+      this.character.root.scale.setScalar(0.26);
       this.character.root.rotation.y = Math.PI;
       this.character.root.position.y = 0.02;
+      const limbMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1a4960,
+        roughness: 0.48,
+        metalness: 0.24,
+      });
+      this.character.root.traverse((object) => {
+        if (object instanceof THREE.Mesh && object.name !== 'Sphere002')
+          object.material = limbMaterial;
+      });
+      const chest = new THREE.Mesh(
+        new THREE.BoxGeometry(0.58, 0.42, 0.1),
+        new THREE.MeshStandardMaterial({ color: 0x17394b, metalness: 0.42, roughness: 0.32 }),
+      );
+      chest.position.set(0, 1.27, 0.28);
+      const visor = new THREE.Mesh(
+        new THREE.SphereGeometry(0.28, 18, 12),
+        new THREE.MeshStandardMaterial({
+          color: 0x07131d,
+          emissive: 0x36cce3,
+          emissiveIntensity: 0.45,
+          metalness: 0.72,
+          roughness: 0.15,
+        }),
+      );
+      visor.scale.set(1, 0.48, 0.26);
+      visor.position.set(0, 1.78, 0.27);
+      this.stage.add(chest, visor);
       if (this.placeholder) {
         this.placeholder.removeFromParent();
         this.disposeObject(this.placeholder);
@@ -439,8 +467,9 @@ class LobbyScene {
     if (id === 'sniper') box(0.14, 0.14, 0.38, 0, 0.29, -0.42, body);
     if (id === 'shotgun') box(0.28, 0.08, 0.3, 0, -0.08, -0.6, accent);
     group.name = `${WEAPONS[id].name} lobby preview`;
-    group.position.set(0.34, 1.19, 0.16);
-    group.rotation.set(0.08, -0.24, -0.13);
+    group.position.set(0.32, 1.35, 0.48);
+    group.rotation.set(0.05, 1.2, -0.17);
+    group.scale.setScalar(0.58);
     return group;
   }
 

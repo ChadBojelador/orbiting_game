@@ -3,13 +3,20 @@ export function SettingsPanel({
   value,
   onChange,
   onClose,
+  isEmbedded = false,
 }: {
   value: FpsSettings;
   onChange: (v: FpsSettings) => void;
   onClose: () => void;
+  isEmbedded?: boolean;
 }) {
   return (
-    <section className="settings-panel" role="dialog" aria-label="Settings" aria-modal="true">
+    <section
+      className="settings-panel"
+      role={isEmbedded ? 'region' : 'dialog'}
+      aria-label="Settings"
+      aria-modal={isEmbedded ? undefined : 'true'}
+    >
       <h2>Settings</h2>
       <label htmlFor="controls">Controls</label>
       <select

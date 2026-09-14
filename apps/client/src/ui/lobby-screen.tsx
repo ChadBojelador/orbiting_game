@@ -184,9 +184,17 @@ export function LobbyScreen(props: LobbyScreenProps) {
         aria-busy={isBusy}
         key={`${section}-${room ? 'room' : 'solo'}-${guest ? 'guest' : 'new'}`}
       >
-        {!guest ? (
-          <IdentityPanel name={name} setName={setName} identify={identify} isBusy={isBusy} />
-        ) : room && view ? (
+      {!guest ? (
+        <IdentityPanel name={name} setName={setName} identify={identify} isBusy={isBusy} />
+      ) : room && !view ? (
+        <>
+          <div className="panel-kicker">Secure room link</div>
+          <h1>Joining room</h1>
+          <p className="panel-lede" role="status">
+            Synchronizing the private lobby and operator roster…
+          </p>
+        </>
+      ) : room && view ? (
           <RoomAwarePanel
             section={section}
             guest={guest}
@@ -385,6 +393,7 @@ function SoloPanel(props: SoloPanelProps) {
         value={props.settings}
         onChange={props.onSettings}
         onClose={() => props.onSection('play')}
+        isEmbedded
       />
     );
   if (section === 'main')
@@ -514,6 +523,7 @@ function RoomAwarePanel(props: RoomAwareProps) {
         value={props.settings}
         onChange={props.onSettings}
         onClose={() => props.onSection('party')}
+        isEmbedded
       />
     );
   const seconds = Math.max(0, Math.ceil((view.phaseDeadline - props.now) / 1000));
@@ -782,7 +792,11 @@ function PartyDock({
   onOpen: () => void;
 }) {
   const members = view
-    ? connected.slice(0, 4)
+    ? [...connected]
+        .sort((left, right) =>
+          left.playerId === guest.playerId ? -1 : right.playerId === guest.playerId ? 1 : 0,
+        )
+        .slice(0, 4)
     : [
         {
           playerId: guest.playerId,
