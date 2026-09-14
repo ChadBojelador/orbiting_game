@@ -47,6 +47,7 @@ export function App(){
   useEffect(()=>{saveSettings(settings);if(scene)scene.settings=settings;},[settings,scene]);
   useEffect(()=>{
     if(!scene)return;
+    scene.isPaused=isSettings;
     if(isSettings){document.exitPointerLock();scene.getInput().reset();scene.getInput().isEnabled=false;}
     else scene.getInput().isEnabled=scene.isTouch||scene.isLocked;
   },[isSettings,scene]);
@@ -90,7 +91,7 @@ export function App(){
   const settingsPanel=isSettings&&<div className="modal-backdrop"><SettingsPanel value={settings} onChange={setSettings} onClose={()=>setIsSettings(false)}/></div>;
   if(isInGame&&view&&guest){
     const complete=view.phase==='finished'||view.phase==='intermission';
-    return <main className="game-shell">
+    return <main className={scene?.isTouch?'game-shell is-touch':'game-shell'}>
       <canvas className="game-canvas" ref={canvas} aria-label="3D game arena"/>
       {!complete&&<GameHud view={view} localPlayerId={guest.playerId} serverNow={now} feed={feed} hitUntil={hit.until} damageUntil={damage.until} damageAngle={damage.angle} headshot={hit.headshot} crosshair={settings.crosshair}/>}
       {scene?.isTouch&&!complete&&!isSettings&&<TouchControls input={scene.getInput()} slot={local?.currentWeaponSlot??0}/>}

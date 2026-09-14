@@ -13,7 +13,11 @@ import { readSettings,type FpsSettings } from './fps-settings.js';
 import { renderPixelRatio } from './render-performance.js';
 export class GameScene {
   readonly session:GameSession;settings:FpsSettings=readSettings();isLocked=false;
-  readonly isTouch=matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints>0;
+  isPaused=false;
+  get isTouch():boolean {
+    if(this.settings.controls!=='auto')return this.settings.controls==='touch';
+    return matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints>0 || innerWidth<=800 || innerHeight<=500;
+  }
   private readonly scene=new Scene();private readonly camera=new PerspectiveCamera(96,1,0.05,320);
   private renderer:WebGLRenderer;private world?:FrostlineMap;private island?:IslandMap;
   private cameraMotion=new FirstPersonCamera();private presentation=new LocalPresentation();
@@ -73,6 +77,7 @@ export class GameScene {
     if(this.destroyed)return;
     const seconds=Math.min(0.05,Math.max(0,(now-this.previous)/1000));this.previous=now;
     const session=this.session,p=session.local(),serverNow=session.serverNow(),input=session.input;
+    input.isEnabled=!this.isPaused&&(this.isTouch||this.isLocked);
     input.sensitivity=this.settings.sensitivity*0.002;this.audio.volume=this.settings.volume;
     if(p){
       const predicted=session.prediction.motion;

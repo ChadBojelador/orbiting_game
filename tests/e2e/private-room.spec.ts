@@ -67,6 +67,10 @@ test('desktop guests play, shoot, die, respawn, see scores and finish',async({pa
 test('mobile supports simultaneous movement, look and fire without overflow',async({browser})=>{
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   const page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  const cdp=await context.newCDPSession(page);
+  // Signed desktop Chrome in this runner may ignore context-level hasTouch.
+  // Enable actual CDP touch emulation before loading the client.
+  await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
   try{
     await page.goto('/');await page.getByLabel('Display name').fill('<>');await page.getByRole('button',{name:'Let’s go'}).tap();await expect(page.getByRole('alert')).toContainText('2–20');
     await page.getByLabel('Display name').fill('Touch Player');await page.getByRole('button',{name:'Let’s go'}).tap();
@@ -76,7 +80,7 @@ test('mobile supports simultaneous movement, look and fire without overflow',asy
     await expect(page.getByRole('button',{name:'Fire',exact:true})).toBeVisible();
     const p=room.state.players.get(room.state.hostPlayerId)!,before={x:p.x,z:p.z,yaw:p.yaw};
     const stick=(await page.getByLabel('Movement joystick').boundingBox())!,fire=(await page.getByRole('button',{name:'Fire',exact:true}).boundingBox())!;
-    const cdp=await context.newCDPSession(page),x=stick.x+stick.width/2,y=stick.y+stick.height/2;
+    const x=stick.x+stick.width/2,y=stick.y+stick.height/2;
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x,y}]});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:1,x,y:y-40}]});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x,y:y-40},{id:2,x:200,y:350}]});
@@ -87,9 +91,12 @@ test('mobile supports simultaneous movement, look and fire without overflow',asy
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     await page.getByRole('button',{name:'Weapon',exact:true}).tap();await expect(page.locator('.ammo-display')).toContainText('Snowmelt');
     await page.getByRole('button',{name:'Scores',exact:true}).tap();await expect(page.getByRole('region',{name:'Scoreboard'})).toBeVisible();await page.getByRole('button',{name:'Scores',exact:true}).tap();
+    await expect(page.getByRole('region',{name:'Scoreboard'})).toHaveCount(0);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:'test-results/fps-mobile.png'});
-    await page.setViewportSize({width:844,height:390});await page.screenshot({path:'test-results/fps-mobile-landscape.png'});
+    await page.setViewportSize({width:844,height:390});
+    await expect(page.getByRole('button',{name:'Fire',exact:true})).toBeVisible();
+    await page.screenshot({path:'test-results/fps-mobile-landscape.png'});
     await page.getByRole('button',{name:'Leave room'}).tap();expect(errors).toEqual([]);
   }finally{await context.close();}
 });

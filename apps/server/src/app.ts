@@ -23,7 +23,8 @@ export async function startServer(
 ) {
   // The measured 150-player initial state exceeds the encoder's 16 KiB default.
   // This is Colyseus's explicit process-wide allocation setting.
-  Encoder.BUFFER_SIZE = 32 * 1024;
+  // The measured 150-player FPS schema exceeds the previous 32 KiB buffer.
+  Encoder.BUFFER_SIZE = 64 * 1024;
   const sessions = new GuestSessions(config.signingSecret, config.sessionTtlSeconds);
   const directory = new RoomDirectory();
   const sessionRate = new RateLimiter(600, 60000);
