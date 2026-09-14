@@ -1,225 +1,120 @@
-import { ARENA, GAMEPLAY } from '@ice-water/shared';
-import * as THREE from 'three';
-import type { LobbyRoom } from '../network/lobby-client.js';
+import { GAMEPLAY,WEAPONS,surfaceAt,type PlayerView } from '@ice-water/shared';
+import { Scene,PerspectiveCamera,WebGLRenderer,Color,Fog,HemisphereLight,DirectionalLight,Group,Mesh,BoxGeometry,MeshStandardMaterial,SRGBColorSpace } from 'three';
 import { GameSession } from '../network/game-session.js';
-import { LocalPresentation, type PresentationMotion } from '../network/player-motion.js';
-import { WorldLayout, WORLD_CAMERA_FAR, worldHeightAt } from '../world/world-layout.js';
-import { loadCharacterModel } from './character-model.js';
-import { FrostProjectileRenderer } from './frost-projectiles.js';
-import { PlayerEntityManager } from './player-entity.js';
+import type { LobbyRoom } from '../network/lobby-client.js';
+import { LocalPresentation } from '../network/player-motion.js';
+import { FrostlineMap } from '../world/frostline-map.js';
+import { FirstPersonCamera } from './first-person-camera.js';
+import { WeaponRenderer } from './weapon-renderer.js';
+import { HitEffects } from './hit-effects.js';
+import { AudioManager } from '../audio/audio-manager.js';
+import { readSettings,type FpsSettings } from './fps-settings.js';
 import { renderPixelRatio } from './render-performance.js';
-import { ThirdPersonCamera } from './third-person-camera.js';
-
-const CAMERA_FOV = 52;
-
 export class GameScene {
-  private readonly session: GameSession;
-  private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, WORLD_CAMERA_FAR);
-  private readonly renderer: THREE.WebGLRenderer;
-  private readonly world: WorldLayout;
-  private readonly followCamera = new ThirdPersonCamera();
-  private readonly frostProjectiles = new FrostProjectileRenderer(this.scene);
-  private readonly localPresentation = new LocalPresentation();
-  private readonly positions = new Map<string, PresentationMotion>();
-  private readonly cameraTarget = new THREE.Vector3();
-  private playerEntities?: PlayerEntityManager;
-  private destroyed = false;
-  private animationFrame = 0;
-  private previousFrameTime = performance.now();
-  private previousPhase = '';
-  private readonly cleanups: (() => void)[] = [];
-
-  constructor(
-    private readonly canvas: HTMLCanvasElement,
-    room: LobbyRoom,
-    playerId: string,
-    private readonly onStateChange?: (phase: string) => void,
-  ) {
-    this.session = new GameSession(room, playerId);
-    this.renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: false,
-      powerPreference: 'high-performance',
-    });
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
-
-    this.scene.background = new THREE.Color(0xaeddf0);
-    this.scene.fog = new THREE.Fog(0xc8e9ec, 250, 560);
-    this.configureLighting();
-    this.world = new WorldLayout(this.scene, this.session.view.arenaHalfExtent || ARENA.halfExtent);
-    this.bindResize();
-    this.bindCameraControls();
-    void this.initializePlayers();
-    this.loop(performance.now());
+  readonly session:GameSession;settings:FpsSettings=readSettings();isLocked=false;
+  readonly isTouch=matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints>0;
+  private readonly scene=new Scene();private readonly camera=new PerspectiveCamera(96,1,0.05,140);
+  private renderer:WebGLRenderer;private world:FrostlineMap;
+  private cameraMotion=new FirstPersonCamera();private presentation=new LocalPresentation();
+  private weapon:WeaponRenderer;private effects:HitEffects;private audio=new AudioManager();
+  private readonly players=new Map<string,Group>();private readonly materials=new Map<string,MeshStandardMaterial>();
+  private body=new BoxGeometry(0.65,1.15,0.42);private head=new BoxGeometry(0.5,0.45,0.48);
+  private cleanups:(()=>void)[]=[];private frame=0;private destroyed=false;private previous=performance.now();private lastStep=0;
+  private remoteSteps=new Map<string,number>();private wasGrounded=true;private wasSliding=false;private wasReloading=false;
+  constructor(private readonly canvas:HTMLCanvasElement,room:LobbyRoom,playerId:string){
+    this.session=new GameSession(room,playerId);
+    this.renderer=new WebGLRenderer({canvas,antialias:!this.isTouch,powerPreference:'high-performance'});
+    this.renderer.outputColorSpace=SRGBColorSpace;
+    this.scene.background=new Color(0xc5e4ef);this.scene.fog=new Fog(0xc5e4ef,65,135);
+    this.scene.add(new HemisphereLight(0xedfaff,0x41617b,2.5));
+    const sun=new DirectionalLight(0xfff0d0,2);sun.position.set(-30,60,20);this.scene.add(sun);
+    this.world=new FrostlineMap(this.scene);this.scene.add(this.camera);
+    this.weapon=new WeaponRenderer(this.camera);this.effects=new HitEffects(this.scene);
+    this.session.input.isEnabled=this.isTouch;
+    const resize=()=>{const w=canvas.clientWidth||innerWidth,h=canvas.clientHeight||innerHeight;this.renderer.setPixelRatio(Math.min(this.isTouch?1.4:2,renderPixelRatio(w,h,devicePixelRatio)));this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();};
+    const observer=new ResizeObserver(resize);observer.observe(canvas);resize();this.cleanups.push(()=>observer.disconnect());
+    this.bindControls();this.loop(performance.now());
   }
-
-  destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
-    cancelAnimationFrame(this.animationFrame);
-    this.session.destroy();
-    for (const cleanup of this.cleanups) cleanup();
-    this.playerEntities?.destroy();
-    this.frostProjectiles.destroy();
-    this.world.destroy();
-    this.renderer.dispose();
+  getInput(){return this.session.input;}
+  lock():void {this.audio.unlock();this.canvas.tabIndex=0;this.canvas.focus();if(!this.isTouch)void this.canvas.requestPointerLock()?.catch(()=>{});}
+  destroy():void{
+    if(this.destroyed)return;this.destroyed=true;cancelAnimationFrame(this.frame);
+    this.cleanups.forEach(c=>c());if(document.pointerLockElement===this.canvas)document.exitPointerLock();
+    this.session.destroy();this.weapon.destroy();this.effects.destroy();this.world.destroy();this.audio.destroy();
+    this.body.dispose();this.head.dispose();this.materials.forEach(m=>m.dispose());this.renderer.dispose();
   }
-
-  getInput() {
-    return this.session.input;
+  private bindControls():void {
+    const input=this.session.input;
+    const lock=()=>{this.isLocked=document.pointerLockElement===this.canvas;input.isEnabled=this.isTouch||this.isLocked;if(!this.isLocked)input.reset();};
+    const down=(e:PointerEvent)=>{this.audio.unlock();if(e.pointerType==='touch')return;if(!this.isLocked){this.lock();return;}if(e.button===0)input.pressFire();if(e.button===2)input.isAds=true;};
+    const up=(e:PointerEvent)=>{if(e.pointerType==='touch')return;if(e.button===0)input.isFiring=false;if(e.button===2)input.isAds=false;};
+    const move=(e:MouseEvent)=>{if(this.isLocked)input.look(e.movementX,e.movementY);};
+    const wheel=(e:WheelEvent)=>{if(this.isLocked){e.preventDefault();input.switchWeapon((this.session.local()?.currentWeaponSlot??0)+(e.deltaY>0?1:-1));}};
+    const context=(e:Event)=>e.preventDefault();
+    this.canvas.addEventListener('pointerdown',down);window.addEventListener('pointerup',up);document.addEventListener('mousemove',move);
+    document.addEventListener('pointerlockchange',lock);this.canvas.addEventListener('wheel',wheel,{passive:false});this.canvas.addEventListener('contextmenu',context);
+    const unlockAudio=()=>this.audio.unlock();window.addEventListener('pointerdown',unlockAudio,{once:true});
+    this.cleanups.push(()=>{this.canvas.removeEventListener('pointerdown',down);window.removeEventListener('pointerup',up);document.removeEventListener('mousemove',move);document.removeEventListener('pointerlockchange',lock);this.canvas.removeEventListener('wheel',wheel);this.canvas.removeEventListener('contextmenu',context);window.removeEventListener('pointerdown',unlockAudio);});
   }
-
-  private configureLighting(): void {
-    const hemisphere = new THREE.HemisphereLight(0xcaf4ff, 0x658060, 1.65);
-    hemisphere.name = 'sky-fill';
-    this.scene.add(hemisphere);
-
-    const sun = new THREE.DirectionalLight(0xffe3b5, 2.35);
-    sun.name = 'warm-sun';
-    sun.position.set(-85, 135, 75);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -220;
-    sun.shadow.camera.right = 220;
-    sun.shadow.camera.top = 220;
-    sun.shadow.camera.bottom = -220;
-    sun.shadow.camera.near = 30;
-    sun.shadow.camera.far = 520;
-    sun.shadow.bias = -0.0004;
-    this.scene.add(sun);
+  private model(player:PlayerView):Group {
+    let model=this.players.get(player.playerId);if(model)return model;
+    model=new Group();
+    const torso=new Mesh(this.body,this.material('body',0x308cad));torso.position.y=0.9;
+    const head=new Mesh(this.head,this.material('head',0xedf6fa));head.position.y=1.575;
+    model.add(torso,head);this.scene.add(model);this.players.set(player.playerId,model);return model;
   }
-
-  private async initializePlayers(): Promise<void> {
-    const characterModel = await loadCharacterModel().catch((error: unknown) => {
-      console.warn(error);
-      return undefined;
-    });
-    if (this.destroyed) return;
-    this.playerEntities = new PlayerEntityManager(this.scene, characterModel);
+  private material(key:string,color:number):MeshStandardMaterial {
+    let material=this.materials.get(key);if(!material){material=new MeshStandardMaterial({color,roughness:0.65});this.materials.set(key,material);}return material;
   }
-
-  private bindResize(): void {
-    const resize = () => {
-      const parent = this.canvas.parentElement;
-      if (!parent) return;
-      const width = Math.max(1, parent.clientWidth);
-      const height = Math.max(1, parent.clientHeight);
-      this.renderer.setPixelRatio(renderPixelRatio(width, height, window.devicePixelRatio));
-      this.renderer.setSize(width, height, false);
-      this.camera.aspect = width / height;
-      this.camera.updateProjectionMatrix();
-    };
-    const observer = new ResizeObserver(resize);
-    if (this.canvas.parentElement) observer.observe(this.canvas.parentElement);
-    resize();
-    this.cleanups.push(() => observer.disconnect());
-  }
-
-  private loop(now: number): void {
-    if (this.destroyed) return;
-    const deltaSeconds = Math.min(0.05, Math.max(0, (now - this.previousFrameTime) / 1000));
-    this.previousFrameTime = now;
-    const view = this.session.view;
-    if (view.phase !== this.previousPhase) {
-      this.previousPhase = view.phase;
-      this.onStateChange?.(view.phase);
-    }
-    this.world.setHalfExtent(view.arenaHalfExtent || ARENA.halfExtent);
-    this.world.update(now / 1000);
-
-    const serverNow = this.session.serverNow();
-    const renderTime = serverNow - GAMEPLAY.interpolationMs;
-    const positions = this.positions;
-    positions.clear();
-    const localPlayer = this.session.local();
-    for (const player of view.players) {
-      if (player.playerId === this.session.playerId) {
-        const prediction = this.session.prediction;
-        positions.set(
-          player.playerId,
-          this.localPresentation.update(
-            {
-              x: prediction.position.x,
-              y: prediction.y,
-              z: prediction.position.z,
-              yaw: prediction.yaw,
-            },
-            deltaSeconds,
-            !this.session.canMove(player),
-          ),
-        );
-        continue;
+  private loop(now:number):void{
+    if(this.destroyed)return;
+    const seconds=Math.min(0.05,Math.max(0,(now-this.previous)/1000));this.previous=now;
+    const session=this.session,p=session.local(),serverNow=session.serverNow(),input=session.input;
+    input.sensitivity=this.settings.sensitivity*0.002;this.audio.volume=this.settings.volume;
+    if(p){
+      const predicted=session.prediction.motion;
+      const pos=this.presentation.update({...predicted,yaw:input.cameraYaw},seconds,p.status!=='alive');
+      const eye=this.cameraMotion.update(pos,predicted,seconds,this.settings.reducedEffects);
+      this.camera.position.set(eye.x,eye.y,eye.z);this.camera.rotation.order='YXZ';this.camera.rotation.set(input.cameraPitch,input.cameraYaw,0);
+      const fov=input.isAds?WEAPONS[p.weaponId].adsZoomFov:this.settings.fov;
+      this.camera.fov+=(fov-this.camera.fov)*(1-Math.exp(-18*seconds));this.camera.updateProjectionMatrix();
+      this.weapon.update(p.weaponId,now,seconds,input.isAds,p.reloadUntil>serverNow,this.settings.reducedEffects);
+      this.audio.listener(eye,input.cameraYaw);
+      if(p.status==='alive'){
+        if(Math.hypot(predicted.velocityX,predicted.velocityZ)>1 && predicted.isGrounded && now-this.lastStep>320){this.audio.play(surfaceAt(predicted));this.lastStep=now;}
+        if(this.wasGrounded&&!predicted.isGrounded)this.audio.play('jump');
+        if(!this.wasGrounded&&predicted.isGrounded)this.audio.play('land');
+        if(!this.wasSliding&&predicted.isSliding)this.audio.play('slide');
+        if(!this.wasReloading&&p.reloadUntil>serverNow)this.audio.play('reload');
       }
-      const sample = this.session.remotes
-        .get(player.playerId)
-        ?.at(renderTime, view.arenaHalfExtent || ARENA.halfExtent);
-      positions.set(
-        player.playerId,
-        sample
-          ? { x: sample.x, y: sample.y, z: sample.z, yaw: sample.yaw }
-          : { x: player.x, y: player.y, z: player.z, yaw: player.yaw },
-      );
+      this.wasGrounded=predicted.isGrounded;this.wasSliding=predicted.isSliding;this.wasReloading=p.reloadUntil>serverNow;
     }
-    this.playerEntities?.update(view, positions, this.session.playerId, deltaSeconds);
-    this.frostProjectiles.update(view.projectiles, serverNow, view.serverTime);
-
-    const localPosition = localPlayer
-      ? (positions.get(localPlayer.playerId) ?? {
-          x: 0,
-          y: worldHeightAt(0, 8),
-          z: 8,
-          yaw: 0,
-        })
-      : { x: 0, y: worldHeightAt(0, 8), z: 8, yaw: 0 };
-    const cameraTarget = this.cameraTarget.set(
-      localPosition.x,
-      localPosition.y + 1.35,
-      localPosition.z,
-    );
-    const cameraPose = this.followCamera.update(cameraTarget, deltaSeconds, [], (x, z) =>
-      worldHeightAt(x, z),
-    );
-    this.session.input.cameraYaw = cameraPose.yaw;
-    this.camera.position.set(cameraPose.position.x, cameraPose.position.y, cameraPose.position.z);
-    this.camera.lookAt(cameraPose.target.x, cameraPose.target.y, cameraPose.target.z);
-    this.renderer.render(this.scene, this.camera);
-    this.animationFrame = requestAnimationFrame((frameTime) => this.loop(frameTime));
-  }
-
-  private bindCameraControls(): void {
-    const onPointerDown = (event: PointerEvent) => {
-      if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return;
-      if (event.button === 2) {
-        event.preventDefault();
-        this.canvas.setPointerCapture(event.pointerId);
-        this.session.input.isFrostHeld = true;
-        this.session.input.pressFrostThrow();
-        return;
+    for(const remote of session.view.players){
+      if(remote.playerId===session.playerId)continue;
+      const model=this.model(remote);model.visible=remote.status==='alive';
+      const position=session.remotes.get(remote.playerId)?.at(serverNow-GAMEPLAY.interpolationMs)??remote;
+      model.position.set(position.x,position.y,position.z);model.rotation.y=position.yaw;
+      model.scale.y=remote.isCrouching||remote.isSliding?0.61:1;
+      const friend=session.view.gameMode==='tdm'&&remote.team===p?.team;
+      const key=remote.protectedUntil>serverNow?'protected':friend?'friend':'enemy';
+      (model.children[0] as Mesh).material=this.material(key,key==='protected'?0xf3b747:friend?0x308cad:0xe96958);
+      if(model.visible&&Math.hypot(remote.velocityX,remote.velocityZ)>1&&remote.isGrounded&&p&&Math.hypot(remote.x-p.x,remote.z-p.z)<35&&now-(this.remoteSteps.get(remote.playerId)??0)>380){
+        this.audio.play(surfaceAt(remote),remote);this.remoteSteps.set(remote.playerId,now);
       }
-      if (event.button !== 0) return;
-    };
-    const onPointerMove = (event: PointerEvent) => {
-      this.followCamera.orbit(event.movementX, event.movementY);
-    };
-    const onPointerUp = (event: PointerEvent) => {
-      if (event.button === 2) this.session.input.isFrostHeld = false;
-    };
-    const onContextMenu = (event: MouseEvent) => event.preventDefault();
-    this.canvas.addEventListener('pointerdown', onPointerDown);
-    this.canvas.addEventListener('pointermove', onPointerMove);
-    this.canvas.addEventListener('pointerup', onPointerUp);
-    this.canvas.addEventListener('contextmenu', onContextMenu);
-    this.cleanups.push(() => {
-      this.canvas.removeEventListener('pointerdown', onPointerDown);
-      this.canvas.removeEventListener('pointermove', onPointerMove);
-      this.canvas.removeEventListener('pointerup', onPointerUp);
-      this.canvas.removeEventListener('contextmenu', onContextMenu);
-    });
+    }
+    for(const event of session.events.splice(0)){
+      const local=session.playerId;
+      if(event.type==='weapon/fired'){
+        if(!this.settings.reducedEffects)this.effects.shot(event.payload.origin,event.payload.end,now);
+        this.audio.play('shot',event.payload.playerId===local?undefined:event.payload.origin);
+        if(event.payload.playerId===local){
+          this.weapon.fire(now);
+          if(!this.settings.reducedEffects)input.cameraPitch=Math.min(Math.PI*89/180,input.cameraPitch+WEAPONS[event.payload.weaponId].recoilVertical*Math.PI/180);
+        }
+      }
+      if(event.type==='player/hit'&&event.payload.attackerId===local)this.audio.play(event.payload.isHeadshot?'headshot':'hit');
+      if(event.type==='player/killed'&&event.payload.killerId===local)this.audio.play('kill');
+    }
+    this.effects.update(now);this.renderer.render(this.scene,this.camera);this.frame=requestAnimationFrame(t=>this.loop(t));
   }
 }

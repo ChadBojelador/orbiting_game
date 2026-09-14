@@ -4,6 +4,8 @@ import {
   GAMEPLAY,
   isEmptyPayload,
   isRecord,
+  isGameMode,
+  isPrimaryWeapon,
   type GameplayMessages,
   type MatchResult,
 } from '@ice-water/shared';
@@ -34,7 +36,6 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
     private readonly controller = new LobbyController(
       this.state,
       config.countdownSeconds * 1000,
-      config.iceBrackets,
     );
     private readonly actions = new RateLimiter(4, 1000);
     private readonly matchId = randomUUID();
@@ -44,7 +45,7 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
     private readonly match = new MatchController(
       this.state,
       (event) => this.broadcast(event.type, event.payload as never),
-      (now, halfExtent) => this.gameplay.startRound(now, halfExtent),
+      (now) => this.gameplay.start(now),
       {
         onResult: (result, startedAt, completedAt) =>
           this.persistResult(result, startedAt, completedAt),
@@ -80,16 +81,18 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
       this.patchRate = GAMEPLAY.tickMs;
       const gameplayMessages: (keyof GameplayMessages)[] = [
         'input/move',
-        'action/frost-throw',
-        'action/rescue-start',
-        'action/rescue-stop',
-        'action/help-ping',
+        'action/shoot',
+        'action/reload',
+        'action/switch-weapon',
       ];
       for (const type of gameplayMessages)
         this.onMessage(type, (client: GuestClient, payload: unknown) => {
           if (!client.auth || client.auth.expiresAt <= Date.now())
             return this.fail(client, 'unauthorized', 'Guest session expired');
-          const error = this.gameplay.handle(client.auth.playerId, type, payload, Date.now());
+          const now = Date.now();
+          this.advance(now);
+          const error = this.gameplay.handle(client.auth.playerId, type, payload, now);
+          this.match.tick(now);
           if (error) this.fail(client, 'invalid-action', error);
         });
       this.onMessage('room/start', (client: GuestClient, payload: unknown) => {
@@ -97,11 +100,35 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
           return this.fail(client, 'rate-limit', 'Slow down and try again');
         if (!isEmptyPayload(payload))
           return this.fail(client, 'invalid-message', 'Invalid start request');
-        if (!client.auth) return this.fail(client, 'unauthorized', 'Guest session required');
+        if (!client.auth || client.auth.expiresAt <= Date.now()) return this.fail(client, 'unauthorized', 'Guest session expired');
         const error = this.controller.start(client.auth.playerId, Date.now());
         if (error) return this.fail(client, 'cannot-start', error);
         void this.lock();
         this.phaseChanged();
+      });
+      this.onMessage('room/configure', (client: GuestClient, payload: unknown) => {
+        if (!client.auth || client.auth.expiresAt <= Date.now()) return this.fail(client,'unauthorized','Guest session expired');
+        if (!this.actions.take(client.sessionId)) return this.fail(client,'rate-limit','Slow down and try again');
+        if (this.state.phase !== 'lobby' || client.auth.playerId !== this.state.hostPlayerId)
+          return this.fail(client,'cannot-configure','Only the host can change the waiting room');
+        if (!isRecord(payload) || Object.keys(payload).length !== 1 || !isGameMode(payload.gameMode))
+          return this.fail(client,'invalid-message','Invalid game mode');
+        if (payload.gameMode === 'duel' && this.state.players.size > 2)
+          return this.fail(client,'cannot-configure','Duel supports at most two players');
+        this.state.gameMode = payload.gameMode;
+      });
+      this.onMessage('player/loadout', (client: GuestClient, payload: unknown) => {
+        if (!client.auth || client.auth.expiresAt <= Date.now()) return this.fail(client,'unauthorized','Guest session expired');
+        if (!this.actions.take(client.sessionId)) return this.fail(client,'rate-limit','Slow down and try again');
+        if (this.state.phase !== 'lobby' || !isRecord(payload) || Object.keys(payload).length !== 1 || !isPrimaryWeapon(payload.primaryWeapon))
+          return this.fail(client,'invalid-message','Choose a primary weapon in the lobby');
+        const player = this.state.players.get(client.auth.playerId);
+        if(player) player.primaryWeapon=payload.primaryWeapon;
+      });
+      this.onMessage('session/ping', (client: GuestClient, payload: unknown) => {
+        if(!client.auth || client.auth.expiresAt <= Date.now() || !this.actions.take(client.sessionId)) return;
+        if(isRecord(payload) && Object.keys(payload).length===1 && typeof payload.sentAt==='number' && Number.isFinite(payload.sentAt))
+          client.send('session/pong', {sentAt:payload.sentAt});
       });
       this.onMessage('*', (client) => this.fail(client, 'invalid-message', 'Unknown room action'));
     }
@@ -124,6 +151,7 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
       if (this.state.players.has(identity.playerId))
         throw new ServerError(409, 'This guest is already in the room');
       if (this.state.players.size >= config.maxPlayers) throw new ServerError(409, 'Room is full');
+      if (this.state.gameMode === 'duel' && this.state.players.size >= 2) throw new ServerError(409, 'Duel is full');
       return identity;
     }
 
@@ -134,6 +162,7 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         this.state.phase !== 'lobby' ||
         this.state.players.has(identity.playerId) ||
         this.state.players.size >= config.maxPlayers ||
+        (this.state.gameMode === 'duel' && this.state.players.size >= 2) ||
         identity.expiresAt <= Date.now()
       )
         throw new ServerError(409, 'Seat is no longer available');
@@ -201,11 +230,10 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         if (player) {
           player.isConnected = false;
           player.reconnectDeadline = 0;
-          if (player.status === 'active' || player.status === 'frozen') {
-            player.status = 'eliminated';
+          if (player.status === 'alive' || player.status === 'dead') {
+            player.status = 'spectator';
             player.protectedUntil = 0;
-            player.rescueProgress = 0;
-            player.rescuingTarget = '';
+            player.respawnAt = 0;
           }
         }
       }
@@ -229,7 +257,7 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
       if (this.controller.tick(now)) {
         if (this.state.phase === 'lobby') void this.unlock();
         // When the countdown finishes and roles are assigned, start the match.
-        if (this.state.phase === 'regular' && this.state.round === 0) {
+        if (this.state.phase === 'playing') {
           this.match.start(now);
           // MatchController.start() emits the first phase-changed — skip duplicate.
           this.gameplay.advance(now);
@@ -248,16 +276,15 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         matchId: this.matchId,
         winner: result.winner,
         resultReason: result.reason,
-        finalRound: this.state.round,
-        maxRounds: this.state.maxRounds,
+        gameMode: this.state.gameMode,
         startedAt: new Date(startedAt),
         completedAt: new Date(completedAt),
         players: [...this.state.players.values()].map((player) => ({
           playerId: player.playerId,
           team: player.team,
           finalStatus: player.status,
-          tags: player.tags,
-          rescues: player.rescues,
+          kills: player.kills,
+          deaths: player.deaths,
         })),
       };
       void database.saveMatchSummary(summary).catch(() => {

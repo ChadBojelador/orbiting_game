@@ -1,168 +1,54 @@
-import { describe, expect, it } from 'vitest';
-import {
-  ARENA,
-  ARENA_ROUNDS,
-  BRIDGES,
-  advanceVerticalMotion,
-  bridgeDeckHeightAt,
-  bridgeDimensions,
-  createSpawnPoints,
-  hasGameplayLineOfSight,
-  isPermanentLand,
-  isRiver,
-  isWalkable,
-  terrainHeightAt,
-} from './arena.js';
-
-describe('authored world arena', () => {
-  it('uses the documented expanded envelope and five shrinking boundaries', () => {
-    expect(ARENA.halfExtent).toBe(198);
-    expect(ARENA_ROUNDS).toEqual([198, 160, 120, 86, 54]);
-    expect(isPermanentLand({ x: -180, z: -35 })).toBe(false);
-    expect(isPermanentLand({ x: 132, z: 149 })).toBe(true);
-    expect(isPermanentLand({ x: -145, z: -12 })).toBe(true);
-    expect(isPermanentLand({ x: 20, z: 139 })).toBe(true);
+import {describe,expect,it} from 'vitest';
+import {ARENA,SPAWN_POINTS,simulateMovement,moveKinematic,isWalkable,terrainHeightAt,worldRayDistance,lookDirection,type MovementState} from './arena.js';
+const motion=(x=0,z=-34):MovementState=>({x,y:0,z,velocityX:0,velocityZ:0,verticalVelocity:0,isGrounded:true,isSliding:false,isCrouching:false,slideUntil:0,slideReadyAt:0});
+describe('Frostline movement and collision',()=>{
+  it('keeps all sixteen spawn points valid and distinct',()=>{
+    expect(SPAWN_POINTS).toHaveLength(16);
+    expect(new Set(SPAWN_POINTS.map(p=>JSON.stringify(p))).size).toBe(16);
+    expect(SPAWN_POINTS.every(p=>isWalkable(p))).toBe(true);
   });
-
-  it('keeps the major biome centers on permanent land', () => {
-    for (const point of [
-      { x: -60, z: -15 },
-      { x: 65, z: -10 },
-      { x: 10, z: -85 },
-      { x: -15, z: 60 },
-      { x: 20, z: 103 },
-      { x: 37, z: 116 },
-    ]) {
-      expect(isPermanentLand(point)).toBe(true);
-    }
+  it('normalizes diagonals and prevents tunneling at high speed',()=>{
+    const cardinal=moveKinematic({x:0,z:-34},{x:1,z:0},0.05);
+    const diagonal=moveKinematic({x:0,z:-34},{x:1,z:1},0.05);
+    expect(Math.hypot(diagonal.x,diagonal.z+34)).toBeCloseTo(cardinal.x);
+    const wall=moveKinematic({x:-34,z:-34},{x:-1,z:0},2,ARENA.halfExtent,40);
+    expect(wall.x).toBeGreaterThan(-39.2);
   });
-
-  it('rejects ocean and river channels while accepting every bridge deck', () => {
-    expect(isWalkable({ x: -118, z: 110 })).toBe(false);
-    expect(isRiver({ x: 9, z: 30 })).toBe(true);
-    expect(isWalkable({ x: 9, z: 30 })).toBe(false);
-
-    for (const bridge of BRIDGES) {
-      expect(isPermanentLand(bridge)).toBe(true);
-    }
+  it('jumps once while grounded and lands under fixed time',()=>{
+    let p=simulateMovement(motion(),{x:0,z:0,sequence:1,jump:true},50);
+    const velocity=p.verticalVelocity;
+    p=simulateMovement(p,{x:0,z:0,sequence:2,jump:true},100);
+    expect(p.verticalVelocity).toBeLessThan(velocity);
+    for(let t=150;t<=1200;t+=50)p=simulateMovement(p,{x:0,z:0,sequence:t},t);
+    expect(p.y).toBe(0);expect(p.isGrounded).toBe(true);
   });
-
-  it('covers every bridge deck and approach with authoritative walkable collision', () => {
-    const playerRadius = 0.8;
-    for (const bridge of BRIDGES) {
-      const { length, deckWidth } = bridgeDimensions(bridge);
-      const cos = Math.cos(bridge.heading);
-      const sin = Math.sin(bridge.heading);
-      const safeHalfWidth = deckWidth / 2 - playerRadius - 0.01;
-
-      for (
-        let along = -length / 2 + playerRadius + 0.01;
-        along <= length / 2 - playerRadius - 0.01;
-        along += 0.25
-      ) {
-        for (const across of [-safeHalfWidth, 0, safeHalfWidth]) {
-          const point = {
-            x: bridge.x + cos * along - sin * across,
-            z: bridge.z + sin * along + cos * across,
-          };
-          expect(isWalkable(point, playerRadius), `${bridge.id} has a collision gap`).toBe(true);
-        }
-      }
-
-      for (let along = -length / 2 - 1; along <= length / 2 + 1; along += 0.1) {
-        const approach = {
-          x: bridge.x + cos * along,
-          z: bridge.z + sin * along,
-        };
-        expect(isWalkable(approach, playerRadius), `${bridge.id} has a broken approach`).toBe(true);
-      }
-    }
+  it('validates slide prerequisites, cooldown, stance and jump chaining',()=>{
+    expect(simulateMovement(motion(),{x:1,z:0,sequence:1,slide:true},50).isSliding).toBe(false);
+    let p=motion();p.velocityX=12;
+    p=simulateMovement(p,{x:1,z:0,sequence:2,slide:true},100);
+    expect(p.isSliding).toBe(true);expect(p.velocityX).toBeGreaterThan(12);
+    p=simulateMovement(p,{x:1,z:0,sequence:3,jump:true},150);
+    expect(p.isSliding).toBe(false);expect(p.isGrounded).toBe(false);expect(p.y).toBeGreaterThan(0);
+    p.isGrounded=true;p.y=0;
+    expect(simulateMovement(p,{x:1,z:0,sequence:4,slide:true},200).isSliding).toBe(false);
   });
-
-  it('keeps bridge slopes and platform seams within the authored step limit', () => {
-    for (const bridge of BRIDGES) {
-      const { length } = bridgeDimensions(bridge);
-      const cos = Math.cos(bridge.heading);
-      const sin = Math.sin(bridge.heading);
-      const pointAt = (along: number) => ({
-        x: bridge.x + cos * along,
-        z: bridge.z + sin * along,
-      });
-
-      for (let along = -length / 2; along < length / 2; along += 0.25) {
-        const next = Math.min(length / 2, along + 0.25);
-        expect(
-          Math.abs(
-            bridgeDeckHeightAt(bridge, pointAt(next)) - bridgeDeckHeightAt(bridge, pointAt(along)),
-          ),
-          `${bridge.id} has an abrupt deck slope`,
-        ).toBeLessThanOrEqual(0.35);
-      }
-
-      for (const side of [-1, 1]) {
-        const deckEnd = pointAt((side * length) / 2);
-        const approach = pointAt(side * (length / 2 + 0.2));
-        expect(
-          Math.abs(terrainHeightAt(deckEnd) - terrainHeightAt(approach)),
-          `${bridge.id} does not meet its platform cleanly`,
-        ).toBeLessThanOrEqual(0.35 + 1e-9);
-      }
-    }
+  it('slows water and crouch movement and retains more ice momentum',()=>{
+    const input={x:0,z:1,sequence:1};
+    expect(simulateMovement(motion(-20,-16),input,50).velocityZ).toBeLessThan(simulateMovement(motion(-34,-16),input,50).velocityZ);
+    expect(simulateMovement(motion(),{...input,crouch:true},50).velocityZ).toBeLessThan(simulateMovement(motion(),input,50).velocityZ);
+    const ice=motion(0,-22),metal=motion(-34,-22);ice.velocityZ=metal.velocityZ=12;
+    expect(simulateMovement(ice,{x:0,z:0,sequence:1},50).velocityZ).toBeGreaterThan(simulateMovement(metal,{x:0,z:0,sequence:1},50).velocityZ);
   });
-
-  it('provides enough safe village spawns for a full room', () => {
-    const spawns = createSpawnPoints();
-    expect(spawns.length).toBeGreaterThanOrEqual(150);
-    expect(spawns.every((spawn) => isWalkable(spawn, 0.8))).toBe(true);
+  it('allows ramp traversal to the catwalk but rejects climbing its sides',()=>{
+    let p=motion(-29,-16);
+    for(let t=50;t<=1300;t+=50)p=simulateMovement(p,{x:0,z:1,sequence:t},t);
+    expect(p.y).toBeCloseTo(3);expect(p.z).toBeGreaterThan(-5);
+    expect(terrainHeightAt({x:-29,z:-10})).toBe(1.5);
+    expect(isWalkable({x:-29,z:0},40,0)).toBe(false);
   });
-
-  it('maintains the intended south-to-north elevation hierarchy', () => {
-    const beach = terrainHeightAt({ x: 20, z: 103 });
-    const meadow = terrainHeightAt({ x: -15, z: 58 });
-    const village = terrainHeightAt({ x: 15, z: 5 });
-    const forest = terrainHeightAt({ x: -60, z: -15 });
-    const summit = terrainHeightAt({ x: 10, z: -91 });
-
-    expect(beach).toBeLessThan(meadow);
-    expect(meadow).toBeLessThan(village);
-    expect(village).toBeLessThan(forest);
-    expect(forest).toBeLessThan(summit);
-    expect(summit).toBeGreaterThanOrEqual(60);
-  });
-
-  it('keeps the outer network connected through authored routes and crossings', () => {
-    for (const point of [
-      { x: -111, z: 35 },
-      { x: 102, z: -28 },
-      { x: 8, z: 135 },
-      { x: 76, z: 165 },
-      { x: 132, z: 149 },
-    ]) {
-      expect(isWalkable(point, 0.8, ARENA.halfExtent)).toBe(true);
-    }
-  });
-
-  it('advances jumps against terrain and allows sight above low cover', () => {
-    const groundY = terrainHeightAt({ x: 0, z: 0 });
-    const airborne = advanceVerticalMotion(
-      { y: groundY, verticalVelocity: 0, isGrounded: true },
-      { x: 0, z: 0 },
-      0.05,
-      true,
-    );
-    expect(airborne.y).toBeGreaterThan(groundY);
-    expect(airborne.isGrounded).toBe(false);
-
-    const lowCover = ARENA.blocks.find((block) => block.id === 'COVER_VILLAGE_N')!;
-    const pointA = { x: lowCover.x, z: lowCover.z - 3 };
-    const pointB = { x: lowCover.x, z: lowCover.z + 3 };
-    const groundA = terrainHeightAt(pointA);
-    const groundB = terrainHeightAt(pointB);
-    expect(hasGameplayLineOfSight({ ...pointA, y: groundA }, { ...pointB, y: groundB })).toBe(
-      false,
-    );
-    expect(
-      hasGameplayLineOfSight({ ...pointA, y: groundA + 2 }, { ...pointB, y: groundB + 2 }),
-    ).toBe(true);
+  it('hits walls, the ground, and ramp wedges with bounded rays',()=>{
+    expect(worldRayDistance({x:0,y:1.6,z:-10},lookDirection(0,0),100)).toBeCloseTo(29.5);
+    expect(worldRayDistance({x:-29,y:1,z:-16},lookDirection(Math.PI,0),20)).toBeLessThan(6);
+    expect(worldRayDistance({x:0,y:2,z:-34},{x:0,y:-1,z:0},100)).toBe(2);
   });
 });

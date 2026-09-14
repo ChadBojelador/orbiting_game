@@ -1,148 +1,52 @@
-import { normalizeAxes, type Position } from '@ice-water/shared';
-
-const INPUT_ACCELERATION = 9;
-const INPUT_DECELERATION = 13;
-
-export function cameraRelative(axes: Position, yaw: number): Position {
-  const { x, z } = normalizeAxes(axes.x, axes.z);
-  return { x: x * Math.cos(yaw) + z * Math.sin(yaw), z: z * Math.cos(yaw) - x * Math.sin(yaw) };
+import type { Position } from '@ice-water/shared';
+export function cameraRelative(axes:Position,yaw:number):Position {
+  const length=Math.max(1,Math.hypot(axes.x,axes.z)),x=axes.x/length,z=axes.z/length;
+  return {x:x*Math.cos(yaw)+z*Math.sin(yaw),z:z*Math.cos(yaw)-x*Math.sin(yaw)};
 }
-
-export function touchAxes(dx: number, dy: number, radius: number): Position {
-  if (Math.hypot(dx, dy) < radius * 0.12) return { x: 0, z: 0 };
-  return normalizeAxes(dx / radius, dy / radius);
+export function touchAxes(dx:number,dy:number,radius:number):Position {
+  if(Math.hypot(dx,dy)<radius*0.12)return {x:0,z:0};
+  const length=Math.max(radius,Math.hypot(dx,dy));return {x:dx/length,z:dy/length};
 }
-
-export function smoothAxes(
-  current: Position,
-  target: Position,
-  seconds: number,
-  acceleration = INPUT_ACCELERATION,
-  deceleration = INPUT_DECELERATION,
-): Position {
-  const targetLength = Math.hypot(target.x, target.z);
-  const maxDelta = (targetLength > 0 ? acceleration : deceleration) * Math.max(0, seconds);
-  const dx = target.x - current.x;
-  const dz = target.z - current.z;
-  const distance = Math.hypot(dx, dz);
-  if (distance <= maxDelta || distance === 0) return { ...target };
-  const scale = maxDelta / distance;
-  return { x: current.x + dx * scale, z: current.z + dz * scale };
-}
-
 export class GameInput {
-  cameraYaw = 0;
-  touch: Position = { x: 0, z: 0 };
-  isTouchRescuing = false;
-  isFrostHeld = false;
-  private readonly keys = new Set<string>();
-  private movement: Position = { x: 0, z: 0 };
-  private hasFrostThrow = false;
-  private hasJump = false;
-  private hasPing = false;
-
-  pressFrostThrow(): void {
-    this.hasFrostThrow = true;
+  cameraYaw=0;cameraPitch=0;sensitivity=0.002;touch:Position={x:0,z:0};
+  isFiring=false;isAds=false;isScoreboard=false;isEnabled=false;
+  private keys=new Set<string>();private hasJump=false;private hasSlide=false;
+  private hasReload=false;private hasShot=false;private slot:number|undefined;
+  look(dx:number,dy:number):void {
+    this.cameraYaw=Math.atan2(Math.sin(this.cameraYaw-dx*this.sensitivity),Math.cos(this.cameraYaw-dx*this.sensitivity));
+    this.cameraPitch=Math.max(-Math.PI*89/180,Math.min(Math.PI*89/180,this.cameraPitch-dy*this.sensitivity));
   }
-  pressJump(): void {
-    this.hasJump = true;
+  pressJump():void{this.hasJump=true;}
+  pressSlide():void{this.hasSlide=true;}
+  pressReload():void{this.hasReload=true;}
+  pressFire():void{this.hasShot=true;this.isFiring=true;}
+  switchWeapon(slot:number):void{this.slot=(slot+3)%3;}
+  sample(){
+    const axes=cameraRelative({x:Number(this.keys.has('KeyD')||this.keys.has('ArrowRight'))-Number(this.keys.has('KeyA')||this.keys.has('ArrowLeft'))+this.touch.x,
+      z:Number(this.keys.has('KeyS')||this.keys.has('ArrowDown'))-Number(this.keys.has('KeyW')||this.keys.has('ArrowUp'))+this.touch.z},this.cameraYaw);
+    const result={...axes,yaw:this.cameraYaw,pitch:this.cameraPitch,jump:this.hasJump,slide:this.hasSlide,crouch:this.keys.has('KeyC'),sprint:this.keys.has('ControlLeft')||this.keys.has('ControlRight'),
+      hasShot:this.hasShot,isFiring:this.isFiring,isAds:this.isAds,hasReload:this.hasReload,slot:this.slot};
+    this.hasJump=false;this.hasSlide=false;this.hasReload=false;this.hasShot=false;this.slot=undefined;
+    return result;
   }
-  pressPing(): void {
-    this.hasPing = true;
-  }
-  reset(): void {
-    this.keys.clear();
-    this.touch = { x: 0, z: 0 };
-    this.movement = { x: 0, z: 0 };
-    this.isTouchRescuing = false;
-    this.isFrostHeld = false;
-    this.hasFrostThrow = false;
-    this.hasJump = false;
-    this.hasPing = false;
-  }
-  sample(seconds = 0): ReturnType<GameInput['createSample']> {
-    const desired = cameraRelative(
-      {
-        x:
-          Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) -
-          Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft')) +
-          this.touch.x,
-        z:
-          Number(this.keys.has('KeyS') || this.keys.has('ArrowDown')) -
-          Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) +
-          this.touch.z,
-      },
-      this.cameraYaw,
-    );
-    this.movement = smoothAxes(this.movement, desired, seconds);
-    return this.createSample();
-  }
-
-  private createSample() {
-    const sample = {
-      ...this.movement,
-      isRescuing: this.keys.has('KeyE') || this.isTouchRescuing,
-      hasFrostThrow: this.hasFrostThrow,
-      isFrostFiring: this.isFrostHeld || this.keys.has('KeyF'),
-      hasJump: this.hasJump,
-      hasPing: this.hasPing,
+  reset():void {this.keys.clear();this.touch={x:0,z:0};this.isFiring=false;this.isAds=false;this.isScoreboard=false;this.hasJump=false;this.hasSlide=false;this.hasReload=false;this.hasShot=false;this.slot=undefined;}
+  bind(target:Window):()=>void {
+    const down=(event:KeyboardEvent)=>{
+      if(!this.isEnabled || (event.target instanceof HTMLElement && (['INPUT','TEXTAREA','SELECT','BUTTON'].includes(event.target.tagName)||event.target.isContentEditable)))return;
+      const codes=['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowLeft','ArrowDown','ArrowRight','Space','ShiftLeft','ShiftRight','ControlLeft','ControlRight','KeyC','KeyR','Tab','Digit1','Digit2','Digit3'];
+      if(!codes.includes(event.code))return;
+      event.preventDefault();this.keys.add(event.code);
+      if(event.code==='Tab')this.isScoreboard=true;
+      if(event.repeat)return;
+      if(event.code==='Space')this.pressJump();
+      if(event.code.startsWith('Shift'))this.pressSlide();
+      if(event.code==='KeyR')this.pressReload();
+      if(event.code.startsWith('Digit'))this.switchWeapon(Number(event.code.slice(-1))-1);
     };
-    this.hasFrostThrow = false;
-    this.hasJump = false;
-    this.hasPing = false;
-    return sample;
-  }
-
-  bind(target: Window, onReset: () => void): () => void {
-    const codes = new Set([
-      'KeyW',
-      'KeyA',
-      'KeyS',
-      'KeyD',
-      'ArrowUp',
-      'ArrowLeft',
-      'ArrowDown',
-      'ArrowRight',
-      'KeyE',
-      'KeyF',
-      'Space',
-      'KeyH',
-    ]);
-    const down = (event: KeyboardEvent) => {
-      if (!codes.has(event.code) || event.ctrlKey || event.metaKey || event.altKey) return;
-      if (
-        event.target instanceof HTMLElement &&
-        (event.target.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName))
-      )
-        return;
-      event.preventDefault();
-      this.keys.add(event.code);
-      if (event.repeat) return;
-      if (event.code === 'Space') this.pressJump();
-      if (event.code === 'KeyF') this.pressFrostThrow();
-      if (event.code === 'KeyH') this.pressPing();
-    };
-    const up = (event: KeyboardEvent) => {
-      this.keys.delete(event.code);
-    };
-    const reset = () => {
-      this.reset();
-      onReset();
-    };
-    const visibility = () => {
-      if (target.document.hidden) reset();
-    };
-    target.addEventListener('keydown', down);
-    target.addEventListener('keyup', up);
-    target.addEventListener('blur', reset);
-    target.document.addEventListener('visibilitychange', visibility);
-    return () => {
-      target.removeEventListener('keydown', down);
-      target.removeEventListener('keyup', up);
-      target.removeEventListener('blur', reset);
-      target.document.removeEventListener('visibilitychange', visibility);
-      reset();
-    };
+    const up=(event:KeyboardEvent)=>{this.keys.delete(event.code);if(event.code==='Tab')this.isScoreboard=false;};
+    const reset=()=>this.reset();
+    target.addEventListener('keydown',down);target.addEventListener('keyup',up);target.addEventListener('blur',reset);
+    target.document.addEventListener('visibilitychange',reset);
+    return ()=>{target.removeEventListener('keydown',down);target.removeEventListener('keyup',up);target.removeEventListener('blur',reset);target.document.removeEventListener('visibilitychange',reset);this.reset();};
   }
 }
