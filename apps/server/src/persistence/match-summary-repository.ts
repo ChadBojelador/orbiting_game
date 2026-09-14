@@ -1,20 +1,20 @@
 import type { Pool, PoolClient } from 'pg';
-import type { MatchResult, PlayerStatus, Team } from '@ice-water/shared';
+import type { MatchResult, PlayerStatus, Team, GameMode } from '@ice-water/shared';
 
 export interface MatchPlayerSummary {
   playerId: string;
   team: Team;
   finalStatus: PlayerStatus;
-  tags: number;
-  rescues: number;
+  kills: number;
+  deaths: number;
 }
 
 export interface MatchSummary {
   matchId: string;
   winner: MatchResult['winner'];
   resultReason: MatchResult['reason'];
-  finalRound: number;
-  maxRounds: number;
+  gameMode: GameMode;
+
   startedAt: Date;
   completedAt: Date;
   players: readonly MatchPlayerSummary[];
@@ -30,14 +30,14 @@ async function insertPlayers(client: PoolClient, summary: MatchSummary): Promise
       player.playerId,
       player.team,
       player.finalStatus,
-      player.tags,
-      player.rescues,
+      player.kills,
+      player.deaths,
     );
     return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`;
   });
   await client.query(
-    `INSERT INTO match_players
-      (match_id, player_id, team, final_status, tags, rescues)
+    `INSERT INTO arena_match_players
+      (match_id, player_id, team, final_status, kills, deaths)
      VALUES ${rows.join(', ')}`,
     values,
   );
@@ -49,17 +49,17 @@ export async function saveMatchSummary(pool: Pool, summary: MatchSummary): Promi
   try {
     await client.query('BEGIN');
     const inserted = await client.query<{ match_id: string }>(
-      `INSERT INTO matches
-        (match_id, winner, result_reason, final_round, max_rounds, started_at, completed_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO arena_matches
+        (match_id, winner, result_reason, game_mode, started_at, completed_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (match_id) DO NOTHING
        RETURNING match_id`,
       [
         summary.matchId,
         summary.winner,
         summary.resultReason,
-        summary.finalRound,
-        summary.maxRounds,
+        summary.gameMode,
+
         summary.startedAt,
         summary.completedAt,
       ],
