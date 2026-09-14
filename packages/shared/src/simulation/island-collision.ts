@@ -166,14 +166,24 @@ export function isIslandBodyClear(
   return ceiling >= height - 0.33;
 }
 
+/** Feet have width: center-only grounding lets a body sink into a ledge beside it. */
+export function islandSupportHeightAt(position: Position, maximum: number, radius: number): number {
+  let floor = islandHeightAt(position, maximum);
+  for (let i=0;i<8;i++) {
+    const angle=i*Math.PI/4;
+    floor=Math.max(floor,islandHeightAt({x:position.x+Math.cos(angle)*radius,z:position.z+Math.sin(angle)*radius},maximum));
+  }
+  return floor;
+}
+
 export function islandCeilingAt(position: Position, headY: number, distance: number): number {
   return headY + islandRayDistance({ ...position, y: headY }, { x: 0, y: 1, z: 0 }, distance);
 }
 
 export function findIslandSpawns(): readonly Position[] {
   const candidates: Position[] = [];
-  for (let x = -48; x <= 48; x += 4)
-    for (let z = -48; z <= 48; z += 4) {
+  for (let x = -48; x <= 48; x += 2)
+    for (let z = -48; z <= 48; z += 2) {
       const p = { x, z },
         y = islandHeightAt(p);
       if (y < 0.4 || y > 6 || !isIslandBodyClear(p, y, 1.8, 0.5)) continue;
@@ -186,6 +196,20 @@ export function findIslandSpawns(): readonly Position[] {
         ].some((q) => Math.abs(islandHeightAt(q) - y) > 0.12)
       )
         continue;
+      // A clear standing point is insufficient: small ledges and doorway pockets
+      // can trap a newly spawned player. Require a usable route in their initial
+      // (arena-facing) direction, including the complete body at every substep.
+      const length = Math.hypot(x, z) || 1;
+      let floor = y, hasExit = true;
+      for (let distance = 0.15; distance <= 2; distance += 0.15) {
+        const next = {x:x-x/length*distance,z:z-z/length*distance};
+        const nextFloor = islandHeightAt(next, floor+0.32);
+        if (Math.abs(nextFloor-floor)>0.32 || !isIslandBodyClear(next, Math.max(floor,nextFloor),1.8,0.5)) {
+          hasExit=false;break;
+        }
+        floor=nextFloor;
+      }
+      if(!hasExit)continue;
       candidates.push(p);
     }
   const chosen: Position[] = [];
@@ -204,6 +228,6 @@ export function findIslandSpawns(): readonly Position[] {
     }
     chosen.push(candidates.splice(best, 1)[0]!);
   }
-  if (chosen.length < 2) throw new Error('Island has insufficient safe spawn surfaces');
+  if (chosen.length < 16) throw new Error('Island has insufficient safe spawn surfaces');
   return chosen;
 }

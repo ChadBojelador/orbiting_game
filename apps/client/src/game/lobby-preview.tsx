@@ -119,7 +119,7 @@ class LobbyScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = !isCoarse;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene.background = new THREE.Color(0x06111d);
     this.scene.fog = new THREE.FogExp2(0x071522, 0.035);
     this.buildEnvironment();
