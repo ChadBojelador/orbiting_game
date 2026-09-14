@@ -1,5 +1,5 @@
 import { GAMEPLAY,WEAPONS,type LobbyView,type GameplayEvents } from '@ice-water/shared';
-export interface KillEntry extends GameplayEvents['player/killed'] { key:number }
+export type KillEntry = GameplayEvents['player/killed'] & { key:number };
 export function GameHud({view,localPlayerId,serverNow,feed,hitUntil,damageUntil,damageAngle,headshot,crosshair}:{view:LobbyView;localPlayerId:string;serverNow:number;feed:KillEntry[];hitUntil:number;damageUntil:number;damageAngle:number;headshot:boolean;crosshair:string}){
   const p=view.players.find(p=>p.playerId===localPlayerId);if(!p)return null;
   const time=Math.max(0,Math.ceil((view.phaseDeadline-serverNow)/1000)),weapon=WEAPONS[p.weaponId];
