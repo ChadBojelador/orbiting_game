@@ -3,33 +3,35 @@ import type { Position, SpatialPosition, MoveInput } from '../protocol/gameplay.
 
 export interface ArenaBlock extends SpatialPosition { id: string; width: number; depth: number; height: number }
 export interface ArenaRamp extends Position { id: string; width: number; depth: number; height: number; direction: 1 | -1 }
-export const ARENA = { halfExtent: 40 } as const;
+const MAP_SCALE = 1.5;
+export const ARENA = { halfExtent: 40 * MAP_SCALE } as const;
 export const ARENA_BLOCKS: readonly ArenaBlock[] = [
-  { id:'north', x:0,y:0,z:-40,width:80,depth:1,height:7 },
-  { id:'south', x:0,y:0,z:40,width:80,depth:1,height:7 },
-  { id:'west', x:-40,y:0,z:0,width:1,depth:80,height:7 },
-  { id:'east', x:40,y:0,z:0,width:1,depth:80,height:7 },
+  { id:'north', x:0,y:0,z:-40*MAP_SCALE,width:80*MAP_SCALE,depth:1,height:7 },
+  { id:'south', x:0,y:0,z:40*MAP_SCALE,width:80*MAP_SCALE,depth:1,height:7 },
+  { id:'west', x:-40*MAP_SCALE,y:0,z:0,width:1,depth:80*MAP_SCALE,height:7 },
+  { id:'east', x:40*MAP_SCALE,y:0,z:0,width:1,depth:80*MAP_SCALE,height:7 },
   ...[-1,1].flatMap(side => [
-    { id:'lab-'+side, x:side*13,y:0,z:0,width:3,depth:18,height:5 },
-    { id:'lane-n-'+side, x:side*13,y:0,z:-25,width:3,depth:10,height:4 },
-    { id:'lane-s-'+side, x:side*13,y:0,z:25,width:3,depth:10,height:4 },
-    ...[-24,-8,8,24].map((z,i) => ({ id:'cover-'+side+'-'+i, x:side*(i%2 ? 30 : 24),y:0,z,width:4,depth:3,height:i%2 ? 1.2:2.4 })),
-    { id:'mid-'+side, x:side*5,y:0,z:side*14,width:4,depth:3,height:1.3 },
-    { id:'catwalk-'+side,x:side*29,y:0,z:0,width:6,depth:10,height:3 },
+    { id:'lab-'+side, x:side*13*MAP_SCALE,y:0,z:0,width:3*MAP_SCALE,depth:18*MAP_SCALE,height:5 },
+    { id:'lane-n-'+side, x:side*13*MAP_SCALE,y:0,z:-25*MAP_SCALE,width:3*MAP_SCALE,depth:10*MAP_SCALE,height:4 },
+    { id:'lane-s-'+side, x:side*13*MAP_SCALE,y:0,z:25*MAP_SCALE,width:3*MAP_SCALE,depth:10*MAP_SCALE,height:4 },
+    ...[-24,-8,8,24].map((z,i) => ({ id:'cover-'+side+'-'+i, x:side*(i%2 ? 30 : 24)*MAP_SCALE,y:0,z:z*MAP_SCALE,width:4*MAP_SCALE,depth:3*MAP_SCALE,height:i%2 ? 1.2:2.4 })),
+    { id:'mid-'+side, x:side*5*MAP_SCALE,y:0,z:side*14*MAP_SCALE,width:4*MAP_SCALE,depth:3*MAP_SCALE,height:1.3 },
+    { id:'catwalk-'+side,x:side*29*MAP_SCALE,y:0,z:0,width:6*MAP_SCALE,depth:10*MAP_SCALE,height:3 },
   ]),
-  {id:'reactor',x:0,y:0,z:0,width:5,depth:5,height:3.5},
+  {id:'reactor',x:0,y:0,z:0,width:5*MAP_SCALE,depth:5*MAP_SCALE,height:3.5},
 ];
 export const ARENA_RAMPS: readonly ArenaRamp[] = [-1,1].flatMap(side => [
-  {id:'ramp-n-'+side,x:side*29,z:-10,width:6,depth:10,height:3,direction:1 as const},
-  {id:'ramp-s-'+side,x:side*29,z:10,width:6,depth:10,height:3,direction:-1 as const},
+  {id:'ramp-n-'+side,x:side*29*MAP_SCALE,z:-10*MAP_SCALE,width:6*MAP_SCALE,depth:10*MAP_SCALE,height:3,direction:1 as const},
+  {id:'ramp-s-'+side,x:side*29*MAP_SCALE,z:10*MAP_SCALE,width:6*MAP_SCALE,depth:10*MAP_SCALE,height:3,direction:-1 as const},
 ]);
 export const SPAWN_POINTS: readonly Position[] = [
-  {x:-34,z:-34},{x:-22,z:-34},{x:0,z:-34},{x:22,z:-34},{x:34,z:-34},
-  {x:-34,z:34},{x:-22,z:34},{x:0,z:34},{x:22,z:34},{x:34,z:34},
-  {x:-35,z:-18},{x:-35,z:18},{x:35,z:-18},{x:35,z:18},{x:-6,z:-26},{x:6,z:26},
+  ...[-34,-22,0,22,34].map(x=>({x:x*MAP_SCALE,z:-34*MAP_SCALE})),
+  ...[-34,-22,0,22,34].map(x=>({x:x*MAP_SCALE,z:34*MAP_SCALE})),
+  ...[-35,35].flatMap(x=>[-18,18].map(z=>({x:x*MAP_SCALE,z:z*MAP_SCALE}))),
+  {x:-6*MAP_SCALE,z:-26*MAP_SCALE},{x:6*MAP_SCALE,z:26*MAP_SCALE},
 ];
-export const ICE_PATCHES = [{x:0,z:-21,width:12,depth:9},{x:0,z:21,width:12,depth:9}] as const;
-export const WATER_PATCHES = [{x:-20,z:0,width:4,depth:34},{x:20,z:0,width:4,depth:34}] as const;
+export const ICE_PATCHES = [{x:0,z:-21*MAP_SCALE,width:12*MAP_SCALE,depth:9*MAP_SCALE},{x:0,z:21*MAP_SCALE,width:12*MAP_SCALE,depth:9*MAP_SCALE}] as const;
+export const WATER_PATCHES = [{x:-20*MAP_SCALE,z:0,width:4*MAP_SCALE,depth:34*MAP_SCALE},{x:20*MAP_SCALE,z:0,width:4*MAP_SCALE,depth:34*MAP_SCALE}] as const;
 const inside = (p: Position, b: Position & {width:number;depth:number}, margin=0) => Math.abs(p.x-b.x) <= b.width/2+margin && Math.abs(p.z-b.z) <= b.depth/2+margin;
 export function surfaceAt(p: Position): 'metal'|'ice'|'water' {
   if (terrainHeightAt(p)>0.1) return 'metal';

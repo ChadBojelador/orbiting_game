@@ -4,7 +4,7 @@ import {
   GAMEPLAY,
   isEmptyPayload,
   isRecord,
-  isGameMode,
+  isGameMode,isMapId,
   isPrimaryWeapon,
   type GameplayMessages,
   type MatchResult,
@@ -111,11 +111,13 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         if (!this.actions.take(client.sessionId)) return this.fail(client,'rate-limit','Slow down and try again');
         if (this.state.phase !== 'lobby' || client.auth.playerId !== this.state.hostPlayerId)
           return this.fail(client,'cannot-configure','Only the host can change the waiting room');
-        if (!isRecord(payload) || Object.keys(payload).length !== 1 || !isGameMode(payload.gameMode))
-          return this.fail(client,'invalid-message','Invalid game mode');
+        if(!isRecord(payload) || Object.keys(payload).length < 1 || Object.keys(payload).some(key=>key!=='gameMode'&&key!=='mapId') ||
+          (payload.gameMode!==undefined&&!isGameMode(payload.gameMode)) || (payload.mapId!==undefined&&!isMapId(payload.mapId)))
+          return this.fail(client,'invalid-message','Invalid room configuration');
         if (payload.gameMode === 'duel' && this.state.players.size > 2)
           return this.fail(client,'cannot-configure','Duel supports at most two players');
-        this.state.gameMode = payload.gameMode;
+        if(payload.gameMode!==undefined)this.state.gameMode=payload.gameMode;
+        if(payload.mapId!==undefined)this.state.mapId=payload.mapId;
       });
       this.onMessage('player/loadout', (client: GuestClient, payload: unknown) => {
         if (!client.auth || client.auth.expiresAt <= Date.now()) return this.fail(client,'unauthorized','Guest session expired');

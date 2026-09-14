@@ -11,6 +11,7 @@ export type ReloadIntent = Record<string, never>;
 export interface WeaponSwitchIntent { slot: number }
 export type PlayerStatus = 'alive' | 'dead' | 'spectator';
 export type GameMode = 'ffa' | 'tdm' | 'duel';
+export type MapId = 'frostline' | 'island';
 export interface GameplayMessages {
   'input/move': MoveInput;
   'action/shoot': ShootIntent;

@@ -1,5 +1,5 @@
 import { schema, t, type SchemaType } from '@colyseus/schema';
-import { ARENA, MIN_PLAYERS, GAMEPLAY, type MatchPhase, type Team, type PlayerStatus, type GameMode, type WeaponId, type MatchResult } from '@ice-water/shared';
+import { ARENA, MIN_PLAYERS, GAMEPLAY, type MatchPhase, type Team, type PlayerStatus, type GameMode, type MapId, type WeaponId, type MatchResult } from '@ice-water/shared';
 export const PlayerState = schema({
   playerId: t.string().default(''), displayName: t.string().default(''),
   team: t.string<Team>().default('unassigned'), isConnected: t.boolean().default(true), isBot: t.boolean().default(false),
@@ -23,7 +23,7 @@ export const LobbyState = schema({
   inviteCode: t.string().default(''), hostPlayerId: t.string().default(''),
   phase: t.string<MatchPhase>().default('lobby'), phaseDeadline: t.number().default(0), serverTime: t.number().default(0),
   maxPlayers: t.uint16().default(150), minPlayers: t.uint8().default(MIN_PLAYERS),
-  arenaHalfExtent: t.float32().default(ARENA.halfExtent), gameMode: t.string<GameMode>().default('ffa'),
+  arenaHalfExtent: t.float32().default(ARENA.halfExtent), gameMode: t.string<GameMode>().default('ffa'), mapId: t.string<MapId>().default('frostline'),
   iceScore: t.uint16().default(0), waterScore: t.uint16().default(0),
   matchWinner: t.string().default(''), resultReason: t.string<MatchResult['reason'] | ''>().default(''),
   players: t.map(PlayerState),

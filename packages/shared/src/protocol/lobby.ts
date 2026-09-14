@@ -1,4 +1,4 @@
-import type { GameplayEvents, GameplayMessages, PlayerStatus, GameMode } from './gameplay.js';
+import type { GameplayEvents, GameplayMessages, PlayerStatus, GameMode, MapId } from './gameplay.js';
 import type { WeaponId } from '../constants/weapons.js';
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 150;
@@ -21,7 +21,7 @@ export interface PlayerView {
 export interface LobbyView {
   inviteCode: string; hostPlayerId: string; phase: MatchPhase; phaseDeadline: number;
   serverTime: number; maxPlayers: number; minPlayers: number; arenaHalfExtent: number;
-  gameMode: GameMode; iceScore: number; waterScore: number;
+  gameMode: GameMode; mapId: MapId; iceScore: number; waterScore: number;
   matchWinner: string; resultReason: MatchResult['reason'] | ''; players: PlayerView[];
 }
 export interface GuestSession { token: string; playerId: string; displayName: string; expiresAt: number }
@@ -31,7 +31,7 @@ export interface SessionError { code: string; message: string }
 export interface MatchResult { winner: string; reason: 'score-limit' | 'time-limit'; gameMode: GameMode }
 export interface ClientMessages extends GameplayMessages {
   'room/start': Record<string, never>;
-  'room/configure': { gameMode: GameMode };
+  'room/configure': { gameMode?: GameMode; mapId?: MapId };
   'player/loadout': { primaryWeapon: WeaponId };
   'session/ping': { sentAt: number };
 }

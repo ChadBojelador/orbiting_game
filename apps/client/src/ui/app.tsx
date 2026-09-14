@@ -1,5 +1,5 @@
 import { lazy,Suspense,useEffect,useRef,useState,type FormEvent } from 'react';
-import { sanitizeDisplayName,normalizeInviteCode,type GuestSession,type LobbyView,type GameMode,type SessionError,type GameplayEvents,type WeaponId } from '@ice-water/shared';
+import { sanitizeDisplayName,normalizeInviteCode,type GuestSession,type LobbyView,type GameMode,type MapId,type SessionError,type GameplayEvents,type WeaponId } from '@ice-water/shared';
 import { createGuest,readGuest,forgetGuest,reserveRoom,reconnectRoom,saveReconnect,clearReconnect,snapshot,type LobbyRoom } from '../network/lobby-client.js';
 import { ServerClock } from '../network/server-clock.js';
 import type { GameScene } from '../game/game-scene.js';
@@ -19,7 +19,7 @@ export function App(){
   const [scene,setScene]=useState<GameScene|null>(null),[now,setNow]=useState(0),[settings,setSettings]=useState(readSettings);
   const [isSettings,setIsSettings]=useState(false),[feed,setFeed]=useState<KillEntry[]>([]);
   const [hit,setHit]=useState({until:0,headshot:false}),[damage,setDamage]=useState({until:0,angle:0});
-  const [copy,setCopy]=useState('Copy invite code'),[mode,setMode]=useState<GameMode>('ffa');
+  const [copy,setCopy]=useState('Copy invite code'),[mode,setMode]=useState<GameMode>('ffa'),[mapId,setMapId]=useState<MapId>('frostline');
   const [primary,setPrimary]=useState<WeaponId>('assault-rifle');
   const canvas=useRef<HTMLCanvasElement>(null),roomRef=useRef<LobbyRoom|null>(null),sceneRef=useRef<GameScene|null>(null);
   const clock=useRef(new ServerClock()),feedKey=useRef(0),roomCleanup=useRef<(()=>void)[]>([]);
@@ -81,7 +81,7 @@ export function App(){
   }
   async function run(action:()=>Promise<void>){setError('');setBusy(true);try{await action();}catch(e){setError(e instanceof Error?e.message:'Unable to complete this action. Try again.');}finally{setBusy(false);}}
   function identify(e:FormEvent){e.preventDefault();const value=sanitizeDisplayName(name);if(!value){setError('Choose a name with 2–20 letters or numbers.');return;}void run(async()=>setGuest(await createGuest(value)));}
-  async function create(){if(!guest)return;const next=await reserveRoom(guest);attach(next);next.send('room/configure',{gameMode:mode});next.send('player/loadout',{primaryWeapon:primary});}
+  async function create(){if(!guest)return;const next=await reserveRoom(guest);attach(next);next.send('room/configure',{gameMode:mode,mapId});next.send('player/loadout',{primaryWeapon:primary});}
   function join(e:FormEvent){e.preventDefault();const invite=normalizeInviteCode(code);if(!invite){setError('Enter the eight-character invite code from your host.');return;}if(guest)void run(async()=>{const next=await reserveRoom(guest,invite);attach(next);next.send('player/loadout',{primaryWeapon:primary});});}
   async function leave(){if(!room)return;roomRef.current=null;clearReconnect();await room.leave();setRoom(null);setView(null);setError('');}
   const local=view?.players.find(p=>p.playerId===guest?.playerId);
@@ -113,6 +113,7 @@ export function App(){
       {!guest?<><h2>Ready to play?</h2><p>Choose a name. Invite your friends.</p><form onSubmit={identify}><label htmlFor="display-name">Display name</label><input id="display-name" value={name} onChange={e=>setName(e.target.value)} maxLength={100} autoComplete="nickname" placeholder="Your player name" required/><small>2–20 characters. No account needed.</small><button className="primary" disabled={isBusy}>{isBusy?'Connecting…':'Let’s go'}</button></form></>
       :!room?<><h2>Welcome, {guest.displayName}</h2><p>Host a match or enter an invite code.</p>
         <label htmlFor="game-mode">Game mode</label><select id="game-mode" value={mode} onChange={e=>setMode(e.target.value as GameMode)}><option value="ffa">Free-for-all</option><option value="tdm">Team deathmatch</option><option value="duel">Duel · 1v1</option></select>
+        <label htmlFor="map-choice">Map</label><select id="map-choice" value={mapId} onChange={e=>setMapId(e.target.value as MapId)}><option value="frostline">Frostline</option><option value="island">Island</option></select>
         <button className="primary" onClick={()=>void run(create)} disabled={isBusy||guest.expiresAt<=Date.now()}>Create private room</button>
         <form className="join-form" onSubmit={join}><label htmlFor="invite-code">Invite code</label><div><input id="invite-code" value={code} onChange={e=>setCode(e.target.value)} maxLength={8} placeholder="ABCDEFGH" autoCapitalize="characters" required/><button type="submit" disabled={isBusy}>Join room</button></div></form>
         <LoadoutScreen value={primary} onChange={setPrimary}/>
@@ -123,6 +124,7 @@ export function App(){
         <output className="invite-output" aria-label="Room invite code">{view.inviteCode}</output>
         <button onClick={()=>void navigator.clipboard.writeText(view.inviteCode).then(()=>setCopy('Copied!'),()=>setCopy('Select and copy the code above'))}>{copy}</button>
         <label htmlFor="room-mode">Game mode</label><select id="room-mode" value={view.gameMode} disabled={!isHost||view.phase!=='lobby'} onChange={e=>room.send('room/configure',{gameMode:e.target.value})}><option value="ffa">Free-for-all</option><option value="tdm">Team deathmatch</option><option value="duel">Duel · 1v1</option></select>
+        <label htmlFor="room-map">Map</label><select id="room-map" value={view.mapId} disabled={!isHost||view.phase!=='lobby'} onChange={e=>room.send('room/configure',{mapId:e.target.value as MapId})}><option value="frostline">Frostline</option><option value="island">Island</option></select>
         <LoadoutScreen value={local?.primaryWeapon??primary} onChange={id=>room.send('player/loadout',{primaryWeapon:id})} disabled={view.phase!=='lobby'}/>
         <ul className="roster">{view.players.map(p=><li key={p.playerId}><span>{p.displayName}</span><small>{p.playerId===view.hostPlayerId?'Host':p.isBot?'Practice bot':p.isConnected?'Ready':'Away'}</small></li>)}</ul>
         {isHost?<button className="primary" disabled={view.phase!=='lobby'||count<view.minPlayers} onClick={()=>room.send('room/start',{})}>Start countdown</button>:<p>Waiting for the host to start.</p>}

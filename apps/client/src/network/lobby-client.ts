@@ -107,7 +107,7 @@ export function snapshot(state: WireLobby): LobbyView {
   return {
     inviteCode: state.inviteCode, hostPlayerId:state.hostPlayerId,phase:state.phase,
     phaseDeadline:state.phaseDeadline,serverTime:state.serverTime,maxPlayers:state.maxPlayers,minPlayers:state.minPlayers,
-    arenaHalfExtent:state.arenaHalfExtent,gameMode:state.gameMode,iceScore:state.iceScore,waterScore:state.waterScore,
+    arenaHalfExtent:state.arenaHalfExtent,gameMode:state.gameMode,mapId:state.mapId,iceScore:state.iceScore,waterScore:state.waterScore,
     matchWinner:state.matchWinner,resultReason:state.resultReason,
     players:[...state.players.values()].map(p=>({
       playerId:p.playerId,displayName:p.displayName,team:p.team,isConnected:p.isConnected,isBot:p.isBot,reconnectDeadline:p.reconnectDeadline,

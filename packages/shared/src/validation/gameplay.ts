@@ -1,5 +1,5 @@
 import { isRecord, isEmptyPayload } from './guest.js';
-import type { MoveInput, ShootIntent, WeaponSwitchIntent, GameMode } from '../protocol/gameplay.js';
+import type { MoveInput, ShootIntent, WeaponSwitchIntent, GameMode, MapId } from '../protocol/gameplay.js';
 import type { WeaponId } from '../constants/weapons.js';
 const isAngle = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max;
 export function isMoveInput(v: unknown): v is MoveInput {
@@ -20,4 +20,5 @@ export function isWeaponSwitchIntent(v: unknown): v is WeaponSwitchIntent {
   return isRecord(v) && Object.keys(v).length === 1 && typeof v.slot === 'number' && Number.isInteger(v.slot) && v.slot >= 0 && v.slot <= 2;
 }
 export function isGameMode(v: unknown): v is GameMode { return v === 'ffa' || v === 'tdm' || v === 'duel'; }
+export function isMapId(v: unknown): v is MapId { return v === 'frostline' || v === 'island'; }
 export function isPrimaryWeapon(v: unknown): v is WeaponId { return ['assault-rifle','smg','shotgun','sniper'].includes(String(v)); }

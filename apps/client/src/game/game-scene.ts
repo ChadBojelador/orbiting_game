@@ -4,6 +4,7 @@ import { GameSession } from '../network/game-session.js';
 import type { LobbyRoom } from '../network/lobby-client.js';
 import { LocalPresentation } from '../network/player-motion.js';
 import { FrostlineMap } from '../world/frostline-map.js';
+import { IslandMap } from '../world/island-map.js';
 import { FirstPersonCamera } from './first-person-camera.js';
 import { WeaponRenderer } from './weapon-renderer.js';
 import { HitEffects } from './hit-effects.js';
@@ -14,7 +15,7 @@ export class GameScene {
   readonly session:GameSession;settings:FpsSettings=readSettings();isLocked=false;
   readonly isTouch=matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints>0;
   private readonly scene=new Scene();private readonly camera=new PerspectiveCamera(96,1,0.05,140);
-  private renderer:WebGLRenderer;private world:FrostlineMap;
+  private renderer:WebGLRenderer;private world?:FrostlineMap;private island?:IslandMap;
   private cameraMotion=new FirstPersonCamera();private presentation=new LocalPresentation();
   private weapon:WeaponRenderer;private effects:HitEffects;private audio=new AudioManager();
   private readonly players=new Map<string,Group>();private readonly materials=new Map<string,MeshStandardMaterial>();
@@ -28,7 +29,9 @@ export class GameScene {
     this.scene.background=new Color(0xc5e4ef);this.scene.fog=new Fog(0xc5e4ef,65,135);
     this.scene.add(new HemisphereLight(0xedfaff,0x41617b,2.5));
     const sun=new DirectionalLight(0xfff0d0,2);sun.position.set(-30,60,20);this.scene.add(sun);
-    this.world=new FrostlineMap(this.scene);this.scene.add(this.camera);
+    if(this.session.view.mapId==='island')this.island=new IslandMap(this.scene);
+    else this.world=new FrostlineMap(this.scene);
+    this.scene.add(this.camera);
     this.weapon=new WeaponRenderer(this.camera);this.effects=new HitEffects(this.scene);
     this.session.input.isEnabled=this.isTouch;
     const resize=()=>{const w=canvas.clientWidth||innerWidth,h=canvas.clientHeight||innerHeight;this.renderer.setPixelRatio(Math.min(this.isTouch?1.4:2,renderPixelRatio(w,h,devicePixelRatio)));this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();};
@@ -40,7 +43,7 @@ export class GameScene {
   destroy():void{
     if(this.destroyed)return;this.destroyed=true;cancelAnimationFrame(this.frame);
     this.cleanups.forEach(c=>c());if(document.pointerLockElement===this.canvas)document.exitPointerLock();
-    this.session.destroy();this.weapon.destroy();this.effects.destroy();this.world.destroy();this.audio.destroy();
+    this.session.destroy();this.weapon.destroy();this.effects.destroy();this.world?.destroy();this.island?.destroy();this.audio.destroy();
     this.body.dispose();this.head.dispose();this.materials.forEach(m=>m.dispose());this.renderer.dispose();
   }
   private bindControls():void {
