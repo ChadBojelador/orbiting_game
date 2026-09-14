@@ -78,14 +78,14 @@ export class GameplayController {
       const ready=pending && pending.receivedAt<=now?queue!.shift():undefined;
       const input=ready?.input??{x:0,z:0,sequence:p.inputSequence};
       if(ready){p.inputSequence=input.sequence;p.yaw=input.yaw??p.yaw;p.pitch=input.pitch??p.pitch;}
-      Object.assign(p,simulateMovement(p,input,now,GAMEPLAY.tickMs/1000,WEAPONS[p.weaponId].moveSpeedMultiplier));
+      Object.assign(p,simulateMovement(p,input,now,GAMEPLAY.tickMs/1000,WEAPONS[p.weaponId].moveSpeedMultiplier,this.state.mapId));
     }
   }
   private respawn(p:PlayerState,now:number,isDeath:boolean):void {
     const spawn=selectSpawn(this.state,p,isDeath?p:undefined);
     this.inputs.delete(p.playerId);
     p.inputSequence=this.sequences.get(p.playerId)??p.inputSequence;
-    Object.assign(p,spawn,{y:terrainHeightAt(spawn),velocityX:0,velocityZ:0,verticalVelocity:0,isGrounded:true,isSliding:false,isCrouching:false,slideUntil:0,slideReadyAt:0});
+    Object.assign(p,spawn,{y:terrainHeightAt(spawn,this.state.mapId),velocityX:0,velocityZ:0,verticalVelocity:0,isGrounded:true,isSliding:false,isCrouching:false,slideUntil:0,slideReadyAt:0});
     p.status='alive';p.hp=GAMEPLAY.maxHp;p.respawnAt=0;p.protectedUntil=now+GAMEPLAY.spawnProtectionMs;p.spawnGeneration++;
     p.yaw=Math.atan2(spawn.x,spawn.z);p.pitch=0;
     this.weapons.reset(p);

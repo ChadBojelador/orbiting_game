@@ -24,7 +24,7 @@ async function create(page:Page){
 }
 async function start(page:Page){
   await page.getByRole('button',{name:'Start countdown'}).click();
-  await expect(page.getByText('Starting in 1')).toBeVisible();
+  await expect(page.getByText('Deploying in 1')).toBeVisible();
   await expect(page.getByLabel('Health',{exact:true})).toBeVisible();
 }
 test('desktop guests play, shoot, die, respawn, see scores and finish',async({page,browser})=>{
@@ -33,7 +33,7 @@ test('desktop guests play, shoot, die, respawn, see scores and finish',async({pa
   const context=await browser.newContext();const friend=await context.newPage();
   try{
     await identify(friend,'FPS Friend');await friend.getByLabel('Invite code',{exact:true}).fill(code);await friend.getByRole('button',{name:'Join room',exact:true}).click();
-    await expect(page.getByLabel('Connected players')).toHaveText('2 / 150 connected');
+    await expect(page.getByLabel('Connected players')).toHaveText(/2\s*\/ 150 connected/);
     await start(page);await page.getByRole('button',{name:'Enter arena'}).click();
     await expect.poll(()=>page.evaluate(()=>!!document.pointerLockElement)).toBe(true);
     const a=room.state.players.get(room.state.hostPlayerId)!,b=[...room.state.players.values()].find(p=>p.playerId!==a.playerId)!;
@@ -41,8 +41,8 @@ test('desktop guests play, shoot, die, respawn, see scores and finish',async({pa
     await page.keyboard.down('KeyW');await expect.poll(()=>Math.hypot(a.x-position.x,a.z-position.z)).toBeGreaterThan(1);await page.keyboard.up('KeyW');
     await page.keyboard.press('Space');await expect.poll(()=>a.y).toBeGreaterThan(0);
     await expect.poll(()=>a.isGrounded).toBe(true);
-    Object.assign(a,{x:-34,y:0,z:-30,yaw:0,pitch:0,velocityX:0,velocityZ:0,protectedUntil:0,spawnGeneration:a.spawnGeneration+1});
-    Object.assign(b,{x:-34,y:0,z:-33,hp:1,protectedUntil:0});
+    Object.assign(a,{x:-50,y:0,z:-30,yaw:0,pitch:0,velocityX:0,velocityZ:0,protectedUntil:0,spawnGeneration:a.spawnGeneration+1});
+    Object.assign(b,{x:-50,y:0,z:-33,hp:1,protectedUntil:0});
     room.broadcastPatch();
     await expect.poll(()=>a.inputSequence).toBeGreaterThan(10);
     await page.waitForTimeout(150);

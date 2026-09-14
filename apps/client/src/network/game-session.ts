@@ -11,7 +11,7 @@ export class GameSession {
   constructor(private readonly room:LobbyRoom,readonly playerId:string){
     this.view=snapshot(room.state);
     const update=()=>{
-      this.view=snapshot(room.state);this.clock.update(this.view.serverTime);
+      this.view=snapshot(room.state);this.prediction.mapId=this.view.mapId;this.clock.update(this.view.serverTime);
       for(const p of this.view.players){
         if(p.playerId===playerId){
           if(p.spawnGeneration!==this.lastGeneration){this.nextShotAt=0;this.lastGeneration=p.spawnGeneration;this.input.cameraYaw=p.yaw;this.input.cameraPitch=p.pitch;this.input.reset();}

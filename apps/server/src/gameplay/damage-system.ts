@@ -8,7 +8,7 @@ export function fireHitscan(state:LobbyState,attacker:PlayerState,intent:ShootIn
   for(let pellet=0;pellet<stats.pelletsPerShot;pellet++){
     const spread=intent.isAds?stats.adsSpread:stats.spread;
     const direction=lookDirection(intent.yaw+(random()*2-1)*spread,intent.pitch+(random()*2-1)*spread);
-    let distance=worldRayDistance(origin,direction,stats.range);
+    let distance=worldRayDistance(origin,direction,stats.range,state.mapId);
     let victim:PlayerState|undefined;
     for(const player of state.players.values()){
       if(player.playerId===attacker.playerId || player.status!=='alive')continue;

@@ -281,6 +281,7 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         winner: result.winner,
         resultReason: result.reason,
         gameMode: this.state.gameMode,
+        mapId: this.state.mapId,
         startedAt: new Date(startedAt),
         completedAt: new Date(completedAt),
         players: [...this.state.players.values()].map((player) => ({

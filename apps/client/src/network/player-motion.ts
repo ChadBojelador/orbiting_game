@@ -1,7 +1,7 @@
-import { GAMEPLAY,simulateMovement,type MoveInput,type PlayerView,type Position,type MovementState } from '@ice-water/shared';
+import { GAMEPLAY,simulateMovement,type MapId,type MoveInput,type PlayerView,type Position,type MovementState } from '@ice-water/shared';
 const initial=():MovementState=>({x:0,y:0,z:0,velocityX:0,velocityZ:0,verticalVelocity:0,isGrounded:true,isSliding:false,isCrouching:false,slideUntil:0,slideReadyAt:0});
 export class LocalPrediction {
-  motion=initial();yaw=0;
+  motion=initial();yaw=0;mapId:MapId='frostline';
   private pending:{input:MoveInput;now:number;speed:number}[]=[];private sequence=0;private generation=-1;
   get position():Position{return this.motion;}
   get y():number{return this.motion.y;}
@@ -11,11 +11,11 @@ export class LocalPrediction {
     this.pending=canMove?this.pending.filter(p=>p.input.sequence>player.inputSequence):[];
     this.motion={x:player.x,y:player.y,z:player.z,velocityX:player.velocityX,velocityZ:player.velocityZ,verticalVelocity:player.verticalVelocity,isGrounded:player.isGrounded,isSliding:player.isSliding,isCrouching:player.isCrouching,slideUntil:player.slideUntil,slideReadyAt:player.slideReadyAt};
     this.yaw=player.yaw;
-    for(const p of this.pending)this.motion=simulateMovement(this.motion,p.input,p.now,GAMEPLAY.tickMs/1000,p.speed);
+    for(const p of this.pending)this.motion=simulateMovement(this.motion,p.input,p.now,GAMEPLAY.tickMs/1000,p.speed,this.mapId);
   }
   predict(input:Omit<MoveInput,'sequence'>,canMove:boolean,now:number,speed=1):MoveInput {
     const move={...input,sequence:++this.sequence};
-    if(canMove && this.pending.length<10){this.pending.push({input:move,now,speed});this.motion=simulateMovement(this.motion,move,now,GAMEPLAY.tickMs/1000,speed);}
+    if(canMove && this.pending.length<10){this.pending.push({input:move,now,speed});this.motion=simulateMovement(this.motion,move,now,GAMEPLAY.tickMs/1000,speed,this.mapId);}
     return move;
   }
   reset():void{this.pending=[];}

@@ -1,9 +1,12 @@
-import { ARENA_BLOCKS,ARENA_RAMPS,ICE_PATCHES,WATER_PATCHES } from '@ice-water/shared';
+import { HOUSE_LANDMARK,ARENA_BLOCKS,ARENA_RAMPS,ICE_PATCHES,WATER_PATCHES } from '@ice-water/shared';
 import houseModelUrl from '../../../../assets/low_poly_wooden_house_rusty_3d_model_free.glb?url';
-import { Box3,BoxGeometry,BufferGeometry,Float32BufferAttribute,Group,Mesh,MeshStandardMaterial,CylinderGeometry,Vector3,type Material,type Object3D,type Scene } from 'three';
+import { Box3,BoxGeometry,BufferGeometry,Float32BufferAttribute,Group,Mesh,MeshStandardMaterial,CylinderGeometry,Vector3,type Scene } from 'three';
+import { disposeModel } from './model-disposal.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 export class FrostlineMap {
   readonly group=new Group();
+  readonly ready:Promise<void>;
+  hasError=false;
   private destroyed=false;
   constructor(scene:Scene){
     const snow=new MeshStandardMaterial({color:0xedf6fa,roughness:0.9});
@@ -13,6 +16,7 @@ export class FrostlineMap {
     const amber=new MeshStandardMaterial({color:0xf3b747,roughness:0.6});
     const floor=new Mesh(new BoxGeometry(120,0.3,120),snow);floor.position.y=-0.15;this.group.add(floor);
     for(const block of ARENA_BLOCKS){
+      if(block.id===HOUSE_LANDMARK.id)continue;
       const material=block.id.startsWith('cover')?blue:block.id==='reactor'?navy:block.height>4?snow:navy;
       const mesh=new Mesh(new BoxGeometry(block.width,block.height,block.depth),material);
       mesh.position.set(block.x,block.y+block.height/2,block.z);this.group.add(mesh);
@@ -40,11 +44,11 @@ export class FrostlineMap {
     const core=new Mesh(new CylinderGeometry(1.5,1.5,2,12),ice);core.position.y=2.5;this.group.add(core);
     const ring=new Mesh(new CylinderGeometry(2.1,2.1,0.2,12),amber);ring.position.y=3.4;this.group.add(ring);
     scene.add(this.group);
-    void this.loadHouse();
+    this.ready=this.loadHouse().catch(()=>{this.hasError=true;});
   }
   private async loadHouse():Promise<void>{
     const model=(await new GLTFLoader().loadAsync(houseModelUrl)).scene;
-    if(this.destroyed){this.disposeModel(model);return;}
+    if(this.destroyed){disposeModel(model);return;}
     model.name='wooden-house-landmark';
     model.traverse(object=>{
       if(!(object instanceof Mesh))return;
@@ -54,22 +58,12 @@ export class FrostlineMap {
     const largest=Math.max(size.x,size.y,size.z);
     if(largest>0)model.scale.setScalar(8/largest);
     const normalizedBounds=new Box3().setFromObject(model);
-    model.position.set(-30,-normalizedBounds.min.y,-30);
+    const center=normalizedBounds.getCenter(new Vector3());
+    model.position.set(HOUSE_LANDMARK.x-center.x,-normalizedBounds.min.y,HOUSE_LANDMARK.z-center.z);
     this.group.add(model);
-  }
-  private disposeModel(model:Object3D):void{
-    model.traverse(object=>{
-      if(!(object instanceof Mesh))return;
-      object.geometry.dispose();
-      for(const material of Array.isArray(object.material)?object.material:[object.material]){
-        (material as Material).dispose();
-      }
-    });
   }
   destroy():void{
     this.destroyed=true;
-    const materials=new Set<Material>(),geometries=new Set<BufferGeometry>();
-    this.group.traverse(o=>{if(o instanceof Mesh){geometries.add(o.geometry);if(o.material instanceof MeshStandardMaterial)materials.add(o.material);}});
-    geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());this.group.removeFromParent();
+    disposeModel(this.group);this.group.removeFromParent();
   }
 }

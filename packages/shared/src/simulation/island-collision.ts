@@ -1,3 +1,4 @@
+export { ISLAND_SPAWNS } from './island-spawns.js';
 import { ISLAND_TRIANGLES_BASE64 } from './island-data.js';
 import type { Position, SpatialPosition } from '../protocol/gameplay.js';
 
@@ -99,7 +100,7 @@ export function islandCeilingAt(position: Position, headY: number, distance: num
   return headY + islandRayDistance({ ...position, y: headY }, { x: 0, y: 1, z: 0 }, distance);
 }
 
-export const ISLAND_SPAWNS: readonly Position[] = (() => {
+export function findIslandSpawns(): readonly Position[] {
   const candidates: Position[] = [];
   for (let x = -48; x <= 48; x += 4) for (let z = -48; z <= 48; z += 4) {
     const p = { x, z }, y = islandHeightAt(p);
@@ -119,4 +120,4 @@ export const ISLAND_SPAWNS: readonly Position[] = (() => {
   }
   if (chosen.length < 2) throw new Error('Island has insufficient safe spawn surfaces');
   return chosen;
-})();
+}

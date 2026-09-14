@@ -5,11 +5,11 @@ export function selectSpawn(state:LobbyState,player:PlayerState,lastDeath?:Posit
   let best=spawnPoints[0]!,bestScore=-Infinity;
   for(const spawn of spawnPoints){
     let score=10000;
-    const eye={...spawn,y:terrainHeightAt(spawn)+1.6};
+    const eye={...spawn,y:terrainHeightAt(spawn,state.mapId)+1.6};
     for(const other of state.players.values()){
       if(other.playerId===player.playerId || other.status!=='alive' || (state.gameMode==='tdm' && other.team===player.team))continue;
       const distance=distanceSquared(spawn,other);
-      score=Math.min(score,distance-(hasGameplayLineOfSight(eye,{x:other.x,y:other.y+1.6,z:other.z})?350:0));
+      score=Math.min(score,distance-(hasGameplayLineOfSight(eye,{x:other.x,y:other.y+1.6,z:other.z},state.mapId)?350:0));
     }
     if(lastDeath)score-=Math.max(0,400-distanceSquared(spawn,lastDeath));
     if(score>bestScore){best=spawn;bestScore=score;}
