@@ -7,7 +7,7 @@ import { readConfig } from '../../apps/server/src/config/environment.js';
 
 interface LoadState {
   phase: string;
-  iceCount: number;
+  gameMode: string;
   players: Map<string, PlayerView>;
 }
 const requested = process.argv.slice(2).map(Number);
@@ -44,6 +44,7 @@ async function until(predicate: () => boolean) {
 try {
   for (const size of sizes) {
     const rooms: Room<unknown, LoadState>[] = [];
+    const ids: string[]=[];let timer:ReturnType<typeof setInterval>|undefined;
     const started = performance.now();
     try {
       let code: string | undefined;
@@ -61,34 +62,53 @@ try {
           url,
         ).consumeSeatReservation<LoadState>(seat.seat);
         room.onMessage('match/phase-changed', () => {});
-        rooms.push(room);
+        for(const type of ['player/respawned','weapon/fired','player/hit','player/killed','match/result','session/error'])room.onMessage(type,()=>{});
+        rooms.push(room);ids.push(guest.playerId);
       }
       await until(() => rooms.every((room) => room.state?.players.size === size));
       const joinMs = Math.round(performance.now() - started);
       rooms[0]!.send('room/start', {});
-      await until(() => rooms.every((room) => room.state.phase === 'regular'));
-      const expectedIce = rooms[0]!.state.iceCount;
-      assert.ok(
-        rooms.every(
-          (room) =>
-            [...room.state.players.values()].filter((player) => player.team === 'ice').length ===
-            expectedIce,
-        ),
-      );
+      await until(() => rooms.every((room) => room.state.phase === 'playing'));
+      let sequence=0;
+      const tickDurations:number[]=[];
+      timer=setInterval(()=>{
+        const tickStart=performance.now();sequence++;
+        rooms.forEach((room,index)=>{
+          const local=room.state.players.get(ids[index]!);if(!local)return;
+          const angle=sequence*.025+index;
+          room.send('input/move',{sequence,x:Math.cos(angle),z:Math.sin(angle),yaw:local.yaw,pitch:0,jump:sequence%40===0,slide:sequence%30===0});
+          if(sequence%4 || local.status!=='alive')return;
+          if(local.ammo===0){if(!local.reloadUntil)room.send('action/reload',{});return;}
+          const target=[...room.state.players.values()].filter(p=>p.playerId!==local.playerId&&p.status==='alive').sort((a,b)=>Math.hypot(a.x-local.x,a.z-local.z)-Math.hypot(b.x-local.x,b.z-local.z))[0];
+          if(target)room.send('action/shoot',{yaw:Math.atan2(local.x-target.x,local.z-target.z),pitch:0,isAds:true});
+        });
+        tickDurations.push(performance.now()-tickStart);
+      },50);
+      await new Promise(resolve=>setTimeout(resolve,5000));clearInterval(timer);timer=undefined;
+      await until(()=>rooms.every((room,i)=>(room.state.players.get(ids[i]!)?.inputSequence??0)>0));
+      const snapshots=[...rooms[0]!.state.players.values()];
+      assert.ok(snapshots.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.z)&&p.hp>=0&&p.hp<=100));
+      assert.ok(snapshots.every(p=>p.team==='none'));
+      tickDurations.sort((a,b)=>a-b);
       console.log(
         JSON.stringify({
-          scenario: 'lobby-and-role-assignment',
+          scenario: 'fps-five-second-gameplay-smoke',
           clients: size,
           joinMs,
-          icePlayers: expectedIce,
+          gameplayMs: 5000,
+          inputTicks: sequence,
+          kills: snapshots.reduce((sum,p)=>sum+p.kills,0),
+          driverP95Ms:Math.round(tickDurations[Math.floor(tickDurations.length*.95)]??0),
           elapsedMs: Math.round(performance.now() - started),
           result: 'passed',
         }),
       );
     } finally {
+      if(timer)clearInterval(timer);
       await Promise.all(rooms.map((room) => room.leave().catch(() => {})));
     }
   }
 } finally {
   await app.stop();
 }
+

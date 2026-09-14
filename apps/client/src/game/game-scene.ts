@@ -12,7 +12,7 @@ import { readSettings,type FpsSettings } from './fps-settings.js';
 import { renderPixelRatio } from './render-performance.js';
 export class GameScene {
   readonly session:GameSession;settings:FpsSettings=readSettings();isLocked=false;
-  readonly isTouch=matchMedia('(pointer: coarse)').matches;
+  readonly isTouch=matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints>0;
   private readonly scene=new Scene();private readonly camera=new PerspectiveCamera(96,1,0.05,140);
   private renderer:WebGLRenderer;private world:FrostlineMap;
   private cameraMotion=new FirstPersonCamera();private presentation=new LocalPresentation();
