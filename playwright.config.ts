@@ -17,18 +17,6 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'node --import tsx apps/server/src/main.ts',
-      reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === 'true',
-      env: {
-        GUEST_SESSION_SIGNING_SECRET: 'browser-test-secret-at-least-32-characters',
-        GAME_SERVER_PORT: '2568',
-        COUNTDOWN_SECONDS: '3',
-        CLIENT_ORIGIN: 'http://localhost:5174',
-        DEV_BOT_COUNT: '0',
-      },
-      url: 'http://127.0.0.1:2568/health',
-    },
-    {
       command: 'node node_modules/vite/bin/vite.js apps/client --host 127.0.0.1 --port 5174',
       url: 'http://localhost:5174',
       reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === 'true',
@@ -36,3 +24,4 @@ export default defineConfig({
     },
   ],
 });
+

@@ -24,6 +24,10 @@ export function App(){
   const canvas=useRef<HTMLCanvasElement>(null),roomRef=useRef<LobbyRoom|null>(null),sceneRef=useRef<GameScene|null>(null);
   const clock=useRef(new ServerClock()),feedKey=useRef(0),roomCleanup=useRef<(()=>void)[]>([]);
   const isInGame=!!view && !['lobby','countdown'].includes(view.phase);
+  const isComplete=view?.phase==='finished'||view?.phase==='intermission';
+  useEffect(()=>{
+    if(isComplete){document.exitPointerLock();sceneRef.current?.getInput().reset();}
+  },[isComplete]);
   useEffect(()=>{
     let active=true;
     void reconnectRoom().then(next=>{if(next&&active)attach(next);}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to reconnect');}).finally(()=>{if(active)setBusy(false);});
@@ -52,6 +56,7 @@ export function App(){
     next.onStateChange(update);roomCleanup.current.push(()=>next.onStateChange.remove(update));
     roomCleanup.current.push(next.onMessage<SessionError>('session/error',m=>setError(m.message)));
     roomCleanup.current.push(next.onMessage('match/phase-changed',()=>setError('')),next.onMessage('match/result',()=>{}));
+    roomCleanup.current.push(next.onMessage('player/respawned',()=>{}),next.onMessage('weapon/fired',()=>{}));
     roomCleanup.current.push(next.onMessage<GameplayEvents['player/killed']>('player/killed',m=>setFeed(old=>[...old.slice(-4),{...m,key:++feedKey.current}])));
     roomCleanup.current.push(next.onMessage<GameplayEvents['player/hit']>('player/hit',m=>{
       const local=readGuest()?.playerId;
