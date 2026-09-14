@@ -22,6 +22,8 @@ export function TouchControls({input,slot}:{input:GameInput;slot:number}){
       <button onPointerDown={e=>{capture(e);input.pressReload();}}>Reload</button>
       <button onPointerDown={e=>{capture(e);input.switchWeapon(slot+1);}}>Weapon</button>
       <button onPointerDown={e=>{capture(e);input.isScoreboard=!input.isScoreboard;}}>Scores</button>
+      <button aria-pressed={input.isTouchCrouching} onPointerDown={e=>{capture(e);input.isTouchCrouching=!input.isTouchCrouching;}}>Crouch</button>
+      <button aria-pressed={input.isTouchSprinting} onPointerDown={e=>{capture(e);input.isTouchSprinting=!input.isTouchSprinting;}}>Sprint</button>
     </div>
   </div>;
 }

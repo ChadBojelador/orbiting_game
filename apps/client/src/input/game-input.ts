@@ -10,6 +10,7 @@ export function touchAxes(dx:number,dy:number,radius:number):Position {
 export class GameInput {
   cameraYaw=0;cameraPitch=0;sensitivity=0.002;touch:Position={x:0,z:0};
   isFiring=false;isAds=false;isScoreboard=false;isEnabled=false;
+  isTouchCrouching=false;isTouchSprinting=false;
   private keys=new Set<string>();private hasJump=false;private hasSlide=false;
   private hasReload=false;private hasShot=false;private slot:number|undefined;
   look(dx:number,dy:number):void {
@@ -24,12 +25,12 @@ export class GameInput {
   sample(){
     const axes=cameraRelative({x:Number(this.keys.has('KeyD')||this.keys.has('ArrowRight'))-Number(this.keys.has('KeyA')||this.keys.has('ArrowLeft'))+this.touch.x,
       z:Number(this.keys.has('KeyS')||this.keys.has('ArrowDown'))-Number(this.keys.has('KeyW')||this.keys.has('ArrowUp'))+this.touch.z},this.cameraYaw);
-    const result={...axes,yaw:this.cameraYaw,pitch:this.cameraPitch,jump:this.hasJump,slide:this.hasSlide,crouch:this.keys.has('KeyC'),sprint:this.keys.has('ControlLeft')||this.keys.has('ControlRight'),
+    const result={...axes,yaw:this.cameraYaw,pitch:this.cameraPitch,jump:this.hasJump,slide:this.hasSlide,crouch:this.keys.has('KeyC')||this.isTouchCrouching,sprint:this.keys.has('ControlLeft')||this.keys.has('ControlRight')||this.isTouchSprinting,
       hasShot:this.hasShot,isFiring:this.isFiring,isAds:this.isAds,hasReload:this.hasReload,slot:this.slot};
     this.hasJump=false;this.hasSlide=false;this.hasReload=false;this.hasShot=false;this.slot=undefined;
     return result;
   }
-  reset():void {this.keys.clear();this.touch={x:0,z:0};this.isFiring=false;this.isAds=false;this.isScoreboard=false;this.hasJump=false;this.hasSlide=false;this.hasReload=false;this.hasShot=false;this.slot=undefined;}
+  reset():void {this.keys.clear();this.touch={x:0,z:0};this.isFiring=false;this.isAds=false;this.isScoreboard=false;this.isTouchCrouching=false;this.isTouchSprinting=false;this.hasJump=false;this.hasSlide=false;this.hasReload=false;this.hasShot=false;this.slot=undefined;}
   bind(target:Window):()=>void {
     const down=(event:KeyboardEvent)=>{
       if(!this.isEnabled || (event.target instanceof HTMLElement && (['INPUT','TEXTAREA','SELECT','BUTTON'].includes(event.target.tagName)||event.target.isContentEditable)))return;

@@ -26,6 +26,7 @@ export class GameScene {
   private body=new BoxGeometry(0.65,1.15,0.42);private head=new BoxGeometry(0.5,0.45,0.48);
   private cleanups:(()=>void)[]=[];private frame=0;private destroyed=false;private previous=performance.now();private lastStep=0;
   private remoteSteps=new Map<string,number>();private wasGrounded=true;private wasSliding=false;private wasReloading=false;
+  private emptyAt=0;
   constructor(private readonly canvas:HTMLCanvasElement,room:LobbyRoom,playerId:string){
     this.session=new GameSession(room,playerId);
     this.renderer=new WebGLRenderer({canvas,antialias:!this.isTouch,powerPreference:'high-performance'});
@@ -89,6 +90,7 @@ export class GameScene {
       this.weapon.update(p.weaponId,now,seconds,input.isAds,p.reloadUntil>serverNow,this.settings.reducedEffects);
       this.audio.listener(eye,input.cameraYaw);
       if(p.status==='alive'){
+        if(input.isFiring&&p.ammo===0&&now-this.emptyAt>500){this.audio.play('empty');this.emptyAt=now;}
         if(Math.hypot(predicted.velocityX,predicted.velocityZ)>1 && predicted.isGrounded && now-this.lastStep>320){this.audio.play(surfaceAt(predicted));this.lastStep=now;}
         if(this.wasGrounded&&!predicted.isGrounded)this.audio.play('jump');
         if(!this.wasGrounded&&predicted.isGrounded)this.audio.play('land');
