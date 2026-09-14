@@ -14,7 +14,7 @@ it('validates secrets, capacity, reconnection windows, and production transport 
     { GUEST_SESSION_SIGNING_SECRET: 'replace-with-a-long-random-secret' },
     { GUEST_SESSION_SIGNING_SECRET: '' },
     { ROOM_MAX_PLAYERS: '151' },
-    { ROOM_MAX_PLAYERS: '5' },
+    { ROOM_MAX_PLAYERS: '0' },
     { ROOM_MAX_PLAYERS: '6', DEV_BOT_COUNT: '6' },
     { ROOM_MAX_PLAYERS: '100', DEV_BOT_COUNT: '100' },
     { DEV_BOT_COUNT: '150' },
@@ -69,3 +69,4 @@ it('allows either loopback hostname during local development only', () => {
     }),
   ).toBe(false);
 });
+

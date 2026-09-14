@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   envDir: '../..',
-  publicDir: '../../assets',
+  // FPS uses original procedural geometry/audio; unreviewed source assets are not shipped.
+  publicDir: false,
   server: { strictPort: true },
 });

@@ -3,7 +3,6 @@ import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { LobbyController } from '../rooms/lobby-controller.js';
 import { GameplayController } from '../gameplay/gameplay-controller.js';
 import { BotRunner } from './bot-runner.js';
-import { DEFAULT_ICE_BRACKETS } from '../config/ice-brackets.js';
 
 describe('BotRunner and solo playtest', () => {
   it('populates bots and allows solo host to start countdown when total reaches MIN_PLAYERS', () => {
@@ -19,10 +18,9 @@ describe('BotRunner and solo playtest', () => {
 
     const gameplay = new GameplayController(state, () => {});
     const bots = new BotRunner(state, gameplay, 5);
-    const lobby = new LobbyController(state, 5000, DEFAULT_ICE_BRACKETS);
+    const lobby = new LobbyController(state, 5000);
 
     expect(lobby.connectedCount()).toBe(1);
-    expect(lobby.start('human-host', 1000)).toBe('At least six connected players are needed');
 
     // Start bots
     bots.start();
@@ -40,8 +38,7 @@ describe('BotRunner and solo playtest', () => {
     // Countdown finishes -> regular round starts
     const transitioned = lobby.tick(6001);
     expect(transitioned).toBe(true);
-    expect(state.phase).toBe('regular');
-    expect(state.round).toBe(0);
+    expect(state.phase).toBe('playing');
 
     // Stop bots
     bots.stop();
@@ -56,7 +53,7 @@ describe('BotRunner and solo playtest', () => {
     const bots = new BotRunner(state, gameplay, 3);
     bots.start();
 
-    const lobby = new LobbyController(state, 5000, DEFAULT_ICE_BRACKETS);
+    const lobby = new LobbyController(state, 5000);
     lobby.transferHost();
     // No humans connected, so hostPlayerId should become empty string
     expect(state.hostPlayerId).toBe('');
@@ -84,3 +81,4 @@ describe('BotRunner and solo playtest', () => {
     expect(state.players.size).toBe(1);
   });
 });
+

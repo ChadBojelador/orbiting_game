@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_ICE_BRACKETS, parseIceBrackets, type IceBracket } from './ice-brackets.js';
 
 export interface ServerConfig {
   host: string;
@@ -18,7 +17,6 @@ export interface ServerConfig {
   countdownSeconds: number;
   reconnectSeconds: number;
   sessionTtlSeconds: number;
-  iceBrackets: readonly IceBracket[];
 }
 
 export function isAllowedClientOrigin(
@@ -66,7 +64,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     if (!['postgres:', 'postgresql:'].includes(database.protocol))
       throw new Error('Invalid DATABASE_URL');
   }
-  const maxPlayers = integer('ROOM_MAX_PLAYERS', 150, 6, 150);
+  const maxPlayers = integer('ROOM_MAX_PLAYERS', 150, 1, 150);
   const requestedDevBotCount = integer('DEV_BOT_COUNT', 0, 0, 149);
   if (requestedDevBotCount > maxPlayers - 1)
     throw new Error('DEV_BOT_COUNT must be at most ROOM_MAX_PLAYERS - 1');
@@ -84,8 +82,5 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     countdownSeconds: integer('COUNTDOWN_SECONDS', 5, 1, 30),
     reconnectSeconds: integer('RECONNECT_SECONDS', 25, 20, 30),
     sessionTtlSeconds: integer('GUEST_SESSION_TTL_SECONDS', 3600, 60, 86400),
-    iceBrackets: env.ICE_COUNT_BRACKETS
-      ? parseIceBrackets(JSON.parse(env.ICE_COUNT_BRACKETS) as unknown)
-      : DEFAULT_ICE_BRACKETS,
   };
 }

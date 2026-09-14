@@ -1,50 +1,23 @@
-import { isRecord } from './guest.js';
-import type { FrostThrowIntent, MoveInput, TargetIntent } from '../protocol/gameplay.js';
-
-export function isMoveInput(value: unknown): value is MoveInput {
-  return (
-    isRecord(value) &&
-    Object.keys(value).every((key) => ['sequence', 'x', 'z', 'jump'].includes(key)) &&
-    Object.keys(value).length >= 3 &&
-    Object.keys(value).length <= 4 &&
-    typeof value.sequence === 'number' &&
-    Number.isInteger(value.sequence) &&
-    value.sequence > 0 &&
-    value.sequence <= 0xffffffff &&
-    typeof value.x === 'number' &&
-    Number.isFinite(value.x) &&
-    Math.abs(value.x) <= 1 &&
-    typeof value.z === 'number' &&
-    Number.isFinite(value.z) &&
-    Math.abs(value.z) <= 1 &&
-    (value.jump === undefined || typeof value.jump === 'boolean')
-  );
+import { isRecord, isEmptyPayload } from './guest.js';
+import type { MoveInput, ShootIntent, WeaponSwitchIntent, GameMode } from '../protocol/gameplay.js';
+import type { WeaponId } from '../constants/weapons.js';
+const isAngle = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max;
+export function isMoveInput(v: unknown): v is MoveInput {
+  return isRecord(v) && Object.keys(v).every(k => ['sequence','x','z','yaw','pitch','jump','slide','sprint','crouch'].includes(k))
+    && typeof v.sequence === 'number' && Number.isInteger(v.sequence) && v.sequence > 0 && v.sequence <= 0xffffffff
+    && isAngle(v.x, 1) && isAngle(v.z, 1)
+    && (v.yaw === undefined || isAngle(v.yaw, Math.PI))
+    && (v.pitch === undefined || isAngle(v.pitch, Math.PI * 89 / 180))
+    && ['jump','slide','sprint','crouch'].every(k => v[k] === undefined || typeof v[k] === 'boolean');
 }
-export function isFrostThrowIntent(value: unknown): value is FrostThrowIntent {
-  if (
-    !isRecord(value) ||
-    Object.keys(value).length !== 3 ||
-    !['directionX', 'directionY', 'directionZ'].every((key) => key in value) ||
-    typeof value.directionX !== 'number' ||
-    typeof value.directionY !== 'number' ||
-    typeof value.directionZ !== 'number' ||
-    !Number.isFinite(value.directionX) ||
-    !Number.isFinite(value.directionY) ||
-    !Number.isFinite(value.directionZ)
-  ) {
-    return false;
-  }
-  const magnitude = Math.hypot(value.directionX, value.directionY, value.directionZ);
-  return (
-    magnitude >= 0.9 && magnitude <= 1.1 && value.directionY >= -0.35 && value.directionY <= 0.5
-  );
+export function isShootIntent(v: unknown): v is ShootIntent {
+  return isRecord(v) && Object.keys(v).every(k => ['yaw','pitch','isAds'].includes(k))
+    && isAngle(v.yaw, Math.PI) && isAngle(v.pitch, Math.PI * 89 / 180)
+    && (v.isAds === undefined || typeof v.isAds === 'boolean');
 }
-export function isTargetIntent(value: unknown): value is TargetIntent {
-  return (
-    isRecord(value) &&
-    Object.keys(value).length === 1 &&
-    typeof value.targetId === 'string' &&
-    value.targetId.length > 0 &&
-    value.targetId.length <= 64
-  );
+export const isReloadIntent = isEmptyPayload;
+export function isWeaponSwitchIntent(v: unknown): v is WeaponSwitchIntent {
+  return isRecord(v) && Object.keys(v).length === 1 && typeof v.slot === 'number' && Number.isInteger(v.slot) && v.slot >= 0 && v.slot <= 2;
 }
+export function isGameMode(v: unknown): v is GameMode { return v === 'ffa' || v === 'tdm' || v === 'duel'; }
+export function isPrimaryWeapon(v: unknown): v is WeaponId { return ['assault-rifle','smg','shotgun','sniper'].includes(String(v)); }
