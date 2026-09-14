@@ -7,9 +7,9 @@ import {
   type RoomReservation,
 } from '@ice-water/shared';
 
-interface WireLobby extends Omit<LobbyView, 'players' | 'projectiles'> {
+interface WireLobby extends Omit<LobbyView, 'players'> {
   players: { values(): IterableIterator<PlayerView> };
-  projectiles: { values(): IterableIterator<LobbyView['projectiles'][number]> };
+
 }
 export type LobbyRoom = Room<unknown, WireLobby>;
 const endpoint = new URL(import.meta.env.VITE_GAME_SERVER_URL || 'ws://localhost:2567');
@@ -105,50 +105,18 @@ export async function reconnectRoom(): Promise<LobbyRoom | null> {
 }
 export function snapshot(state: WireLobby): LobbyView {
   return {
-    inviteCode: state.inviteCode,
-    hostPlayerId: state.hostPlayerId,
-    phase: state.phase,
-    phaseDeadline: state.phaseDeadline,
-    serverTime: state.serverTime,
-    maxPlayers: state.maxPlayers,
-    minPlayers: state.minPlayers,
-    iceCount: state.iceCount,
-    round: state.round ?? 0,
-    maxRounds: state.maxRounds ?? 0,
-    arenaHalfExtent: state.arenaHalfExtent ?? 28,
-    projectiles: [...state.projectiles.values()].map((projectile) => ({
-      projectileId: projectile.projectileId,
-      ownerPlayerId: projectile.ownerPlayerId,
-      x: projectile.x,
-      y: projectile.y,
-      z: projectile.z,
-      velocityX: projectile.velocityX,
-      velocityY: projectile.velocityY,
-      velocityZ: projectile.velocityZ,
-      expiresAt: projectile.expiresAt,
-    })),
-    players: [...state.players.values()].map((player) => ({
-      playerId: player.playerId,
-      displayName: player.displayName,
-      team: player.team,
-      isConnected: player.isConnected,
-      reconnectDeadline: player.reconnectDeadline,
-      x: player.x,
-      y: player.y,
-      z: player.z,
-      yaw: player.yaw,
-      verticalVelocity: player.verticalVelocity,
-      isGrounded: player.isGrounded,
-      inputSequence: player.inputSequence,
-      status: player.status,
-      protectedUntil: player.protectedUntil,
-      rescueProgress: player.rescueProgress,
-      rescuingTarget: player.rescuingTarget,
-      frostReadyAt: player.frostReadyAt,
-      helpPingUntil: player.helpPingUntil,
-      helpPingReadyAt: player.helpPingReadyAt,
-      tags: player.tags,
-      rescues: player.rescues,
+    inviteCode: state.inviteCode, hostPlayerId:state.hostPlayerId,phase:state.phase,
+    phaseDeadline:state.phaseDeadline,serverTime:state.serverTime,maxPlayers:state.maxPlayers,minPlayers:state.minPlayers,
+    arenaHalfExtent:state.arenaHalfExtent,gameMode:state.gameMode,iceScore:state.iceScore,waterScore:state.waterScore,
+    matchWinner:state.matchWinner,resultReason:state.resultReason,
+    players:[...state.players.values()].map(p=>({
+      playerId:p.playerId,displayName:p.displayName,team:p.team,isConnected:p.isConnected,isBot:p.isBot,reconnectDeadline:p.reconnectDeadline,
+      x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,velocityX:p.velocityX,velocityZ:p.velocityZ,verticalVelocity:p.verticalVelocity,
+      isGrounded:p.isGrounded,inputSequence:p.inputSequence,status:p.status,protectedUntil:p.protectedUntil,
+      isSliding:p.isSliding,isCrouching:p.isCrouching,slideUntil:p.slideUntil,slideReadyAt:p.slideReadyAt,
+      hp:p.hp,kills:p.kills,deaths:p.deaths,currentWeaponSlot:p.currentWeaponSlot,primaryWeapon:p.primaryWeapon,weaponId:p.weaponId,
+      ammo:p.ammo,reserveAmmo:p.reserveAmmo,reloadUntil:p.reloadUntil,fireReadyAt:p.fireReadyAt,respawnAt:p.respawnAt,
+      spawnGeneration:p.spawnGeneration,lastKillerId:p.lastKillerId,lastDeathWeapon:p.lastDeathWeapon,ping:p.ping,
     })),
   };
 }
