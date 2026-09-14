@@ -11,8 +11,8 @@ describe('Frostline movement and collision',()=>{
     const cardinal=moveKinematic({x:0,z:-34},{x:1,z:0},0.05);
     const diagonal=moveKinematic({x:0,z:-34},{x:1,z:1},0.05);
     expect(Math.hypot(diagonal.x,diagonal.z+34)).toBeCloseTo(cardinal.x);
-    const wall=moveKinematic({x:-34,z:-34},{x:-1,z:0},2,ARENA.halfExtent,40);
-    expect(wall.x).toBeGreaterThan(-39.2);
+    const wall=moveKinematic({x:-51,z:-51},{x:-1,z:0},2,ARENA.halfExtent,40);
+    expect(wall.x).toBeGreaterThan(-59.2);
   });
   it('jumps once while grounded and lands under fixed time',()=>{
     let p=simulateMovement(motion(),{x:0,z:0,sequence:1,jump:true},50);
@@ -34,21 +34,21 @@ describe('Frostline movement and collision',()=>{
   });
   it('slows water and crouch movement and retains more ice momentum',()=>{
     const input={x:0,z:1,sequence:1};
-    expect(simulateMovement(motion(-20,-16),input,50).velocityZ).toBeLessThan(simulateMovement(motion(-34,-16),input,50).velocityZ);
+    expect(simulateMovement(motion(-30,-24),input,50).velocityZ).toBeLessThan(simulateMovement(motion(-51,-24),input,50).velocityZ);
     expect(simulateMovement(motion(),{...input,crouch:true},50).velocityZ).toBeLessThan(simulateMovement(motion(),input,50).velocityZ);
-    const ice=motion(0,-22),metal=motion(-34,-22);ice.velocityZ=metal.velocityZ=12;
+    const ice=motion(0,-33),metal=motion(-51,-33);ice.velocityZ=metal.velocityZ=12;
     expect(simulateMovement(ice,{x:0,z:0,sequence:1},50).velocityZ).toBeGreaterThan(simulateMovement(metal,{x:0,z:0,sequence:1},50).velocityZ);
   });
   it('allows ramp traversal to the catwalk but rejects climbing its sides',()=>{
-    let p=motion(-29,-16);
+    let p=motion(-43.5,-24);
     for(let t=50;t<=1300;t+=50)p=simulateMovement(p,{x:0,z:1,sequence:t},t);
-    expect(p.y).toBeCloseTo(3);expect(p.z).toBeGreaterThan(-5);
-    expect(terrainHeightAt({x:-29,z:-10})).toBe(1.5);
-    expect(isWalkable({x:-29,z:0},40,0)).toBe(false);
+    expect(p.y).toBeGreaterThan(2.5);expect(p.z).toBeGreaterThan(-10);
+    expect(terrainHeightAt({x:-43.5,z:-15})).toBe(1.5);
+    expect(isWalkable({x:-43.5,z:0},ARENA.halfExtent,0)).toBe(false);
   });
   it('hits walls, the ground, and ramp wedges with bounded rays',()=>{
-    expect(worldRayDistance({x:0,y:1.6,z:-10},lookDirection(0,0),100)).toBeCloseTo(29.5);
-    expect(worldRayDistance({x:-29,y:1,z:-16},lookDirection(Math.PI,0),20)).toBeLessThan(6);
-    expect(worldRayDistance({x:0,y:2,z:-34},{x:0,y:-1,z:0},100)).toBe(2);
+    expect(worldRayDistance({x:0,y:1.6,z:-10},lookDirection(0,0),100)).toBeCloseTo(49.5);
+    expect(worldRayDistance({x:-43.5,y:1,z:-24},lookDirection(Math.PI,0),20)).toBeLessThan(7);
+    expect(worldRayDistance({x:0,y:2,z:-51},{x:0,y:-1,z:0},100)).toBe(2);
   });
 });

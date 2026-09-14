@@ -1,5 +1,5 @@
 import { GAMEPLAY } from '../constants/gameplay.js';
-import type { Position, SpatialPosition, MoveInput } from '../protocol/gameplay.js';
+import type { MapId, Position, SpatialPosition, MoveInput } from '../protocol/gameplay.js';
 
 export interface ArenaBlock extends SpatialPosition { id: string; width: number; depth: number; height: number }
 export interface ArenaRamp extends Position { id: string; width: number; depth: number; height: number; direction: 1 | -1 }
@@ -30,6 +30,12 @@ export const SPAWN_POINTS: readonly Position[] = [
   ...[-35,35].flatMap(x=>[-18,18].map(z=>({x:x*MAP_SCALE,z:z*MAP_SCALE}))),
   {x:-6*MAP_SCALE,z:-26*MAP_SCALE},{x:6*MAP_SCALE,z:26*MAP_SCALE},
 ];
+export const ISLAND_SPAWN_POINTS: readonly Position[] = [
+  {x:-30,z:-30},{x:-10,z:-30},{x:10,z:-30},{x:30,z:-30},
+  {x:-30,z:30},{x:-10,z:30},{x:10,z:30},{x:30,z:30},
+  {x:-30,z:-10},{x:-30,z:10},{x:30,z:-10},{x:30,z:10},
+  {x:-10,z:-10},{x:10,z:-10},{x:-10,z:10},{x:10,z:10},
+];
 export const ICE_PATCHES = [{x:0,z:-21*MAP_SCALE,width:12*MAP_SCALE,depth:9*MAP_SCALE},{x:0,z:21*MAP_SCALE,width:12*MAP_SCALE,depth:9*MAP_SCALE}] as const;
 export const WATER_PATCHES = [{x:-20*MAP_SCALE,z:0,width:4*MAP_SCALE,depth:34*MAP_SCALE},{x:20*MAP_SCALE,z:0,width:4*MAP_SCALE,depth:34*MAP_SCALE}] as const;
 const inside = (p: Position, b: Position & {width:number;depth:number}, margin=0) => Math.abs(p.x-b.x) <= b.width/2+margin && Math.abs(p.z-b.z) <= b.depth/2+margin;
@@ -44,6 +50,7 @@ export function terrainHeightAt(p: Position): number {
   return 0;
 }
 export function createSpawnPoints(): Position[] { return SPAWN_POINTS.map(p=>({...p})); }
+export function spawnPointsForMap(mapId:MapId): readonly Position[] { return mapId==='island'?ISLAND_SPAWN_POINTS:SPAWN_POINTS; }
 export function distanceSquared(a: Position,b: Position): number { return (a.x-b.x)**2+(a.z-b.z)**2; }
 export function distanceSquared3d(a: SpatialPosition,b: SpatialPosition): number { return distanceSquared(a,b)+(a.y-b.y)**2; }
 export function bodyHeight(p: {isSliding:boolean;isCrouching:boolean}): number {

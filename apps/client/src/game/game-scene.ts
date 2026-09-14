@@ -14,7 +14,7 @@ import { renderPixelRatio } from './render-performance.js';
 export class GameScene {
   readonly session:GameSession;settings:FpsSettings=readSettings();isLocked=false;
   readonly isTouch=matchMedia('(any-pointer: coarse)').matches || navigator.maxTouchPoints>0;
-  private readonly scene=new Scene();private readonly camera=new PerspectiveCamera(96,1,0.05,140);
+  private readonly scene=new Scene();private readonly camera=new PerspectiveCamera(96,1,0.05,320);
   private renderer:WebGLRenderer;private world?:FrostlineMap;private island?:IslandMap;
   private cameraMotion=new FirstPersonCamera();private presentation=new LocalPresentation();
   private weapon:WeaponRenderer;private effects:HitEffects;private audio=new AudioManager();
@@ -26,7 +26,7 @@ export class GameScene {
     this.session=new GameSession(room,playerId);
     this.renderer=new WebGLRenderer({canvas,antialias:!this.isTouch,powerPreference:'high-performance'});
     this.renderer.outputColorSpace=SRGBColorSpace;
-    this.scene.background=new Color(0xc5e4ef);this.scene.fog=new Fog(0xc5e4ef,65,135);
+    this.scene.background=new Color(0xc5e4ef);this.scene.fog=new Fog(0xc5e4ef,150,300);
     this.scene.add(new HemisphereLight(0xedfaff,0x41617b,2.5));
     const sun=new DirectionalLight(0xfff0d0,2);sun.position.set(-30,60,20);this.scene.add(sun);
     if(this.session.view.mapId==='island')this.island=new IslandMap(this.scene);

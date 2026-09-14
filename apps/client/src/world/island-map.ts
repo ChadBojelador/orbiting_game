@@ -21,8 +21,11 @@ export class IslandMap {
       object.receiveShadow=true;
     });
     const bounds=new Box3().setFromObject(model),size=bounds.getSize(new Vector3());
-    const largest=Math.max(size.x,size.y,size.z);
-    if(largest>0)model.scale.setScalar(72/largest);
+    const horizontalSize=Math.max(size.x,size.z);
+    if(horizontalSize>0){
+      const horizontalScale=220000/horizontalSize;
+      model.scale.set(horizontalScale,1,horizontalScale);
+    }
     const normalizedBounds=new Box3().setFromObject(model),center=normalizedBounds.getCenter(new Vector3());
     model.position.set(-center.x,-normalizedBounds.min.y,-center.z);
     this.group.add(model);
