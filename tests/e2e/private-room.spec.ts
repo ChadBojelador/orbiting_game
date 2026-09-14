@@ -257,5 +257,5 @@ test('Island loads its optimized Fort and uses the selected authoritative map', 
   await page.screenshot({ path: 'test-results/fps-island.png' });
   expect(errors).toEqual([]);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Leave room' }).click();
+  await page.getByRole('button', { name: 'Leave room' }).click({ force: true });
 });
