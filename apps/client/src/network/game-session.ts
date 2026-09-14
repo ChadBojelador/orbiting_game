@@ -14,7 +14,7 @@ export class GameSession {
       this.view=snapshot(room.state);this.clock.update(this.view.serverTime);
       for(const p of this.view.players){
         if(p.playerId===playerId){
-          if(p.spawnGeneration!==this.lastGeneration){this.nextShotAt=0;this.lastGeneration=p.spawnGeneration;}
+          if(p.spawnGeneration!==this.lastGeneration){this.nextShotAt=0;this.lastGeneration=p.spawnGeneration;this.input.cameraYaw=p.yaw;this.input.cameraPitch=p.pitch;this.input.reset();}
           this.prediction.reconcile(p,this.canMove(p));
         }else{
           let remote=this.remotes.get(p.playerId);if(!remote){remote=new RemoteInterpolation();this.remotes.set(p.playerId,remote);}

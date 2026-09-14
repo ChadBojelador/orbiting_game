@@ -34,8 +34,8 @@ export class FrostlineMap {
     for(const x of [-20,0,20])for(const z of [-31,31]){
       const stripe=new Mesh(new BoxGeometry(5,0.015,0.3),amber);stripe.position.set(x,0.025,z);this.group.add(stripe);
     }
-    const core=new Mesh(new CylinderGeometry(1.5,1.5,2,12),ice);core.position.y=4.5;this.group.add(core);
-    const ring=new Mesh(new CylinderGeometry(2.1,2.1,0.2,12),amber);ring.position.y=5.5;this.group.add(ring);
+    const core=new Mesh(new CylinderGeometry(1.5,1.5,2,12),ice);core.position.y=2.5;this.group.add(core);
+    const ring=new Mesh(new CylinderGeometry(2.1,2.1,0.2,12),amber);ring.position.y=3.4;this.group.add(ring);
     scene.add(this.group);
   }
   destroy():void{

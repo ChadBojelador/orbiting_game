@@ -87,6 +87,7 @@ export class GameplayController {
     p.inputSequence=this.sequences.get(p.playerId)??p.inputSequence;
     Object.assign(p,spawn,{y:terrainHeightAt(spawn),velocityX:0,velocityZ:0,verticalVelocity:0,isGrounded:true,isSliding:false,isCrouching:false,slideUntil:0,slideReadyAt:0});
     p.status='alive';p.hp=GAMEPLAY.maxHp;p.respawnAt=0;p.protectedUntil=now+GAMEPLAY.spawnProtectionMs;p.spawnGeneration++;
+    p.yaw=Math.atan2(spawn.x,spawn.z);p.pitch=0;
     this.weapons.reset(p);
     this.emit({type:'player/respawned',payload:{playerId:p.playerId,x:p.x,y:p.y,z:p.z,serverTime:now}});
   }
