@@ -55,11 +55,33 @@ function renderedMesh(): Mesh {
 
 describe('Island render and authoritative geometry', () => {
   it('lets every spawn walk forward out of its initial position', () => {
-    for(const spawn of ISLAND_SPAWN_POINTS){
-      const length=Math.hypot(spawn.x,spawn.z);
-      let p={...spawn,y:terrainHeightAt(spawn,'island'),verticalVelocity:0,velocityX:0,velocityZ:0,isGrounded:true,isSliding:false,isCrouching:false,slideUntil:0,slideReadyAt:0};
-      for(let tick=1;tick<=8;tick++)p=simulateMovement(p,{x:-spawn.x/length,z:-spawn.z/length,sequence:tick},tick*50,0.05,1,'island');
-      expect(Math.hypot(p.x-spawn.x,p.z-spawn.z),`spawn ${spawn.x},${spawn.z}`).toBeGreaterThan(1.5);
+    for (const spawn of ISLAND_SPAWN_POINTS) {
+      const length = Math.hypot(spawn.x, spawn.z);
+      let p = {
+        ...spawn,
+        y: terrainHeightAt(spawn, 'island'),
+        verticalVelocity: 0,
+        velocityX: 0,
+        velocityZ: 0,
+        isGrounded: true,
+        isSliding: false,
+        isCrouching: false,
+        slideUntil: 0,
+        slideReadyAt: 0,
+      };
+      for (let tick = 1; tick <= 8; tick++)
+        p = simulateMovement(
+          p,
+          { x: -spawn.x / length, z: -spawn.z / length, sequence: tick },
+          tick * 50,
+          0.05,
+          1,
+          'island',
+        );
+      expect(
+        Math.hypot(p.x - spawn.x, p.z - spawn.z),
+        `spawn ${spawn.x},${spawn.z}`,
+      ).toBeGreaterThan(1.5);
     }
   });
   it('grounds all sixteen spawns on the rendered mesh with room for a standing player', () => {

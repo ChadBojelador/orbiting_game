@@ -1,5 +1,6 @@
 import {
   islandHeightAt,
+  islandSupportHeightAt,
   islandRayDistance,
   isIslandBodyClear,
   islandCeilingAt,
@@ -210,7 +211,10 @@ export function moveKinematic(
     if (isWalkable(x, halfExtent, floor, height, mapId)) next.x = x.x;
     const z = { x: next.x, z: next.z + dz / steps };
     if (isWalkable(z, halfExtent, floor, height, mapId)) next.z = z.z;
-    const sampled = terrainHeightAt(next, mapId, floor + 0.32);
+    const sampled =
+      mapId === 'island'
+        ? islandSupportHeightAt(next, floor + 0.32, GAMEPLAY.playerRadius)
+        : terrainHeightAt(next, mapId, floor + 0.32);
     if (sampled <= floor + 0.32 && sampled > floor) floor = sampled;
   }
   return next;
@@ -228,10 +232,15 @@ export function advanceVerticalMotion(
   mapId: MapId = 'frostline',
   height: number = GAMEPLAY.playerHeight,
 ): VerticalMotion {
-  const floor = terrainHeightAt(position, mapId, previous.y + 0.32);
+  const floor =
+    mapId === 'island'
+      ? islandSupportHeightAt(position, previous.y + 0.32, GAMEPLAY.playerRadius)
+      : terrainHeightAt(position, mapId, previous.y + 0.32);
   let velocity = previous.verticalVelocity;
   if (wantsJump && previous.isGrounded) velocity = GAMEPLAY.jumpSpeed;
   let y = previous.y;
+  if (previous.isGrounded && !wantsJump && Math.abs(y - floor) <= 0.32)
+    return { y: floor, verticalVelocity: 0, isGrounded: true };
   if (!previous.isGrounded || velocity > 0 || y > floor + 0.06) {
     y += velocity * seconds - 0.5 * GAMEPLAY.gravity * seconds * seconds;
     velocity -= GAMEPLAY.gravity * seconds;
@@ -301,6 +310,13 @@ export function simulateMovement(
       (surface === 'ice' ? GAMEPLAY.slideIceBonus : 1);
   }
   next.isCrouching = !!input.crouch && !next.isSliding;
+  if (
+    !next.isSliding &&
+    !next.isCrouching &&
+    (p.isCrouching || p.isSliding) &&
+    !isWalkable(p, ARENA.halfExtent, p.y, GAMEPLAY.playerHeight, mapId)
+  )
+    next.isCrouching = true;
   if (next.isSliding) {
     const friction = surface === 'ice' ? GAMEPLAY.iceFriction : GAMEPLAY.slideFriction;
     next.velocityX *= friction;

@@ -177,7 +177,7 @@ These commands are a required scaffold contract. Until package manifests exist, 
 
 - Keep mobile input parity and portrait/landscape controls. Reset held intent on blur, disconnect, hidden tabs, pointer cancellation, and pointer-lock loss.
 - FPS source types replace the old protocol; client and server must deploy together. Files ending in `.freeze-tag-backup` and `docs/archive` are historical, not a supported alternate mode or test suite.
-- Use shared Frostline geometry for collision, prediction, rendering, and shot occlusion. No untracked decorative cover.
+- Use the selected map's shared geometry for collision, prediction, rendering, and shot occlusion. No untracked decorative cover. Island spawn generation must verify a clear exit, not just a clear standing point; retain ledge-support and low-ceiling regression coverage.
 - The database uses additive FPS summary tables; do not edit checksummed historical migrations.
 - Browser tests may control authoritative state only inside their test worker fixture. Never ship test control endpoints or trust browser outcomes.
 - Same-process five-second load smoke checks do not establish full-match capacity, 20 Hz server throughput, or mobile rendering FPS. Report limits accurately.

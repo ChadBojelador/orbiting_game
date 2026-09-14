@@ -144,7 +144,7 @@ export class GameScene {
     const input = this.session.input;
     const lock = () => {
       this.isLocked = document.pointerLockElement === this.canvas;
-      input.isEnabled = this.isTouch || this.isLocked;
+      input.isEnabled = !this.isPaused;
       if (!this.isLocked) input.reset();
     };
     const down = (e: PointerEvent) => {
@@ -152,7 +152,6 @@ export class GameScene {
       if (e.pointerType === 'touch') return;
       if (!this.isLocked) {
         this.lock();
-        return;
       }
       if (e.button === 0) input.pressFire();
       if (e.button === 2) input.isAds = true;
@@ -174,6 +173,14 @@ export class GameScene {
       }
     };
     const context = (e: Event) => e.preventDefault();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+      this.isLocked = false;
+      input.reset();
+      input.isEnabled = !this.isPaused;
+    };
+    window.addEventListener('keydown', escape);
     this.canvas.addEventListener('pointerdown', down);
     window.addEventListener('pointerup', up);
     document.addEventListener('mousemove', move);
@@ -183,6 +190,7 @@ export class GameScene {
     const unlockAudio = () => this.audio.unlock();
     window.addEventListener('pointerdown', unlockAudio, { once: true });
     this.cleanups.push(() => {
+      window.removeEventListener('keydown', escape);
       this.canvas.removeEventListener('pointerdown', down);
       window.removeEventListener('pointerup', up);
       document.removeEventListener('mousemove', move);
@@ -221,7 +229,7 @@ export class GameScene {
       p = session.local(),
       serverNow = session.serverNow(),
       input = session.input;
-    input.isEnabled = this.isMapReady && !this.isPaused && (this.isTouch || this.isLocked);
+    input.isEnabled = !this.isPaused;
     input.sensitivity = this.settings.sensitivity * 0.002;
     this.audio.volume = this.settings.isMuted
       ? 0

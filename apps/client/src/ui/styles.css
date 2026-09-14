@@ -112,6 +112,7 @@ form .primary {
 
 /* Persistent 3D lobby */
 .lobby-shell {
+  display: flow-root;
   position: relative;
   min-height: 100dvh;
   overflow: hidden;
@@ -1696,13 +1697,18 @@ form .primary {
     display: none;
   }
   .lobby-wordmark {
-    top: 138px;
+    left: auto;
+    right: 16px;
+    top: 136px;
+    transform: none;
+    align-items: flex-end;
+    opacity: 0.72;
   }
   .lobby-wordmark span {
-    font-size: 28px;
+    font-size: 19px;
   }
   .lobby-wordmark strong {
-    font-size: 50px;
+    font-size: 34px;
   }
   .command-panel {
     margin: 355px 10px 14px;

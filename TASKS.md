@@ -32,4 +32,25 @@ Current product: private-room arena FPS with desktop/mobile support and Frostlin
 
 ## Evidence and limits
 
-The current unit/integration suite passes 80 tests, strict type checking passes, and the production build passes. Browser coverage exercises desktop and mobile join/play/combat/results/settings flows; the Windows Chrome runner uses CDP touch events because its reported touch capability is incomplete. Existing 20/50/100/150-client checks are same-process five-second smoke tests, not sustained 20 Hz capacity evidence. Island-specific full-match profiling, physical-device performance, balance, accessibility, and asset-permission verification remain open.
+Final checks on 2026-09-15:
+
+- `npm test`: 81 passed across 20 files, including PostgreSQL migrations/transactional summaries and real WebSocket reconnect/security flows.
+- `npm run test:e2e`: 5 passed in installed Chrome. Desktop combat/results; mobile simultaneous movement/look/fire on Frostline and Island in portrait/landscape; loadout/duel/settings; Island loading, movement, firing and Escape/leave.
+- `npm run lint`, `npm run typecheck`, `npm run build`: passed. Vite reports large shared-collision/renderer chunks; do not suppress this advisory as a substitute for device profiling.
+- Independent GLB raycasting matches Island ground and shot collision. All sixteen spawns have a clear initial exit; regression tests cover walking off ledges without sinking into adjacent collision. Pointer-lock release has an explicit Escape handler.
+- Migrations 003/004 applied to the local database; `/ready` reports database ready. The developer game runs at http://127.0.0.1:5173 with the authoritative server on 2567. Test ports 5174/2568 are separate.
+
+The Windows Chrome runner uses CDP touch events because reported touch capability is incomplete. Physical-device FPS and full-match capacity remain unverified.
+
+### Staged load smoke evidence — 2026-09-14
+
+Five seconds of active input/firing, real WebSockets, same-process driver/server, no rendering. These Frostline measurements precede the final Island integration and do not establish sustained 20 Hz capacity.
+
+| Clients | Join ms | Observed simulation tick changes | Kills | Driver timer p95 ms |
+|---|---:|---:|---:|---:|
+| 20 | 679 | 81 | 15 | 4 |
+| 50 | 1544 | 61 | 46 | 10 |
+| 100 | 3359 | 18 | 61 | 40 |
+| 150, encoder rerun | 6224 | 29 | 126 | 38 |
+
+The first 150-client run overflowed the 32 KiB schema buffer. A 64 KiB buffer removed that failure on rerun. Larger populations did not sustain the target tick rate; the configured 150-player cap is not verified production capacity. Independent-process full-match profiling on both maps, physical-device performance, balance, accessibility and asset-permission evidence remain open.

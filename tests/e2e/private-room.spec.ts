@@ -114,94 +114,97 @@ test('desktop guests play, shoot, die, respawn, see scores and finish', async ({
     await context.close();
   }
 });
-test('mobile supports simultaneous movement, look and fire without overflow', async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-  });
-  const page = await context.newPage(),
-    errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  const cdp = await context.newCDPSession(page);
-  // Signed desktop Chrome in this runner may ignore context-level hasTouch.
-  // Enable actual CDP touch emulation before loading the client.
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-  try {
-    await page.goto('/');
-    await page.getByLabel('Display name').fill('<>');
-    await page.getByRole('button', { name: 'Let’s go' }).tap();
-    await expect(page.getByRole('alert')).toContainText('2–20');
-    await page.getByLabel('Display name').fill('Touch Player');
-    await page.getByRole('button', { name: 'Let’s go' }).tap();
-    await page.getByLabel('Invite code', { exact: true }).fill('ABCDEFGH');
-    await page.getByRole('button', { name: 'Join room', exact: true }).tap();
-    await expect(page.getByRole('alert')).toContainText('Room not found');
-    await page.screenshot({ path: 'test-results/fps-lobby-mobile.png', fullPage: true });
-    const { room } = await create(page);
-    await start(page);
-    await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeVisible();
-    const p = room.state.players.get(room.state.hostPlayerId)!,
-      before = { x: p.x, z: p.z, yaw: p.yaw };
-    const stick = (await page.getByLabel('Movement joystick').boundingBox())!,
-      fire = (await page.getByRole('button', { name: 'Fire', exact: true }).boundingBox())!;
-    const x = stick.x + stick.width / 2,
-      y = stick.y + stick.height / 2;
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ id: 1, x, y }],
-    });
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [{ id: 1, x, y: y - 40 }],
-    });
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [
-        { id: 1, x, y: y - 40 },
-        { id: 2, x: 200, y: 350 },
-      ],
-    });
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [
-        { id: 1, x, y: y - 40 },
-        { id: 2, x: 245, y: 350 },
-      ],
-    });
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [
-        { id: 1, x, y: y - 40 },
-        { id: 2, x: 245, y: 350 },
-        { id: 3, x: fire.x + fire.width / 2, y: fire.y + fire.height / 2 },
-      ],
-    });
-    await expect.poll(() => Math.hypot(p.x - before.x, p.z - before.z)).toBeGreaterThan(1);
-    await expect.poll(() => p.ammo).toBeLessThan(30);
-    expect(p.yaw).not.toBe(before.yaw);
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await page.getByRole('button', { name: 'Weapon', exact: true }).tap();
-    await expect(page.locator('.ammo-display')).toContainText('Snowmelt');
-    await page.getByRole('button', { name: 'Scores', exact: true }).tap();
-    await expect(page.getByRole('region', { name: 'Scoreboard' })).toBeVisible();
-    await page.getByRole('button', { name: 'Scores', exact: true }).tap();
-    await expect(page.getByRole('region', { name: 'Scoreboard' })).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
-    await page.screenshot({ path: 'test-results/fps-mobile.png' });
-    await page.setViewportSize({ width: 844, height: 390 });
-    await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeVisible();
-    await page.screenshot({ path: 'test-results/fps-mobile-landscape.png' });
-    await page.getByRole('button', { name: 'Leave room' }).tap();
-    expect(errors).toEqual([]);
-  } finally {
-    await context.close();
-  }
-});
+for (const mapId of ['frostline', 'island'] as const)
+  test(
+    'mobile ' + mapId + ' supports simultaneous movement, look and fire without overflow',
+    async ({ browser }) => {
+      const context = await browser.newContext({
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+      });
+      const page = await context.newPage(),
+        errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      const cdp = await context.newCDPSession(page);
+      // Signed desktop Chrome in this runner may ignore context-level hasTouch.
+      // Enable actual CDP touch emulation before loading the client.
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+      try {
+        await page.goto('/');
+        await page.getByLabel('Display name').fill('<>');
+        await page.getByRole('button', { name: 'Let’s go' }).tap();
+        await expect(page.getByRole('alert')).toContainText('2–20');
+        await page.getByLabel('Display name').fill('Touch Player');
+        await page.getByRole('button', { name: 'Let’s go' }).tap();
+        await page.getByLabel('Invite code', { exact: true }).fill('ABCDEFGH');
+        await page.getByRole('button', { name: 'Join room', exact: true }).tap();
+        await expect(page.getByRole('alert')).toContainText('Room not found');
+        await page.screenshot({ path: 'test-results/fps-lobby-mobile.png', fullPage: true });
+        await page.getByLabel('Map', { exact: true }).selectOption(mapId);
+        const { room } = await create(page);
+        await start(page);
+        await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeVisible();
+        const p = room.state.players.get(room.state.hostPlayerId)!,
+          before = { x: p.x, z: p.z, yaw: p.yaw };
+        const stick = (await page.getByLabel('Movement joystick').boundingBox())!,
+          fire = (await page.getByRole('button', { name: 'Fire', exact: true }).boundingBox())!;
+        const x = stick.x + stick.width / 2,
+          y = stick.y + stick.height / 2;
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart',
+          touchPoints: [{ id: 1, x, y }],
+        });
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ id: 1, x, y: y - 40 }],
+        });
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart',
+          touchPoints: [
+            { id: 1, x, y: y - 40 },
+            { id: 2, x: 200, y: 350 },
+          ],
+        });
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [
+            { id: 1, x, y: y - 40 },
+            { id: 2, x: 245, y: 350 },
+          ],
+        });
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchStart',
+          touchPoints: [
+            { id: 1, x, y: y - 40 },
+            { id: 2, x: 245, y: 350 },
+            { id: 3, x: fire.x + fire.width / 2, y: fire.y + fire.height / 2 },
+          ],
+        });
+        await expect.poll(() => Math.hypot(p.x - before.x, p.z - before.z)).toBeGreaterThan(1);
+        await expect.poll(() => p.ammo).toBeLessThan(30);
+        expect(p.yaw).not.toBe(before.yaw);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.getByRole('button', { name: 'Weapon', exact: true }).tap();
+        await expect(page.locator('.ammo-display')).toContainText('Snowmelt');
+        await page.getByRole('button', { name: 'Scores', exact: true }).tap();
+        await expect(page.getByRole('region', { name: 'Scoreboard' })).toBeVisible();
+        await page.getByRole('button', { name: 'Scores', exact: true }).tap();
+        await expect(page.getByRole('region', { name: 'Scoreboard' })).toHaveCount(0);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true,
+        );
+        await page.screenshot({ path: 'test-results/fps-mobile-' + mapId + '.png' });
+        await page.setViewportSize({ width: 844, height: 390 });
+        await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeVisible();
+        await page.screenshot({ path: 'test-results/fps-mobile-landscape-' + mapId + '.png' });
+        await page.getByRole('button', { name: 'Leave room' }).tap();
+        expect(errors).toEqual([]);
+      } finally {
+        await context.close();
+      }
+    },
+  );
 test('loadout, duel mode and local settings survive their intended boundaries', async ({
   page,
 }) => {
@@ -252,10 +255,14 @@ test('Island loads its optimized Fort and uses the selected authoritative map', 
   await page.keyboard.down('KeyW');
   await expect
     .poll(() => Math.hypot(player.x - before.x, player.z - before.z))
-    .toBeGreaterThan(0.5);
+    .toBeGreaterThan(1.5);
   await page.keyboard.up('KeyW');
+  await page.mouse.down();
+  await expect.poll(() => player.ammo).toBeLessThan(30);
+  await page.mouse.up();
   await page.screenshot({ path: 'test-results/fps-island.png' });
   expect(errors).toEqual([]);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Leave room' }).click({ force: true });
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement === null)).toBe(true);
+  await page.getByRole('button', { name: 'Leave room' }).click();
 });

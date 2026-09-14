@@ -14,6 +14,7 @@ import type { FpsSettings } from '../game/fps-settings.js';
 import type { LobbySection } from '../game/lobby-preview.js';
 import { LoadoutScreen } from './loadout-screen.js';
 import { SettingsPanel } from './settings-panel.js';
+import assetCreditsUrl from '../../../../assets/ATTRIBUTION.txt?url&no-inline';
 
 const LobbyPreview = lazy(() =>
   import('../game/lobby-preview.js').then((module) => ({ default: module.LobbyPreview })),
@@ -775,6 +776,11 @@ function ProfilePanel({ guest }: { guest: GuestSession }) {
       <p className="system-note">
         Accounts, currency, and persistent progression are outside the current playable release.
         Your callsign remains active for this browser tab.
+      </p>
+      <p>
+        <a href={assetCreditsUrl} target="_blank" rel="noreferrer">
+          Asset credits
+        </a>
       </p>
     </>
   );

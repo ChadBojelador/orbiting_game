@@ -29,11 +29,13 @@ Island uses the Fort sector of the supplied archipelago. The 136.6 MB source rem
 
 ## Verification status
 
-- `npm test`: passed, 80 tests.
+- `npm test`: passed, 81 tests across 20 files, including the database suite.
 - `npm run typecheck`: passed for shared, client, server, and root tests.
 - `npm run build`: passed for shared, server, and client. Vite retains a large renderer chunk as a tracked advisory.
-- `npm run lint`: ESLint passed; Prettier reported existing formatting drift, which is being normalized in the current continuation.
-- Browser and load checks cover desktop/mobile flows and staged 20/50/100/150-client smoke runs. These do not establish full-match capacity or physical-device frame rate.
+- `npm run lint`: ESLint and Prettier passed.
+- `npm run test:e2e`: 5 passed in Chrome, including desktop Island movement/firing/Escape and simultaneous mobile controls on both maps in portrait/landscape.
+- Island movement follow-up: generated spawns require a clear initial exit; feet use radius-based ledge support; standing beneath low ceilings retains crouch. Render/shot collision is checked against the actual GLB, and all sixteen spawns are tested for forward movement.
+- Staged 20/50/100/150-client load smoke measurements and remaining limits are recorded in TASKS.md. They do not establish full-match capacity or physical-device frame rate.
 - PostgreSQL integration requires a disposable `TEST_DATABASE_URL`; never use production credentials.
 
 ## Remaining release gates

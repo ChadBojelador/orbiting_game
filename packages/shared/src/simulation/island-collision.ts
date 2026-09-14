@@ -169,9 +169,15 @@ export function isIslandBodyClear(
 /** Feet have width: center-only grounding lets a body sink into a ledge beside it. */
 export function islandSupportHeightAt(position: Position, maximum: number, radius: number): number {
   let floor = islandHeightAt(position, maximum);
-  for (let i=0;i<8;i++) {
-    const angle=i*Math.PI/4;
-    floor=Math.max(floor,islandHeightAt({x:position.x+Math.cos(angle)*radius,z:position.z+Math.sin(angle)*radius},maximum));
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4;
+    floor = Math.max(
+      floor,
+      islandHeightAt(
+        { x: position.x + Math.cos(angle) * radius, z: position.z + Math.sin(angle) * radius },
+        maximum,
+      ),
+    );
   }
   return floor;
 }
@@ -200,16 +206,21 @@ export function findIslandSpawns(): readonly Position[] {
       // can trap a newly spawned player. Require a usable route in their initial
       // (arena-facing) direction, including the complete body at every substep.
       const length = Math.hypot(x, z) || 1;
-      let floor = y, hasExit = true;
+      let floor = y,
+        hasExit = true;
       for (let distance = 0.15; distance <= 2; distance += 0.15) {
-        const next = {x:x-x/length*distance,z:z-z/length*distance};
-        const nextFloor = islandHeightAt(next, floor+0.32);
-        if (Math.abs(nextFloor-floor)>0.32 || !isIslandBodyClear(next, Math.max(floor,nextFloor),1.8,0.5)) {
-          hasExit=false;break;
+        const next = { x: x - (x / length) * distance, z: z - (z / length) * distance };
+        const nextFloor = islandHeightAt(next, floor + 0.32);
+        if (
+          Math.abs(nextFloor - floor) > 0.32 ||
+          !isIslandBodyClear(next, Math.max(floor, nextFloor), 1.8, 0.5)
+        ) {
+          hasExit = false;
+          break;
         }
-        floor=nextFloor;
+        floor = nextFloor;
       }
-      if(!hasExit)continue;
+      if (!hasExit) continue;
       candidates.push(p);
     }
   const chosen: Position[] = [];
