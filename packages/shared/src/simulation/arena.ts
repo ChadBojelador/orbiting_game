@@ -50,7 +50,7 @@ export function bodyHeight(p: {isSliding:boolean;isCrouching:boolean}): number {
 export function eyeHeight(p: {isSliding:boolean;isCrouching:boolean}): number {
   return p.isSliding ? GAMEPLAY.slideEyeHeight : p.isCrouching ? GAMEPLAY.crouchEyeHeight : GAMEPLAY.playerEyeHeight;
 }
-export function isWalkable(p: Position, halfExtent=ARENA.halfExtent, y=0, height:number=GAMEPLAY.playerHeight): boolean {
+export function isWalkable(p: Position, halfExtent:number=ARENA.halfExtent, y=0, height:number=GAMEPLAY.playerHeight): boolean {
   const r=GAMEPLAY.playerRadius;
   if(Math.abs(p.x)>halfExtent-r || Math.abs(p.z)>halfExtent-r) return false;
   if(ARENA_BLOCKS.some(b=>inside(p,b,r) && y+0.06<b.y+b.height && y+height>b.y)) return false;
