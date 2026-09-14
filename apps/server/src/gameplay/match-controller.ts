@@ -1,213 +1,40 @@
-import {
-  GAMEPLAY,
-  arenaHalfExtentForRound,
-  type GameplayEvent,
-  type MatchPhase,
-  type MatchResult,
-} from '@ice-water/shared';
+import { GAMEPLAY,type MatchResult,type ServerMessages } from '@ice-water/shared';
 import type { LobbyState } from '../rooms/lobby-state.js';
-
-type EmitFn = (
-  event:
-    | GameplayEvent
-    | {
-        type: 'match/phase-changed';
-        payload: { phase: MatchPhase; phaseDeadline: number; serverTime: number; round?: number };
-      }
-    | { type: 'match/result'; payload: MatchResult },
-) => void;
-
-export interface MatchLifecycle {
-  onResult?: (result: MatchResult, startedAt: number, completedAt: number) => void;
-  onResultExpired?: () => void;
-}
-
-/**
- * MatchController owns the authoritative multi-round phase state machine.
- * It is driven by the room's advance() tick and should be called after
- * GameplayController.advance() so movement is resolved before we evaluate
- * win conditions in the same tick.
- *
- * Phase sequence per round:
- *   regular → warning → deep-freeze → round-result → (next round or match-result)
- *
- * The 30-second regular phase contains an 8-second warning window at the end.
- * Deep Freeze lasts exactly 30 server-controlled seconds.
- */
+type MatchEvent={type:'match/result';payload:MatchResult}|{type:'match/phase-changed';payload:ServerMessages['match/phase-changed']};
+export interface MatchLifecycle {onResult?:(result:MatchResult,startedAt:number,completedAt:number)=>void;onResultExpired?:()=>void}
 export class MatchController {
-  private hasStarted = false;
-  private startedAt = 0;
-  private hasExpiredResult = false;
-
-  constructor(
-    private readonly state: LobbyState,
-    private readonly emit: EmitFn,
-    private readonly onStartRound: (now: number, halfExtent: number) => void,
-    private readonly lifecycle: MatchLifecycle = {},
-  ) {}
-
-  /** Called once when the countdown ends and roles are assigned. */
-  start(now: number): void {
-    if (this.hasStarted) return;
-    this.hasStarted = true;
-    this.startedAt = now;
-    this.beginRound(1, now);
+  private hasStarted=false;private startedAt=0;private hasExpired=false;
+  constructor(private readonly state:LobbyState,private readonly emit:(event:MatchEvent)=>void,private readonly onStart:(now:number)=>void,private readonly lifecycle:MatchLifecycle={}){}
+  start(now:number):void {
+    if(this.hasStarted)return;
+    this.hasStarted=true;this.startedAt=now;this.state.phase='playing';
+    this.state.phaseDeadline=now+(this.state.gameMode==='duel'?GAMEPLAY.duelTimeLimitMs:GAMEPLAY.ffaTimeLimitMs);
+    this.onStart(now);this.changed(now);
   }
-
-  /**
-   * Advance the phase clock. Returns true if the phase changed so the room
-   * can broadcast the new state.
-   */
-  tick(now: number): boolean {
-    if (!this.hasStarted) return false;
-    const phase = this.state.phase;
-    if (phase === 'lobby' || phase === 'countdown') return false;
-    if (phase === 'match-result') {
-      if (
-        !this.hasExpiredResult &&
-        this.state.phaseDeadline !== 0 &&
-        now >= this.state.phaseDeadline
-      ) {
-        this.hasExpiredResult = true;
-        this.lifecycle.onResultExpired?.();
-        return true;
-      }
-      return false;
+  tick(now:number):boolean {
+    if(!this.hasStarted)return false;
+    if(this.state.phase==='finished'){this.state.phase='intermission';this.changed(now);return true;}
+    if(this.state.phase==='intermission'){
+      if(!this.hasExpired && now>=this.state.phaseDeadline){this.hasExpired=true;this.lifecycle.onResultExpired?.();return true;}return false;
     }
-
-    // Check Ice-wins-early condition every tick during a play phase.
-    if (phase === 'regular' || phase === 'warning' || phase === 'deep-freeze') {
-      if (this.iceWinsNow()) {
-        this.resolveMatch('ice', 'all-frozen', now);
-        return true;
-      }
-    }
-
-    const deadline = this.state.phaseDeadline;
-    if (deadline !== 0 && now < deadline) {
-      // Transition regular → warning when the warning window begins.
-      if (phase === 'regular') {
-        const warningStart = deadline - GAMEPLAY.warningMs;
-        if (now >= warningStart) {
-          this.state.phase = 'warning';
-          this.emit({
-            type: 'match/phase-changed',
-            payload: {
-              phase: 'warning',
-              phaseDeadline: deadline,
-              serverTime: now,
-            },
-          });
-          return true;
-        }
-      }
-      return false;
-    }
-
-    switch (phase) {
-      case 'regular':
-      case 'warning':
-        this.beginDeepFreeze(now);
-        return true;
-      case 'deep-freeze':
-        this.resolveDeepFreeze(now);
-        return true;
-      case 'round-result':
-        if (this.state.round >= this.state.maxRounds) {
-          this.resolveMatch('water', 'rounds-complete', now);
-        } else {
-          this.beginRound(this.state.round + 1, now);
-        }
-        return true;
-      default:
-        return false;
-    }
+    if(this.state.phase!=='playing')return false;
+    const limit=this.state.gameMode==='tdm'?GAMEPLAY.tdmScoreLimit:this.state.gameMode==='duel'?GAMEPLAY.duelScoreLimit:GAMEPLAY.ffaScoreLimit;
+    const scores=this.state.gameMode==='tdm'
+      ? [{id:'ice',score:this.state.iceScore},{id:'water',score:this.state.waterScore}]
+      : [...this.state.players.values()].filter(p=>p.team!=='unassigned').map(p=>({id:p.playerId,score:p.kills}));
+    scores.sort((a,b)=>b.score-a.score);
+    const leader=scores[0];
+    const hasScoreLimit=(leader?.score??0)>=limit;
+    if(!hasScoreLimit && now<this.state.phaseDeadline)return false;
+    const winner=!leader || leader.score===scores[1]?.score?'draw':leader.id;
+    const result:MatchResult={winner,reason:hasScoreLimit?'score-limit':'time-limit',gameMode:this.state.gameMode};
+    const completedAt=hasScoreLimit?now:this.state.phaseDeadline;
+    this.state.phase='finished';this.state.matchWinner=winner;this.state.resultReason=result.reason;
+    this.state.phaseDeadline=completedAt+GAMEPLAY.intermissionMs;
+    this.emit({type:'match/result',payload:result});this.changed(now);
+    this.lifecycle.onResult?.(result,this.startedAt,completedAt);return true;
   }
-
-  private beginRound(round: number, now: number): void {
-    const halfExtent = arenaHalfExtentForRound(round);
-    this.state.round = round;
-    this.state.arenaHalfExtent = halfExtent;
-    this.state.phase = 'regular';
-    this.state.phaseDeadline = now + GAMEPLAY.regularMs;
-    this.onStartRound(now, halfExtent);
-    this.emit({ type: 'arena/boundary-changed', payload: { halfExtent, round, serverTime: now } });
-    this.emit({
-      type: 'match/phase-changed',
-      payload: {
-        phase: 'regular',
-        phaseDeadline: this.state.phaseDeadline,
-        serverTime: now,
-        round,
-      },
-    });
-  }
-
-  private beginDeepFreeze(now: number): void {
-    this.state.phase = 'deep-freeze';
-    this.state.phaseDeadline = now + GAMEPLAY.deepFreezeMs;
-    this.emit({
-      type: 'match/phase-changed',
-      payload: {
-        phase: 'deep-freeze',
-        phaseDeadline: this.state.phaseDeadline,
-        serverTime: now,
-      },
-    });
-  }
-
-  private resolveDeepFreeze(now: number): void {
-    // Atomically permanently-freeze all Water players still frozen at the deadline.
-    for (const player of this.state.players.values()) {
-      if (player.team === 'water' && player.status === 'frozen') {
-        player.status = 'eliminated';
-        this.emit({
-          type: 'player/permanently-frozen',
-          payload: { playerId: player.playerId, serverTime: now },
-        });
-      }
-    }
-    this.state.phase = 'round-result';
-    this.state.phaseDeadline = now + GAMEPLAY.roundResultMs;
-    this.emit({
-      type: 'match/phase-changed',
-      payload: {
-        phase: 'round-result',
-        phaseDeadline: this.state.phaseDeadline,
-        serverTime: now,
-      },
-    });
-  }
-
-  private resolveMatch(winner: 'ice' | 'water', reason: MatchResult['reason'], now: number): void {
-    this.state.phase = 'match-result';
-    this.state.phaseDeadline = now + GAMEPLAY.matchResultMs;
-    this.state.matchWinner = winner;
-    const result = { winner, reason } satisfies MatchResult;
-    this.emit({ type: 'match/result', payload: result });
-    this.emit({
-      type: 'match/phase-changed',
-      payload: {
-        phase: 'match-result',
-        phaseDeadline: this.state.phaseDeadline,
-        serverTime: now,
-      },
-    });
-    this.lifecycle.onResult?.(result, this.startedAt, now);
-  }
-
-  /** Ice wins immediately when every Water player is frozen or eliminated. */
-  private iceWinsNow(): boolean {
-    let hasActiveWater = false;
-    let hasAnyWater = false;
-    for (const player of this.state.players.values()) {
-      if (player.team !== 'water') continue;
-      hasAnyWater = true;
-      if (player.status === 'active') {
-        hasActiveWater = true;
-        break;
-      }
-    }
-    return hasAnyWater && !hasActiveWater;
+  private changed(now:number):void {
+    this.emit({type:'match/phase-changed',payload:{phase:this.state.phase,phaseDeadline:this.state.phaseDeadline,serverTime:now}});
   }
 }
