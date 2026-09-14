@@ -328,8 +328,8 @@ describe('HTTP and real WebSocket room flow', () => {
     const actor=participants[0]!,target=participants[1]!;
     const serverRoom=authoritativeRoom(actor.room);
     const a=serverRoom.state.players.get(actor.identity.playerId)!,b=serverRoom.state.players.get(target.identity.playerId)!;
-    Object.assign(a,{x:-34,z:-30,y:0,protectedUntil:0});
-    Object.assign(b,{x:-34,z:-33,y:0,hp:1,protectedUntil:0});
+    Object.assign(a,{x:-50,z:-30,y:0,protectedUntil:0});
+    Object.assign(b,{x:-50,z:-33,y:0,hp:1,protectedUntil:0});
     actor.room.send('action/shoot',{yaw:0,pitch:0,isAds:true});
     await waitFor(()=>actor.room.state.players.get(target.identity.playerId)?.status==='dead');
     expect(actor.room.state.players.get(actor.identity.playerId)?.kills).toBe(1);

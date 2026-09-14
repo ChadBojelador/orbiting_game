@@ -116,3 +116,23 @@ test('loadout, duel mode and local settings survive their intended boundaries',a
   await start(page);await expect(page.locator('.ammo-display')).toContainText('Icicle');
   await page.getByRole('button',{name:'Leave room'}).click();
 });
+
+test('Island loads its optimized Fort and uses the selected authoritative map',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await identify(page,'Island Scout');
+  await page.getByLabel('Map',{exact:true}).selectOption('island');
+  const {room}=await create(page);
+  await expect.poll(()=>room.state.mapId).toBe('island');
+  const loaded=page.waitForResponse(response=>response.url().includes('island-fort.glb')&&response.status()===200);
+  await start(page);await loaded;
+  await page.getByRole('button',{name:'Enter arena'}).click();
+  const player=room.state.players.get(room.state.hostPlayerId)!;
+  expect(player.y).toBeGreaterThan(0.3);
+  const before={x:player.x,z:player.z};
+  await page.keyboard.down('KeyW');
+  await expect.poll(()=>Math.hypot(player.x-before.x,player.z-before.z)).toBeGreaterThan(0.5);
+  await page.keyboard.up('KeyW');
+  await page.screenshot({path:'test-results/fps-island.png'});
+  expect(errors).toEqual([]);
+  await page.keyboard.press('Escape');await page.getByRole('button',{name:'Leave room'}).click();
+});

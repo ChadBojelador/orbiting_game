@@ -9,7 +9,7 @@ export function fixture(){
   const a=new PlayerState(),b=new PlayerState();a.playerId='a';b.playerId='b';a.team=b.team='none';
   state.players.set('a',a);state.players.set('b',b);
   const events:GameplayEvent[]=[];const controller=new GameplayController(state,e=>events.push(e));controller.start(1000);
-  Object.assign(a,{x:-34,y:0,z:-30,protectedUntil:0});Object.assign(b,{x:-34,y:0,z:-33,protectedUntil:0});
+  Object.assign(a,{x:-50,y:0,z:-30,protectedUntil:0});Object.assign(b,{x:-50,y:0,z:-33,protectedUntil:0});
   return {state,a,b,controller,events};
 }
 describe('authoritative FPS combat',()=>{
