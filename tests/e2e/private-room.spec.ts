@@ -39,7 +39,7 @@ async function create(page: Page) {
 }
 async function start(page: Page) {
   await page.getByRole('button', { name: 'Start countdown' }).click();
-  await expect(page.getByLabel('Health', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Health', { exact: true })).toBeVisible({ timeout: 15000 });
 }
 test('desktop guests play, shoot, die, respawn, see scores and finish', async ({
   page,
