@@ -110,6 +110,9 @@ export class GameSession {
       p.isConnected &&
       p.status === 'alive' &&
       this.view.phase === 'playing' &&
+      // phaseDeadline is 0 before the match is fully started; reject explicitly
+      // rather than relying on serverNow() > 0 being coincidentally true.
+      this.view.phaseDeadline > 0 &&
       this.serverNow() < this.view.phaseDeadline
     );
   }

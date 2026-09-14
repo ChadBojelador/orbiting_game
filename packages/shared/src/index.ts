@@ -5,3 +5,4 @@ export * from './constants/gameplay.js';
 export * from './constants/weapons.js';
 export * from './validation/gameplay.js';
 export * from './simulation/arena.js';
+export { islandSupportHeightAt } from './simulation/island-collision.js';

@@ -158,12 +158,18 @@ export function isIslandBodyClear(
     )
       return false;
   }
+  // Only block when geometry intrudes into the upper half of the player body.
+  // Using the full headroom (height - 0.33) is too strict: open-air positions
+  // near sloped roofs or overhanging ledges would fail even though the player
+  // can stand there comfortably. A ceiling closer than height * 0.5 (≈ 0.9 m
+  // above the waist ray origin) is a genuine obstruction.
+  const ceilingClearance = height * 0.5;
   const ceiling = islandRayDistance(
     { ...position, y: y + 0.33 },
     { x: 0, y: 1, z: 0 },
-    Math.max(0, height - 0.33),
+    Math.max(0, ceilingClearance),
   );
-  return ceiling >= height - 0.33;
+  return ceiling >= ceilingClearance;
 }
 
 /** Feet have width: center-only grounding lets a body sink into a ledge beside it. */

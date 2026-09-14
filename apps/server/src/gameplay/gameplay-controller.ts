@@ -3,6 +3,7 @@ import {
   WEAPONS,
   simulateMovement,
   terrainHeightAt,
+  islandSupportHeightAt,
   isMoveInput,
   isShootIntent,
   isReloadIntent,
@@ -148,8 +149,16 @@ export class GameplayController {
     const spawn = selectSpawn(this.state, p, isDeath ? p : undefined);
     this.inputs.delete(p.playerId);
     p.inputSequence = this.sequences.get(p.playerId) ?? p.inputSequence;
+    // Use islandSupportHeightAt for the island map so the spawn Y correctly
+    // samples the multi-cell mesh surface. islandHeightAt (called by
+    // terrainHeightAt) only queries one grid cell and returns 0 at cell
+    // boundaries, causing players/bots to spawn at sea level.
+    const spawnY =
+      this.state.mapId === 'island'
+        ? islandSupportHeightAt(spawn, 30, GAMEPLAY.playerRadius)
+        : terrainHeightAt(spawn, this.state.mapId);
     Object.assign(p, spawn, {
-      y: terrainHeightAt(spawn, this.state.mapId),
+      y: spawnY,
       velocityX: 0,
       velocityZ: 0,
       verticalVelocity: 0,
