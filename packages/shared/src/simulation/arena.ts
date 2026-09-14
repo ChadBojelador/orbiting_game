@@ -38,7 +38,7 @@ export function surfaceAt(p: Position): 'metal'|'ice'|'water' {
 }
 export function terrainHeightAt(p: Position): number {
   for (const ramp of ARENA_RAMPS) if(inside(p,ramp)) return ramp.height * (0.5 + ramp.direction*(p.z-ramp.z)/ramp.depth);
-  for (const b of ARENA_BLOCKS) if(b.id.startsWith('catwalk') && inside(p,b)) return b.height;
+  for (const b of ARENA_BLOCKS) if(inside(p,b)) return b.y+b.height;
   return 0;
 }
 export function createSpawnPoints(): Position[] { return SPAWN_POINTS.map(p=>({...p})); }
@@ -53,7 +53,7 @@ export function eyeHeight(p: {isSliding:boolean;isCrouching:boolean}): number {
 export function isWalkable(p: Position, halfExtent:number=ARENA.halfExtent, y=0, height:number=GAMEPLAY.playerHeight): boolean {
   const r=GAMEPLAY.playerRadius;
   if(Math.abs(p.x)>halfExtent-r || Math.abs(p.z)>halfExtent-r) return false;
-  if(ARENA_BLOCKS.some(b=>inside(p,b,r) && y+0.06<b.y+b.height && y+height>b.y)) return false;
+  if(ARENA_BLOCKS.some(b=>inside(p,b,r) && y+0.32<b.y+b.height && y+height>b.y)) return false;
   // A ramp is solid from the ground to its slope. Its sides cannot be climbed.
   return terrainHeightAt(p) <= y+0.32;
 }
@@ -91,7 +91,8 @@ export interface MovementState extends SpatialPosition,VerticalMotion {
   slideUntil:number;slideReadyAt:number;
 }
 export function simulateMovement(p:MovementState,input:MoveInput,now:number,seconds=GAMEPLAY.tickMs/1000,speedMultiplier=1): MovementState {
-  const next={...p};
+  const next:MovementState={x:p.x,y:p.y,z:p.z,velocityX:p.velocityX,velocityZ:p.velocityZ,verticalVelocity:p.verticalVelocity,
+    isGrounded:p.isGrounded,isSliding:p.isSliding,isCrouching:p.isCrouching,slideUntil:p.slideUntil,slideReadyAt:p.slideReadyAt};
   const length=Math.max(1,Math.hypot(input.x,input.z));
   const x=input.x/length,z=input.z/length;
   const surface=surfaceAt(p);
@@ -111,7 +112,8 @@ export function simulateMovement(p:MovementState,input:MoveInput,now:number,seco
     const alpha=p.isGrounded?(surface==='ice'?0.08:0.82):GAMEPLAY.airControlFactor;
     next.velocityX+=(x*speed-next.velocityX)*alpha;next.velocityZ+=(z*speed-next.velocityZ)*alpha;
   }
-  const moved=moveKinematic(p,{x:next.velocityX,z:next.velocityZ},seconds,ARENA.halfExtent,Math.hypot(next.velocityX,next.velocityZ),p.y,bodyHeight(next));
+  const travelSpeed=Math.hypot(next.velocityX,next.velocityZ);
+  const moved=moveKinematic(p,{x:travelSpeed?next.velocityX/travelSpeed:0,z:travelSpeed?next.velocityZ/travelSpeed:0},seconds,ARENA.halfExtent,travelSpeed,p.y,bodyHeight(next));
   if(Math.abs(moved.x-p.x)<0.00001) next.velocityX=0;
   if(Math.abs(moved.z-p.z)<0.00001) next.velocityZ=0;
   Object.assign(next,moved,advanceVerticalMotion(p,moved,seconds,!!input.jump));
