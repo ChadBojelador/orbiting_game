@@ -4,7 +4,7 @@
 The request to execute `implementation_plan.md` approves replacing freeze-tag with a browser arena FPS. Mobile support was explicitly retained. Previous requirements are historical in `docs/archive/freeze-tag-prd.md` and no longer govern gameplay. Product name, guest sessions, private invite rooms, authoritative server, and existing stack remain.
 
 ## Playable release
-- First-person keyboard/mouse and mobile touch play in Frostline, an original approximately 80 × 80 metre frozen research arena with three lanes, cover, ramps, elevated routes, ice, and shallow water.
+- First-person keyboard/mouse and mobile touch play on Frostline, an original 120 × 120 metre frozen research arena, and Island - Fort, a supplied island sector normalized into the same play boundary.
 - WASD/arrows move, mouse aims with pointer lock, Space jumps, Shift slides, C crouches, and Control sprints. Mobile provides a movement stick, drag-to-look region, fire, aim, jump, slide, reload, weapon cycling, scoreboard, crouch, and sprint buttons.
 - Movement, health, shots, damage, ammunition, cooldowns, death, respawn, teams, score, and match deadlines are server-authoritative. No physical player-to-player collision.
 - Six weapon archetypes: assault rifle, SMG, shotgun, sniper, pistol, and ice pick. Choose a primary in the lobby; carry it alongside pistol and melee. ADS, recoil, spread, damage falloff, reloads, headshots, hit/kill feedback, and brief spawn protection are part of combat.

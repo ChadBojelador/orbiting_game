@@ -184,17 +184,17 @@ export function LobbyScreen(props: LobbyScreenProps) {
         aria-busy={isBusy}
         key={`${section}-${room ? 'room' : 'solo'}-${guest ? 'guest' : 'new'}`}
       >
-      {!guest ? (
-        <IdentityPanel name={name} setName={setName} identify={identify} isBusy={isBusy} />
-      ) : room && !view ? (
-        <>
-          <div className="panel-kicker">Secure room link</div>
-          <h1>Joining room</h1>
-          <p className="panel-lede" role="status">
-            Synchronizing the private lobby and operator roster…
-          </p>
-        </>
-      ) : room && view ? (
+        {!guest ? (
+          <IdentityPanel name={name} setName={setName} identify={identify} isBusy={isBusy} />
+        ) : room && !view ? (
+          <>
+            <div className="panel-kicker">Secure room link</div>
+            <h1>Joining room</h1>
+            <p className="panel-lede" role="status">
+              Synchronizing the private lobby and operator roster…
+            </p>
+          </>
+        ) : room && view ? (
           <RoomAwarePanel
             section={section}
             guest={guest}

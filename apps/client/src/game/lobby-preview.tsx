@@ -29,8 +29,14 @@ const CAMERA_POSES: Record<LobbySection, { position: THREE.Vector3; target: THRE
     target: new THREE.Vector3(0.24, 1.18, 0),
   },
   party: { position: new THREE.Vector3(4.05, 2.65, 5.9), target: new THREE.Vector3(0.54, 1.19, 0) },
-  profile: { position: new THREE.Vector3(3.15, 2.4, 4.7), target: new THREE.Vector3(0.23, 1.38, 0) },
-  settings: { position: new THREE.Vector3(4.55, 2.9, 6.55), target: new THREE.Vector3(0.48, 1.26, 0) },
+  profile: {
+    position: new THREE.Vector3(3.15, 2.4, 4.7),
+    target: new THREE.Vector3(0.23, 1.38, 0),
+  },
+  settings: {
+    position: new THREE.Vector3(4.55, 2.9, 6.55),
+    target: new THREE.Vector3(0.48, 1.26, 0),
+  },
 };
 
 export function LobbyPreview({ section, weapon, reducedEffects, isRoomActive }: LobbyPreviewProps) {

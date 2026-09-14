@@ -69,4 +69,3 @@ it('allows either loopback hostname during local development only', () => {
     }),
   ).toBe(false);
 });
-

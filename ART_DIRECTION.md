@@ -1,6 +1,6 @@
 # Ice Ice Water! Art Direction
 
-The approved FPS pivot establishes **Frostline: a bright frozen research facility** and the user-approved **Island ? Fort** arena. Previous art direction and concept images are historical in `docs/archive` and `assets/concepts`.
+The approved FPS pivot establishes **Frostline: a bright frozen research facility** and the user-approved **Island - Fort** arena. Previous art direction and concept images are historical in `docs/archive` and `assets/concepts`.
 
 ## Visual language
 - Crisp, readable low-poly painted metal, polar-white walls, navy structural blocks, cyan ice, amber route paint, and coral opponents.

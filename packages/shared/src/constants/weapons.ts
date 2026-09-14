@@ -23,13 +23,7 @@ export interface WeaponStats {
   pelletsPerShot: number; // > 1 for shotguns
 }
 
-export type WeaponId =
-  | 'assault-rifle'
-  | 'smg'
-  | 'shotgun'
-  | 'sniper'
-  | 'pistol'
-  | 'ice-pick';
+export type WeaponId = 'assault-rifle' | 'smg' | 'shotgun' | 'sniper' | 'pistol' | 'ice-pick';
 
 export const WEAPONS: Record<WeaponId, WeaponStats> = {
   'assault-rifle': {

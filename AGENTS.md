@@ -4,7 +4,7 @@ These instructions apply to all AI coding agents working in this repository. Mor
 
 ## Project overview
 
-Ice Ice Water! is a browser-only first-person arena FPS with keyboard/mouse and mobile touch support. Private invite rooms allow solo practice and up to 150 players; duel caps at two. Frostline and Island ? Fort host FFA, balanced-team TDM, and duel with server-authoritative health, weapons, deaths, respawns, and scores. The 2026-09-14 implementation-plan pivot replaces freeze-tag; archived documents do not define current behavior.
+Ice Ice Water! is a browser-only first-person arena FPS with keyboard/mouse and mobile touch support. Private invite rooms allow solo practice and up to 150 players; duel caps at two. Frostline and Island - Fort host FFA, balanced-team TDM, and duel with server-authoritative health, weapons, deaths, respawns, and scores. The 2026-09-14 implementation-plan pivot replaces freeze-tag; archived documents do not define current behavior.
 
 ## Sources of truth
 

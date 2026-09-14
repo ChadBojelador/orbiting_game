@@ -81,4 +81,3 @@ describe('BotRunner and solo playtest', () => {
     expect(state.players.size).toBe(1);
   });
 });
-

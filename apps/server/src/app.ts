@@ -37,7 +37,7 @@ export async function startServer(
     verifyClient({ req }: { req: IncomingMessage }) {
       const origin = req.headers.origin;
       return (
-          (!origin || isAllowedClientOrigin(origin, config)) &&
+        (!origin || isAllowedClientOrigin(origin, config)) &&
         upgradeRate.take(req.socket.remoteAddress ?? 'unknown')
       );
     },
