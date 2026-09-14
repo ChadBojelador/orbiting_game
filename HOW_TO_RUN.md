@@ -54,13 +54,13 @@ npm run db:down
 
 ## Test a match by yourself
 
-The game normally requires six players. For local solo testing, set this value in `.env`:
+One player can start solo practice. Optionally add wandering targets by setting this value in `.env`:
 
 ```dotenv
 DEV_BOT_COUNT=5
 ```
 
-Restart `npm run dev`, create a private room, and start the match with one human player plus five development bots.
+Restart `npm run dev`, create a private room, and start solo or with development bots. Choose FFA, team deathmatch, or duel; duel allows at most two occupants, so use zero or one bot for it.
 
 ## Troubleshooting
 
@@ -99,3 +99,4 @@ npm run build
 ```
 
 See [README.md](README.md) for gameplay controls, configuration options, browser tests, and load-test commands.
+

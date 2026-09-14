@@ -90,7 +90,9 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
           if (!client.auth || client.auth.expiresAt <= Date.now())
             return this.fail(client, 'unauthorized', 'Guest session expired');
           const now = Date.now();
-          this.advance(now);
+          this.state.serverTime = now;
+          // Receiving client messages must not grant extra bot ticks.
+          advanceAuthoritativeTick(now, this.gameplay, this.match);
           const error = this.gameplay.handle(client.auth.playerId, type, payload, now);
           this.match.tick(now);
           if (error) this.fail(client, 'invalid-action', error);

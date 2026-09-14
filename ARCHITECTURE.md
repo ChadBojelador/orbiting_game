@@ -23,6 +23,12 @@ Client messages: `input/move`, `action/shoot`, `action/reload`, `action/switch-w
 
 Inactive-slot ammo stays server-side. Hit markers/feed consume authoritative events. React does not drive per-frame movement. Camera/weapon animation uses the Three.js loop. Pointer-lock loss/blur neutralizes intent; mobile tracks independent pointers for concurrent look/movement/fire. Settings are validated local preferences.
 
+## Lobby presentation
+
+The pre-match client keeps one `LobbyScene` alive while React changes between main, play, game-mode, loadout, customization, party, profile, and settings panels. The scene owns its Three.js renderer, cinematic camera poses, loaded character instance, selected-weapon proxy, procedural frozen-facility environment, and low-cost effects. React communicates state changes through imperative setters; it never drives the render loop.
+
+Lobby audio is application-scoped rather than panel-scoped. One Web Audio graph decodes and loops the repository-authored lobby track, shares persisted master/music/SFX/mute preferences, resumes after a valid interaction when autoplay is blocked, and fades out before the active match scene starts. Private-room creation remains the Play action; the lobby does not simulate a public matchmaking queue, friends service, progression, rank, currency, or cosmetic inventory.
+
 ## Security and access
 Retain HMAC-SHA256 signed guests, timing-safe signature verification, per-tab storage, random eight-character invites, origins, 4 KiB payload cap, private/unlisted rooms. Public Colyseus matchmaking remains blocked; authenticated HTTP issues seats and WebSocket auth verifies sessions again. Never log tokens, connection strings, or unnecessary personal data.
 

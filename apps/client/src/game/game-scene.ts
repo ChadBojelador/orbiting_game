@@ -79,7 +79,7 @@ export class GameScene {
     const seconds=Math.min(0.05,Math.max(0,(now-this.previous)/1000));this.previous=now;
     const session=this.session,p=session.local(),serverNow=session.serverNow(),input=session.input;
     input.isEnabled=!this.isPaused&&(this.isTouch||this.isLocked);
-    input.sensitivity=this.settings.sensitivity*0.002;this.audio.volume=this.settings.volume;
+    input.sensitivity=this.settings.sensitivity*0.002;this.audio.volume=this.settings.isMuted?0:this.settings.volume*this.settings.sfxVolume;
     if(p){
       const predicted=session.prediction.motion;
       const pos=this.presentation.update({...predicted,yaw:input.cameraYaw},seconds,p.status!=='alive');

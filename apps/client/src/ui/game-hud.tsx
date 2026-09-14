@@ -10,7 +10,7 @@ export function GameHud({view,localPlayerId,serverNow,feed,hitUntil,damageUntil,
       <strong>{Math.floor(time/60)}:{String(time%60).padStart(2,'0')}</strong>
       <span>{view.gameMode==='tdm'?`Ice ${view.iceScore} : ${view.waterScore} Water`:`${p.kills} / ${limit} kills`}</span></div>
     <div className="kill-feed" aria-label="Kill feed">{feed.filter(k=>serverNow-k.serverTime<6500).map(k=><p key={k.key}><b>{name(k.killerId)}</b> <span>{WEAPONS[k.weaponId].name}{k.isHeadshot?' ◆':''}</span> {name(k.victimId)}</p>)}</div>
-    {p.status==='alive'&&<div className="crosshair" style={{color:crosshair}} aria-label="Crosshair">+</div>}
+    {p.status==='alive'&&<div className="crosshair" style={{color:crosshair,fontSize:27+Math.min(10,Math.hypot(p.velocityX,p.velocityZ))}} aria-label="Crosshair">+</div>}
     {hitUntil>serverNow&&<div className={headshot?'hit-marker is-headshot':'hit-marker'} aria-label={headshot?'Headshot':'Hit'}>×</div>}
     {damageUntil>serverNow&&<div className="damage-direction" style={{transform:`translate(-50%,-50%) rotate(${damageAngle}rad)`}} aria-label="Incoming damage">▲</div>}
     <div className="health-display"><span>Health</span><strong>{Math.ceil(p.hp)}<small> / 100</small></strong><meter aria-label="Health" min={0} max={100} value={p.hp}/>{p.protectedUntil>serverNow&&<small>Spawn protection</small>}</div>

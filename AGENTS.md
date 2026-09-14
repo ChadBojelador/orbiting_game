@@ -4,7 +4,7 @@ These instructions apply to all AI coding agents working in this repository. Mor
 
 ## Project overview
 
-Ice Ice Water! is a browser-only, third-person 3D multiplayer freeze-tag game for private rooms of 6–150 players. Each of five rounds has 30 seconds of regular play, when Water can rescue teammates, followed by 30 seconds of Deep Freeze, when rescue is disabled. Players still frozen at the deadline are permanently eliminated.
+Ice Ice Water! is a browser-only first-person arena FPS with keyboard/mouse and mobile touch support. Private invite rooms allow solo practice and up to 150 players; duel caps at two. Frostline hosts FFA, balanced-team TDM, and duel with server-authoritative health, weapons, deaths, respawns, and scores. The 2026-09-14 implementation-plan pivot replaces freeze-tag; archived documents do not define current behavior.
 
 ## Sources of truth
 
@@ -12,6 +12,8 @@ Ice Ice Water! is a browser-only, third-person 3D multiplayer freeze-tag game fo
 - `ARCHITECTURE.md`: technical structure and decisions
 - `ART_DIRECTION.md`: visual language, asset sourcing, and generation prompts
 - `TASKS.md`: current work and status
+- `implementation_plan.md`: approved FPS execution status and follow-ups
+- `MAP_SPEC.md`: Frostline layout and shared geometry
 - `AGENTS.md`: AI-agent working rules
 
 Read `PRD.md` and `ARCHITECTURE.md` before implementing any major feature. Check `TASKS.md` before starting work and keep the relevant entry accurate when requested to manage task status.
@@ -63,20 +65,20 @@ Respect the module responsibilities in `ARCHITECTURE.md`. Do not create alternat
 - Constants: `UPPER_SNAKE_CASE` only for true module-level constants
 - Boolean values: use `is`, `has`, `can`, or `should` prefixes
 - Database tables and columns: `snake_case`
-- Colyseus messages: lowercase `domain/action`, such as `action/frost-throw`
+- Colyseus messages: lowercase `domain/action`, such as `action/shoot`
 - Tests: `<unit>.test.ts` for unit/integration tests and `<flow>.spec.ts` for browser tests
 
 ## Architecture rules
 
-- The server is authoritative for position, roles, freeze status, rescue progress, phase deadlines, elimination, and results.
+- The server is authoritative for position, aim, stance, health, ammo, cooldowns, hits, deaths, respawns, scores, phase deadlines, and results.
 - Clients send input and action intent, never trusted outcomes.
 - One active match belongs to one Colyseus room and one server process.
 - Live room state remains in memory; do not persist per-tick state to PostgreSQL.
 - `packages/shared` may contain protocol types, constants, and pure utilities only.
 - The client and server must not import directly from one another.
 - Disable player-to-player physical collision unless the PRD and architecture are intentionally revised.
-- Reject all rescue intent during Deep Freeze, even if a stale client displays a rescue control.
-- Keep the Ice-count bracket table configurable; do not invent or hard-code balancing values without recording the decision.
+- Reject gameplay at/after the match deadline and all actions from dead or spectator players. Reject legacy freeze-tag messages.
+- Keep weapon, movement, respawn and mode balance in shared configuration. Record tuning decisions; TDM balances teams, with no Ice-count brackets.
 - Optimize only after measurement, except for established 150-player constraints documented in the architecture.
 - Never change architecture or introduce a major dependency without documenting the reason, alternatives, and consequences in `ARCHITECTURE.md`.
 
@@ -126,7 +128,7 @@ These commands are a required scaffold contract. Until package manifests exist, 
 - Treat every client payload as hostile.
 - Validate session tokens, message shape, ranges, rates, cooldowns, and current phase.
 - Sanitize display names and any user-visible input.
-- Rate-limit session creation, joins, gameplay actions, and help pings.
+- Rate-limit session creation, joins, gameplay actions, loadout changes, and ping messages.
 - Use HTTPS and secure WebSockets outside local development.
 - Do not log tokens, connection strings, secrets, or unnecessary personal data.
 - Do not implement client-authoritative shortcuts, even temporarily, without isolating them to explicit local test fixtures.
@@ -138,8 +140,8 @@ These commands are a required scaffold contract. Until package manifests exist, 
 - Unit-test pure game rules and boundary cases.
 - Integration-test room lifecycle, invalid messages, reconnection, and database writes.
 - Test phase deadlines with controlled/fake time rather than slow real-time waits.
-- Test simultaneous Deep Freeze resolution atomically.
-- Include browser tests for join, play, freeze, rescue, elimination, spectate, and results.
+- Test exact match deadlines, death credit once, spawn protection, reload/ammo conservation, reconnection continuity, and rejected client-forged hits.
+- Include browser tests for join, play, shooting, damage, death, respawn, scoreboard, and results.
 - Add load scenarios progressively at 20, 50, 100, and 150 clients.
 - A change is not complete until relevant tests, lint, type checking, and builds pass, or the handoff clearly documents why they could not run.
 - Never weaken or delete a failing test merely to make a change pass unless the requirement itself changed and the source-of-truth documents were updated.
@@ -162,8 +164,18 @@ These commands are a required scaffold contract. Until package manifests exist, 
 - Do not reformat unrelated files.
 - Do not start major features without reading the PRD and architecture.
 - Do not silently expand MVP scope.
-- Do not copy Pokémon, Pokopia, or any other third-party character, logo, model, texture, name, or recognizable design. Inspiration must remain at the level of broad visual qualities.
+- Veck.io may inform broad arena-FPS qualities. Import third-party assets only after inspecting the original source and license or applicable written permission; retain provenance and attribution. Do not infer permission from public game files. The user reports permission for some Veck.io assets, but no files are imported until the supplied source/permission is inspected.
 - Before generating a visual asset, write and retain a structured production prompt that states purpose, composition, palette, constraints, and explicit IP exclusions.
 - Before importing an internet asset, verify its original source and license, record both, and preserve any required attribution.
 - If a requested change conflicts with the PRD or architecture, explain the conflict and update the source of truth only with clear authorization.
 - Summarize changed files, verification performed, and remaining risks in the final handoff.
+
+
+## FPS implementation notes
+
+- Keep mobile input parity and portrait/landscape controls. Reset held intent on blur, disconnect, hidden tabs, pointer cancellation, and pointer-lock loss.
+- FPS source types replace the old protocol; client and server must deploy together. Files ending in `.freeze-tag-backup` and `docs/archive` are historical, not a supported alternate mode or test suite.
+- Use shared Frostline geometry for collision, prediction, rendering, and shot occlusion. No untracked decorative cover.
+- The database uses additive FPS summary tables; do not edit checksummed historical migrations.
+- Browser tests may control authoritative state only inside their test worker fixture. Never ship test control endpoints or trust browser outcomes.
+- Same-process five-second load smoke checks do not establish full-match capacity, 20 Hz server throughput, or mobile rendering FPS. Report limits accurately.

@@ -8,7 +8,9 @@ The approved FPS pivot replaces the cozy freeze-tag island with **Frostline: a b
 - First-person eye-height composition: keep center screen clear for crosshair and silhouettes, place health/ammo at the lower corners, timer above, kill feed to the right.
 - Original compact geometric weapon silhouettes, with understated recoil, ADS, reload and switch animations. No gore. Headshots and kills use readable HUD/audio confirmation.
 - Mobile uses portrait/landscape touch layouts and a selectable control mode. Reduced effects suppress camera landing dip, muzzle flashes, tracers, and particles.
-- Menus frame an angled preview of the real arena. Bahnschrift/system sans typography, large game title, left-aligned forms, amber main action. Avoid extra decorative panels.
+- The main menu is a persistent real-time 3D frozen-facility lobby. A full-body player holding the selected primary weapon stands on an amber deployment ring, framed by dark steel, cryogenic tanks, cyan work lights, sparse frost, and deep navy fog. Use an off-axis third-person camera with damped cursor parallax; Loadout and Customize move that same camera closer.
+- Lobby navigation is a narrow left rail, the contextual private-room panel sits on the right, and the current party occupies a compact lower dock. Bahnschrift/system sans typography, clipped ice-facet corners, frost-white type, cyan selection, and one amber deployment action keep the interface competitive without becoming a grid of decorative cards.
+- The lobby may borrow broad staging quality from modern multiplayer games but must not copy any third-party layout, faction, character, weapon, icon set, logo, or progression system. Profile, party, social, and cosmetics surfaces must label unavailable backend services honestly.
 
 ## Production assets
 The retained structured brief is [Frostline production prompt](assets/frostline-production-prompt.md). Map, tools, player geometry, tracer/impact effects, and Web Audio cues are original repository-authored assets. Runtime public asset copying is disabled; old music/models/concepts are retained as source references and are not bundled.
