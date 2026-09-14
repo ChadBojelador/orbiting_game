@@ -1,0 +1,23 @@
+{
+  "source": "apps/client/src/world/island.glb",
+  "sha256": "d921c1dd668f8de45667bac0bd95d0af8fa1df08f7cb42b1e076c7de525ffdb8",
+  "sourceAttribution": {
+    "author": "amogusstrikesback2 (https://sketchfab.com/amogusstrikesback2)",
+    "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+    "source": "https://sketchfab.com/3d-models/chicken-gun-pirateislands-reupload-893581df1abf4d35a0dd849b169722fc",
+    "title": "chicken gun pirateislands reupload"
+  },
+  "selectedSector": "Fort",
+  "scale": 0.30316504035961445,
+  "seaLevel": -18.773349,
+  "sourceCenter": {
+    "x": 335.894744896128,
+    "y": -5.436573956730353,
+    "z": -110.47561246255557
+  },
+  "playableHalfExtent": 60,
+  "triangles": 61396,
+  "drawCalls": 1,
+  "runtimeBytes": 4937100,
+  "collisionBytes": 1105128
+}
