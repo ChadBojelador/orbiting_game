@@ -12,14 +12,14 @@ The original seven-phase plan is archived at `docs/archive/approved-fps-implemen
 
 ## Executed phases
 
-| Phase                        | Result                                                                                                       | Primary modules                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Movement and camera          | Authoritative movement, jump, slide, crouch, sprint, surfaces, prediction, pointer lock, and touch look      | `packages/shared/src/simulation`; `game-input`; `first-person-camera`; `player-motion` |
-| Combat                       | Six weapons, ammo, reload, ADS, spread, falloff, headshots, authoritative damage/death, and feedback         | `weapons`; `weapon-controller`; `damage-system`; `weapon-renderer`                     |
-| Match loop                   | FFA/TDM/duel, solo practice, score/time limits, teams, respawn protection, reconnect, results, and summaries | `match-controller`; `gameplay-controller`; `spawn-manager`; `private-room`             |
-| Maps                         | Frostline plus hybrid Frost Island archipelago collision, outer spawns, routes, Fort ruin, and closed house  | `arena`; `island-layout`; `island-collision`; `FrostlineMap`; `IslandMap`              |
-| HUD and controls             | Health, ammo, timer, score, feed, crosshair, indicators, scoreboard, results, and mobile controls            | `apps/client/src/ui`; `hit-effects`; `touch-controls`                                  |
-| Loadout, settings, and audio | Loadout selection, persistent settings, lobby preview, synthesized combat cues, and retained lobby audio     | `lobby-screen`; `settings-panel`; `fps-settings`; `audio-manager`; `lobby-audio`       |
+| Phase                        | Result                                                                                                                                     | Primary modules                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Movement and camera          | Authoritative movement, jump, slide, crouch, sprint, surfaces, prediction, pointer lock, and touch look                                    | `packages/shared/src/simulation`; `game-input`; `first-person-camera`; `player-motion` |
+| Combat                       | Six weapons, ammo, reload, ADS, spread, falloff, headshots, authoritative damage/death, and feedback                                       | `weapons`; `weapon-controller`; `damage-system`; `weapon-renderer`                     |
+| Match loop                   | FFA/TDM/duel, solo practice, score/time limits, teams, respawn protection, reconnect, results, and summaries                               | `match-controller`; `gameplay-controller`; `spawn-manager`; `private-room`             |
+| Maps                         | Original World restoration plus Frostline and hybrid Frost Island archipelago collision, outer spawns, routes, Fort ruin, and closed house | `arena`; `island-layout`; `island-collision`; `FrostlineMap`; `IslandMap`              |
+| HUD and controls             | Health, ammo, timer, score, feed, crosshair, indicators, scoreboard, results, and mobile controls                                          | `apps/client/src/ui`; `hit-effects`; `touch-controls`                                  |
+| Loadout, settings, and audio | Loadout selection, persistent settings, lobby preview, synthesized combat cues, and retained lobby audio                                   | `lobby-screen`; `settings-panel`; `fps-settings`; `audio-manager`; `lobby-audio`       |
 
 ## Implementation boundaries
 
@@ -40,8 +40,12 @@ Frost Island preserves the approximately 4.9 MB optimized Fort derivative as its
 
 ## Remaining release gates
 
-1. Independent-process full-match load on both maps, with tick latency, memory, bandwidth, and results correctness recorded.
+1. Independent-process full-match load on all three maps, with tick latency, memory, bandwidth, and results correctness recorded.
 2. Physical Android/iOS and desktop GPU playtesting for frame rate, input parity, reload/ADS, and portrait/landscape layouts.
 3. Spawn, route, interior/ceiling, weapon-balance, accessibility, and latency/fairness playtests.
 4. Independent rightsholder-permission evidence for the supplied reuploaded Island asset and an audit of retained character/music assets.
 5. Staging deployment with HTTPS/WSS, proxy isolation, telemetry, and documented operational limits.
+
+### Original World follow-up ? 2026-09-15
+
+The user requested adding their very first GitHub map to the selector. Restored the pre-expansion procedural world from 87a8893, retained all current FPS modes and server authority, baked matching triangle collision, validated sixteen spawn exits, and added migration 005 for summary persistence. See MAP_SPEC.md and TASKS.md for scope and verification.

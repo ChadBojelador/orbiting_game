@@ -301,7 +301,13 @@ export function App() {
           !scene.isLocked &&
           !isSettings && (
             <div className="pause-screen">
-              <h2>{view.mapId === 'island' ? 'Frost Island' : 'Frostline'}</h2>
+              <h2>
+                {view.mapId === 'original'
+                  ? 'Original World'
+                  : view.mapId === 'island'
+                    ? 'Frost Island'
+                    : 'Frostline'}
+              </h2>
               <p>Click to aim. Esc releases your cursor.</p>
               <button className="primary" onClick={() => scene.lock()}>
                 Enter arena

@@ -41,80 +41,98 @@ async function start(page: Page) {
   await page.getByRole('button', { name: 'Start countdown' }).click();
   await expect(page.getByLabel('Health', { exact: true })).toBeVisible({ timeout: 15000 });
 }
-test('desktop guests play, shoot, die, respawn, see scores and finish', async ({
-  page,
-  browser,
-}) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await identify(page, 'FPS Host');
-  const { room, code } = await create(page);
-  const context = await browser.newContext();
-  const friend = await context.newPage();
-  try {
-    await identify(friend, 'FPS Friend');
-    await friend.getByLabel('Invite code', { exact: true }).fill(code);
-    await friend.getByRole('button', { name: 'Join room', exact: true }).click();
-    await expect
-      .poll(() => [...room.state.players.values()].filter((player) => player.isConnected).length)
-      .toBe(2);
-    await expect(page.getByLabel('Connected players')).toHaveText(/2\s*\/ 150 connected/);
-    await start(page);
-    await page.getByRole('button', { name: 'Enter arena' }).click();
-    await expect.poll(() => page.evaluate(() => !!document.pointerLockElement)).toBe(true);
-    const a = room.state.players.get(room.state.hostPlayerId)!,
-      b = [...room.state.players.values()].find((p) => p.playerId !== a.playerId)!;
-    const position = { x: a.x, z: a.z };
-    await page.keyboard.down('KeyW');
-    await expect.poll(() => Math.hypot(a.x - position.x, a.z - position.z)).toBeGreaterThan(1);
-    await page.keyboard.up('KeyW');
-    await page.keyboard.press('Space');
-    await expect.poll(() => a.y).toBeGreaterThan(0);
-    await expect.poll(() => a.isGrounded).toBe(true);
-    Object.assign(a, {
-      x: -50,
-      y: 0,
-      z: -30,
-      yaw: 0,
-      pitch: 0,
-      velocityX: 0,
-      velocityZ: 0,
-      protectedUntil: 0,
-      spawnGeneration: a.spawnGeneration + 1,
-    });
-    Object.assign(b, { x: -50, y: 0, z: -33, hp: 1, protectedUntil: 0 });
-    room.broadcastPatch();
-    await expect.poll(() => a.inputSequence).toBeGreaterThan(10);
-    await page.waitForTimeout(150);
-    await page.mouse.down();
-    await page.mouse.up();
-    await expect(friend.getByText('Eliminated by FPS Host')).toBeVisible();
-    await expect(page.getByText('1 / 30 kills')).toBeVisible();
-    await expect.poll(() => b.status).toBe('alive');
-    await expect(friend.getByText('Eliminated by FPS Host')).toHaveCount(0);
-    await page.keyboard.press('KeyR');
-    await expect(page.getByText('Reloading…')).toBeVisible();
-    await expect(page.getByText('Reloading…')).toHaveCount(0, { timeout: 4000 });
-    await page.keyboard.press('Digit2');
-    await expect(page.locator('.ammo-display')).toContainText('Snowmelt');
-    await page.keyboard.down('Tab');
-    await expect(page.getByRole('region', { name: 'Scoreboard' })).toBeVisible();
-    await page.keyboard.up('Tab');
-    await page.screenshot({ path: 'test-results/fps-desktop.png' });
-    a.kills = 30;
-    const advance = Reflect.get(room, 'advance') as (now: number) => void;
-    advance.call(room, Date.now());
-    room.broadcastPatch();
-    await expect(page.getByRole('heading', { name: 'FPS Host wins' })).toBeVisible();
-    await page.screenshot({ path: 'test-results/fps-results.png' });
-    await page.getByRole('button', { name: 'Back to lobby' }).click();
-    await expect(page.getByRole('button', { name: 'Create private room' })).toBeVisible();
-    expect(errors).toEqual([]);
-  } finally {
-    await context.close();
-  }
-});
-for (const mapId of ['frostline', 'island'] as const)
+for (const mapId of ['frostline', 'original'] as const)
+  test(
+    'desktop ' + mapId + ' guests play, shoot, die, respawn, see scores and finish',
+    async ({ page, browser }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await identify(page, 'FPS Host');
+      await page.getByLabel('Map', { exact: true }).selectOption(mapId);
+      const { room, code } = await create(page);
+      await expect.poll(() => room.state.mapId).toBe(mapId);
+      if (mapId === 'original') {
+        await page.getByLabel('Map', { exact: true }).selectOption('frostline');
+        await expect.poll(() => room.state.mapId).toBe('frostline');
+        await page.getByLabel('Map', { exact: true }).selectOption('original');
+        await expect.poll(() => room.state.arenaHalfExtent).toBe(125);
+      }
+      const context = await browser.newContext();
+      const friend = await context.newPage();
+      try {
+        await identify(friend, 'FPS Friend');
+        await friend.getByLabel('Invite code', { exact: true }).fill(code);
+        await friend.getByRole('button', { name: 'Join room', exact: true }).click();
+        await expect
+          .poll(
+            () => [...room.state.players.values()].filter((player) => player.isConnected).length,
+          )
+          .toBe(2);
+        await expect(page.getByLabel('Connected players')).toHaveText(/2\s*\/ 150 connected/);
+        await start(page);
+        await page.getByRole('button', { name: 'Enter arena' }).click();
+        await expect.poll(() => page.evaluate(() => !!document.pointerLockElement)).toBe(true);
+        const a = room.state.players.get(room.state.hostPlayerId)!,
+          b = [...room.state.players.values()].find((p) => p.playerId !== a.playerId)!;
+        const position = { x: a.x, z: a.z };
+        await page.keyboard.down('KeyW');
+        await expect.poll(() => Math.hypot(a.x - position.x, a.z - position.z)).toBeGreaterThan(1);
+        await page.keyboard.up('KeyW');
+        const groundY = a.y;
+        await page.keyboard.press('Space');
+        await expect.poll(() => a.y).toBeGreaterThan(groundY);
+        await expect.poll(() => a.isGrounded).toBe(true);
+        Object.assign(a, {
+          x: mapId === 'original' ? -18 : -50,
+          y: mapId === 'original' ? 12 : 0,
+          z: mapId === 'original' ? -2 : -30,
+          yaw: 0,
+          pitch: 0,
+          velocityX: 0,
+          velocityZ: 0,
+          protectedUntil: 0,
+          spawnGeneration: a.spawnGeneration + 1,
+        });
+        Object.assign(b, {
+          x: mapId === 'original' ? -18 : -50,
+          y: mapId === 'original' ? 12 : 0,
+          z: mapId === 'original' ? -5 : -33,
+          hp: 1,
+          protectedUntil: 0,
+        });
+        room.broadcastPatch();
+        await expect.poll(() => a.inputSequence).toBeGreaterThan(10);
+        await page.waitForTimeout(150);
+        await page.mouse.down();
+        await page.mouse.up();
+        await expect(friend.getByText('Eliminated by FPS Host')).toBeVisible();
+        await expect(page.getByText('1 / 30 kills')).toBeVisible();
+        await expect.poll(() => b.status).toBe('alive');
+        await expect(friend.getByText('Eliminated by FPS Host')).toHaveCount(0);
+        await page.keyboard.press('KeyR');
+        await expect(page.getByText('Reloading…')).toBeVisible();
+        await expect(page.getByText('Reloading…')).toHaveCount(0, { timeout: 4000 });
+        await page.keyboard.press('Digit2');
+        await expect(page.locator('.ammo-display')).toContainText('Snowmelt');
+        await page.keyboard.down('Tab');
+        await expect(page.getByRole('region', { name: 'Scoreboard' })).toBeVisible();
+        await page.keyboard.up('Tab');
+        await page.screenshot({ path: 'test-results/fps-desktop-' + mapId + '.png' });
+        a.kills = 30;
+        const advance = Reflect.get(room, 'advance') as (now: number) => void;
+        advance.call(room, Date.now());
+        room.broadcastPatch();
+        await expect(page.getByRole('heading', { name: 'FPS Host wins' })).toBeVisible();
+        await page.screenshot({ path: 'test-results/fps-results-' + mapId + '.png' });
+        await page.getByRole('button', { name: 'Back to lobby' }).click();
+        await expect(page.getByRole('button', { name: 'Create private room' })).toBeVisible();
+        expect(errors).toEqual([]);
+      } finally {
+        await context.close();
+      }
+    },
+  );
+for (const mapId of ['frostline', 'island', 'original'] as const)
   test(
     'mobile ' + mapId + ' supports simultaneous movement, look and fire without overflow',
     async ({ browser }) => {

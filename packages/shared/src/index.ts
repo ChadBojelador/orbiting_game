@@ -7,3 +7,4 @@ export * from './validation/gameplay.js';
 export * from './simulation/arena.js';
 export * from './simulation/island-layout.js';
 export { islandSupportHeightAt } from './simulation/island-collision.js';
+export * as originalTopology from './simulation/original-topology.js';

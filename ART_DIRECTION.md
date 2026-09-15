@@ -1,6 +1,6 @@
 # Ice Ice Water! Art Direction
 
-The approved FPS pivot establishes **Frostline: a bright frozen research facility** and **Frost Island: a frozen combat archipelago**. Previous art direction and concept images are historical in `docs/archive` and `assets/concepts`.
+The approved FPS pivot establishes **Frostline: a bright frozen research facility** and **Frost Island: a frozen combat archipelago**. Original World restores the first repository-authored colorful village, forest, crystal, snowy peaks, meadow, and beach palette by user request on 2026-09-15. Previous gameplay art direction and concept images are historical in `docs/archive` and `assets/concepts`.
 
 ## Visual language
 - Crisp, readable low-poly painted metal, polar-white walls, navy structural blocks, cyan ice, amber route paint, and coral opponents.

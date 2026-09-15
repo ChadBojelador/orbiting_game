@@ -1,5 +1,11 @@
 import { expect, it } from 'vitest';
-import { isMoveInput, isShootIntent, isWeaponSwitchIntent, isReloadIntent } from './gameplay.js';
+import {
+  isMoveInput,
+  isShootIntent,
+  isWeaponSwitchIntent,
+  isReloadIntent,
+  isMapId,
+} from './gameplay.js';
 it('rejects non-finite, excessive and forged input across FPS boundaries', () => {
   expect(isMoveInput({ sequence: 1, x: 1, z: 0, yaw: 0, pitch: 0, slide: true })).toBe(true);
   for (const input of [
@@ -23,4 +29,10 @@ it('rejects non-finite, excessive and forged input across FPS boundaries', () =>
   expect(isWeaponSwitchIntent({ slot: 3 })).toBe(false);
   expect(isReloadIntent({})).toBe(true);
   expect(isReloadIntent({ ammo: 30 })).toBe(false);
+});
+
+it('accepts the restored map and rejects unknown map identifiers', () => {
+  for (const map of ['frostline', 'island', 'original']) expect(isMapId(map)).toBe(true);
+  for (const map of ['freeze-tag', '', null, {}, 'original-world'])
+    expect(isMapId(map)).toBe(false);
 });

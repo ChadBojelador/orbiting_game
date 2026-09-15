@@ -27,7 +27,7 @@ export interface WeaponSwitchIntent {
 }
 export type PlayerStatus = 'alive' | 'dead' | 'spectator';
 export type GameMode = 'ffa' | 'tdm' | 'duel';
-export type MapId = 'frostline' | 'island';
+export type MapId = 'frostline' | 'island' | 'original';
 export interface GameplayMessages {
   'input/move': MoveInput;
   'action/shoot': ShootIntent;

@@ -444,6 +444,7 @@ function SoloPanel(props: SoloPanelProps) {
         >
           <option value="frostline">Frostline</option>
           <option value="island">Frost Island</option>
+          <option value="original">Original World</option>
         </select>
       </div>
       <LoadoutScreen value={props.primary} onChange={props.setPrimary} />
@@ -577,6 +578,7 @@ function RoomAwarePanel(props: RoomAwareProps) {
         >
           <option value="frostline">Frostline</option>
           <option value="island">Frost Island</option>
+          <option value="original">Original World</option>
         </select>
       </div>
       <ul className="roster">

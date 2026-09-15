@@ -8,11 +8,14 @@ import {
   type SessionError,
   type PlayerView,
   type MatchPhase,
+  type MapId,
 } from '@ice-water/shared';
 import { startServer } from './app.js';
 import { readConfig } from './config/environment.js';
 
 interface TestState {
+  mapId: MapId;
+  arenaHalfExtent: number;
   phase: MatchPhase;
   phaseDeadline: number;
   serverTime: number;
@@ -202,6 +205,33 @@ describe('HTTP and real WebSocket room flow', () => {
     expect([...room.state.players.values()].every((p) => p.team === 'none')).toBe(true);
     expect((await post('/api/rooms/join', { inviteCode: code }, intruder.token)).status).toBe(409);
     await Promise.all([room, ...others].map((client) => client.leave()));
+  });
+  it('allows only the lobby host to select Original World and freezes selection at countdown', async () => {
+    const first = await enter(await guest('Original Host'));
+    const second = await enter(await guest('Original Guest'), first.code);
+    try {
+      const unauthorized = new Promise<SessionError>((resolve) =>
+        second.room.onMessage('session/error', resolve),
+      );
+      second.room.send('room/configure', { mapId: 'original' });
+      expect((await unauthorized).message).toContain('host');
+      expect(first.room.state.mapId).toBe('frostline');
+      first.room.send('room/configure', { mapId: 'original' });
+      await waitFor(() => second.room.state.mapId === 'original');
+      expect(second.room.state.arenaHalfExtent).toBe(125);
+      first.room.send('room/start', {});
+      await waitFor(() => first.room.state.phase === 'countdown');
+      const frozen = new Promise<SessionError>((resolve) =>
+        first.room.onMessage('session/error', resolve),
+      );
+      first.room.send('room/configure', { mapId: 'island' });
+      await frozen;
+      expect(first.room.state.mapId).toBe('original');
+      await waitFor(() => first.room.state.phase === 'playing');
+      expect([...first.room.state.players.values()].every((p) => p.y > 1.5)).toBe(true);
+    } finally {
+      await Promise.all([first.room.leave(), second.room.leave()]);
+    }
   });
   it('transfers the host on leave and disposes empty invite codes', async () => {
     const host = await guest('Old Host');

@@ -25,7 +25,8 @@
     "db:migrate": "tsx apps/server/src/persistence/migrate.ts",
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down",
-    "assets:island": "node scripts/prepare-island.mjs && npm run build -w @ice-water/shared && node scripts/prepare-island-spawns.mjs"
+    "assets:island": "node scripts/prepare-island.mjs && npm run build -w @ice-water/shared && node scripts/prepare-island-spawns.mjs",
+    "assets:original": "npm run build -w @ice-water/shared && tsx scripts/prepare-original-world.ts && npm run build -w @ice-water/shared"
   },
   "devDependencies": {
     "@colyseus/sdk": "0.18.2",

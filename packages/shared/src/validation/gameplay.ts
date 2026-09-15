@@ -52,7 +52,7 @@ export function isGameMode(v: unknown): v is GameMode {
   return v === 'ffa' || v === 'tdm' || v === 'duel';
 }
 export function isMapId(v: unknown): v is MapId {
-  return v === 'frostline' || v === 'island';
+  return v === 'frostline' || v === 'island' || v === 'original';
 }
 export function isPrimaryWeapon(v: unknown): v is WeaponId {
   return ['assault-rifle', 'smg', 'shotgun', 'sniper'].includes(String(v));

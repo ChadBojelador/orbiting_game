@@ -17,6 +17,7 @@ import { GameSession } from '../network/game-session.js';
 import type { LobbyRoom } from '../network/lobby-client.js';
 import { LocalPresentation } from '../network/player-motion.js';
 import { FrostlineMap } from '../world/frostline-map.js';
+import { OriginalWorldMap } from '../world/original-world-map.js';
 import { IslandMap } from '../world/island-map.js';
 import { FirstPersonCamera } from './first-person-camera.js';
 import { WeaponRenderer } from './weapon-renderer.js';
@@ -47,7 +48,7 @@ export class GameScene {
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(96, 1, 0.05, 320);
   private renderer: WebGLRenderer;
-  private world?: FrostlineMap;
+  private world?: FrostlineMap | OriginalWorldMap;
   private island?: IslandMap;
   private cameraMotion = new FirstPersonCamera();
   private presentation = new LocalPresentation();
@@ -93,6 +94,12 @@ export class GameScene {
       void this.island.ready.then(() => {
         if (!this.destroyed) this.onMapStatusChange?.();
       });
+    } else if (this.session.view.mapId === 'original') {
+      this.world = new OriginalWorldMap(this.scene);
+      this.camera.far = 600;
+      this.camera.updateProjectionMatrix();
+      this.scene.background = new Color(0xa4e8ee);
+      this.scene.fog = new Fog(0xa4e8ee, 190, 440);
     } else this.world = new FrostlineMap(this.scene);
     this.scene.add(this.camera);
     this.weapon = new WeaponRenderer(this.camera);
@@ -340,6 +347,7 @@ export class GameScene {
       if (event.type === 'player/killed' && event.payload.killerId === local)
         this.audio.play('kill');
     }
+    if (this.world instanceof OriginalWorldMap) this.world.update(now / 1000);
     this.effects.update(now);
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame((t) => this.loop(t));
