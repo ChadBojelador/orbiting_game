@@ -1,12 +1,12 @@
 # Ice Ice Water!
 
-A browser-only multiplayer freeze-tag game for private groups of 6–150 players.
+A browser arena FPS with desktop and mobile touch controls, private invite rooms, and server-authoritative combat.
 
-**Implemented:** the npm monorepo, React/Vite/Three.js client, signed guest sessions, private rooms, authoritative movement and actions, the five-round match loop, Deep Freeze elimination, spectating, and results. Development-only wandering bots can fill seats for solo testing.
+The implementation plan's FPS pivot is implemented as a playable prototype: Frostline and Frost Island arenas, movement/jump/swim/slide/crouch/sprint, six weapons, reload/ADS/headshots, death/respawn, FFA/TDM/duel scoring, settings, scoreboard, sound cues, and PostgreSQL summaries. Frost Island is a 160-metre combat archipelago with a central Fort/Cryogenic Core battlefield and specialized outer islands. Freeze-tag is replaced; historical specifications and superseded sources/tests are retained for reference.
 
 ## Run locally
 
-Use **Node 24.18.0** and **npm 11.17.0**, Docker Desktop with the Linux engine, and a modern WebGL 2 browser. Versions are pinned in `.node-version`, `.nvmrc`, and `package.json`.
+Use **Node 24.18.0**, **npm 11.17.0**, Docker Desktop with Linux containers, and a WebGL 2 browser.
 
 ```bash
 npm install
@@ -16,102 +16,74 @@ npm run db:migrate
 npm run dev
 ```
 
-Open **http://localhost:5173** (or **http://127.0.0.1:5173**). The game server listens on **127.0.0.1:2567**. `setup:local` creates an ignored `.env` with random credentials and preserves an existing file. Alternatively, copy `.env.example` to `.env` and replace its placeholders. On PowerShell systems that block `npm.ps1`, use `npm.cmd` for these commands.
+Open **http://localhost:5173** (or **http://127.0.0.1:5173**). Server: **127.0.0.1:2567**. Keep the terminal running. On PowerShell, use `npm.cmd` if `npm.ps1` is blocked. Setup creates an ignored `.env` and preserves an existing one. Never put secrets in browser-visible `VITE_` variables.
 
-Keep the terminal running while you play. If the browser says **Cannot reach the game server**, confirm that `npm run dev` shows both the client and server as started, then open `http://127.0.0.1:2567/health`; it should return an `ok` response. Restart `npm run dev` after changing `.env`, and make sure no older process is already using ports 5173 or 2567.
+The existing local database uses port 55432. Docker must be running. If port 5432 is reserved, set both `POSTGRES_PORT` and the port in `DATABASE_URL` to 55432. `db:down` retains data. Gameplay runs without PostgreSQL, but summary writes fail and `/ready` reports 503. Migrations 003/004 add FPS tables and map identity while preserving freeze-tag history.
 
-Docker must be running before `db:up`. If Windows reserves port 5432, set `POSTGRES_PORT=55432` and change the port in `DATABASE_URL` to 55432. This workspace uses that override. `db:down` stops the database while retaining its named volume. The lobby works without PostgreSQL; `/ready` reports 503 until the database is reachable.
+## Play
 
-## Try a private room
+1. Choose a name, select a mode and primary weapon, then create a private room.
+2. Share the eight-character invite code before starting.
+3. One player can start solo practice. FFA ends at 30 kills/five minutes; TDM at 50 team kills/five minutes; duel at 10 kills/three minutes and allows at most two players.
+4. Death respawns after 2.5 seconds. Spawn protection lasts 1.5 seconds and ends on firing.
+5. Results display for eight seconds, then the room closes. Create a new room for another match.
 
-1. Enter a name, then choose **Create private room**.
-2. Share the eight-character invite code with friends.
-3. Each guest chooses a name and joins with the code. Use separate browser contexts for independent test guests.
-4. With six connected guests, the host can start the countdown. It cancels if the count drops below six.
-5. The server assigns Ice and Water at the deadline and starts the five-round match.
+**Desktop:** click Enter arena for mouse lock; WASD/arrows move; mouse aims; Space jumps; Shift slides; C crouches; Control sprints; left-click fires; right-click aims; R reloads; 1/2/3 or wheel switches weapons; hold Tab for scores; Esc releases the cursor.
 
-Host duties transfer to the first connected guest when the host leaves. Unexpected disconnects reserve the same player for 25 seconds by default; the browser reconnects automatically, and a reload can reclaim the per-tab connection. During a match, reconnecting restores the current authoritative team, position, and freeze/elimination state, including any server-side changes that occurred while disconnected. If the reservation expires, an active or frozen participant forfeits and becomes permanently eliminated, and that match cannot be rejoined. Intentional **Leave room** releases the seat and has the same in-match forfeit outcome. Fresh joins close when countdown begins.
+**Mobile:** movement stick, drag-to-look area, Fire, Aim, Jump, Slide, Reload, Weapon, Scores, Crouch, Sprint. Controls support simultaneous fingers and portrait/landscape. Settings offers Automatic/Touch/Keyboard and mouse if device detection is unreliable. Look sensitivity, FOV, volume, crosshair color, and reduced effects persist locally.
 
-### Controls
+Primary choices: Frost AR, Ice Spray SMG, Glacier Pump shotgun, Icicle sniper. Every loadout also carries Snowmelt pistol and Ice Pick. Values are initial playtest tuning.
 
-- PC: WASD or arrow keys move, left-drag turns the camera, Space jumps, and Ice throws frost toward the center reticle with right-click (`F` is a keyboard fallback). Water holds `E` near a frozen teammate to rescue; a frozen player presses `H` for help.
-- Touch: use the left joystick plus the on-screen Jump and role-specific action buttons.
+Host transfers on departure. Fresh joins close at countdown. Unexpected disconnects reserve identity for 25 seconds by default; reload/reconnect restores health, ammo, score, position, and deadlines. Reserved bodies remain vulnerable; respawn waits for connection. Expired or intentional departures become spectators and cannot rejoin that match.
 
-The in-match HUD shows a compact role-aware PC control guide. Jumping and frost projectiles are server-authoritative. Projectiles can be dodged, stop at cover, and cannot be spammed through the server cooldown; jumping cannot pass through static obstacles.
+## Development bots
 
-### Test locally with bots
+Optional `DEV_BOT_COUNT=5` fills five seats with wandering targets. Bots have normal authoritative health/death/respawn but do not shoot; solo practice does not require them. Bots reserve room capacity and always leave one human seat. Production disables them.
 
-Set `DEV_BOT_COUNT=5` in the root `.env`, restart `npm run dev`, and create a room. One human plus five server-side wandering bots satisfies the six-player start minimum. Bots occupy normal room seats and participate in authoritative movement, team assignment, freezing, and elimination, but they do not throw frost or rescue.
+## Commands and checks
 
-`DEV_BOT_COUNT` must be between zero and `ROOM_MAX_PLAYERS - 1`, leaving at least one human seat. Human capacity is `ROOM_MAX_PLAYERS - DEV_BOT_COUNT`, so the combined bot and human population cannot exceed the configured room maximum or the global limit of 150. Production always runs with zero bots.
+| Command                    | Purpose                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `npm run dev`              | Client and authoritative server                                           |
+| `npm test`                 | Rules, real WebSocket security/lifecycle, database integration            |
+| `npm run test:e2e`         | Desktop and mobile join/play/combat/results/settings flows                |
+| `npm run test:load`        | 20/50/100/150-client five-second gameplay smoke checks                    |
+| `npm run test:load -- 150` | One staged population                                                     |
+| `npm run lint`             | ESLint and Prettier                                                       |
+| `npm run typecheck`        | Strict TypeScript, including tests                                        |
+| `npm run build`            | All production packages and SQL migrations                                |
+| `npm run assets:island`    | Rebuild Fort geometry/collision and validate authored Frost Island spawns |
+| `npm run db:migrate`       | Transactional checksummed migrations                                      |
 
-## Commands
+Playwright starts an isolated Vite on 5174 and a real server inside the test worker on 2568, with zero bots and a test persistence stub. Its test-only server fixture controls poses/deadlines for combat/results assertions; no control endpoint or client-authoritative shortcut ships. Install Chromium with `npx playwright install chromium`, or set `PLAYWRIGHT_CHANNEL=chrome`/`msedge` for an installed signed browser. Restricted Windows runners need permission to terminate test child processes. Touch input is tested through CDP multitouch; this runner may report no touch capability despite emulation.
 
-| Command                             | Purpose                                                               |
-| ----------------------------------- | --------------------------------------------------------------------- |
-| `npm run dev`                       | Run client and game server                                            |
-| `npm test`                          | Unit and real HTTP/WebSocket integration tests                        |
-| `npm run test:e2e`                  | Chromium desktop/mobile lobby flows                                   |
-| `npm run test:load`                 | Staged lobby checks at 20, 50, 100, and 150 connections               |
-| `npm run test:load -- 150`          | Run one lobby size                                                    |
-| `npm run lint`                      | ESLint and Prettier check                                             |
-| `npm run format`                    | Format implementation files                                           |
-| `npm run typecheck`                 | Strict TypeScript across packages and tests                           |
-| `npm run build`                     | Build shared, server (including SQL migrations), and browser packages |
-| `npm run db:migrate`                | Apply transactional, checksummed SQL migrations                       |
-| `npm run db:up` / `npm run db:down` | Start / stop local PostgreSQL                                         |
-
-Install the test browser once with `npx playwright install chromium` (Linux CI uses `--with-deps`). Browser tests always start isolated client and server processes with `DEV_BOT_COUNT=0` on dedicated ports 5174 and 2568, so a normal development session can remain running. Run them with an account allowed to terminate the child processes they launch; restrictive Windows sandboxes can hang during process-tree cleanup even after assertions pass.
-
-If Windows Application Control blocks Playwright's downloaded Chromium, run the same suite with an installed signed browser by setting `PLAYWRIGHT_CHANNEL=chrome` (or `msedge`) for that command. CI and normal local runs leave the variable unset and use the pinned Playwright browser.
-
-Database integration tests require an explicit `TEST_DATABASE_URL` pointing to a disposable test database. They report a skip when it is absent. The local verification uses a separate `icewater_test` database; CI provisions its own PostgreSQL service and runs this check. Never point the test URL at a production database.
-
-The load harness verifies connection count, synchronized lobby state, and role assignment. It does **not** establish gameplay throughput, render FPS, or full-match capacity. Those remain MVP-43–46. Current verification details are in [TASKS.md](TASKS.md).
+Database tests require `TEST_DATABASE_URL` pointing at a disposable database; never production. They skip when absent. Full-match capacity, remote-network latency, and physical mobile-device FPS remain unverified. Five-second same-process load smoke results do not establish 20 Hz throughput or public release readiness; see `TASKS.md`.
 
 ## Configuration
 
-| Variable                                | Default / constraint                                                                                                         |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_GAME_SERVER_URL`                  | `ws://localhost:2567`; public browser configuration                                                                          |
-| `GAME_SERVER_HOST` / `GAME_SERVER_PORT` | `127.0.0.1` / `2567`                                                                                                         |
-| `CLIENT_ORIGIN`                         | `http://localhost:5173`; local development also accepts the equivalent `127.0.0.1` origin                                  |
-| `GUEST_SESSION_SIGNING_SECRET`          | Required random secret, at least 32 characters                                                                               |
-| `GUEST_SESSION_TTL_SECONDS`             | 3600; range 60–86400                                                                                                         |
-| `ROOM_MAX_PLAYERS`                      | 150; range 6–150; total humans plus development bots; start minimum always six                                               |
-| `DEV_BOT_COUNT`                         | 0; development range 0 to `ROOM_MAX_PLAYERS - 1`; reserves seats from human capacity; disabled in production                 |
-| `COUNTDOWN_SECONDS`                     | 5; range 1–30                                                                                                                |
-| `RECONNECT_SECONDS`                     | 25; range 20–30                                                                                                              |
-| `ICE_COUNT_BRACKETS`                    | Optional JSON array of `{ "maxPlayers": 10, "icePlayers": 1 }` rows covering through 150; see the approved full table in PRD |
-| `DATABASE_URL`                          | PostgreSQL URL; required in production                                                                                       |
-| `POSTGRES_PASSWORD` / `POSTGRES_PORT`   | Local Compose password / host port (5432)                                                                                    |
-| `TEST_DATABASE_URL`                     | Optional explicit isolated database for integration tests                                                                    |
+| Variable                                | Default/constraint                                                 |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| `VITE_GAME_SERVER_URL`                  | ws://localhost:2567; public browser config                         |
+| `GAME_SERVER_HOST` / `GAME_SERVER_PORT` | 127.0.0.1 / 2567                                                   |
+| `CLIENT_ORIGIN`                         | http://localhost:5173; equivalent loopback origin accepted locally |
+| `GUEST_SESSION_SIGNING_SECRET`          | Required random secret, at least 32 characters                     |
+| `GUEST_SESSION_TTL_SECONDS`             | 3600; range 60–86400                                               |
+| `ROOM_MAX_PLAYERS`                      | 150; range 1–150, humans plus bots                                 |
+| `DEV_BOT_COUNT`                         | 0; at most room capacity minus one; off in production              |
+| `COUNTDOWN_SECONDS`                     | 5; range 1–30                                                      |
+| `RECONNECT_SECONDS`                     | 25; range 20–30                                                    |
+| `DATABASE_URL`                          | PostgreSQL; required in production                                 |
+| `POSTGRES_PASSWORD` / `POSTGRES_PORT`   | Local Compose credentials/port                                     |
+| `TEST_DATABASE_URL`                     | Optional isolated test database                                    |
 
-`.env` loads from the repository root; existing process environment values take precedence. `VITE_` variables are bundled into browser code and must never contain secrets. Production requires HTTPS/WSS via a trusted TLS proxy and a private raw server port. Hosting is not configured yet.
+`ICE_COUNT_BRACKETS` is obsolete. TDM balances teams at countdown completion. Weapon/movement/match tuning lives in shared constants. Production requires HTTPS/WSS with a trusted TLS proxy and private raw game port. No hosting is configured.
 
-HTTP routes are `/health`, `/ready`, `POST /api/guest-session`, `POST /api/rooms`, and `POST /api/rooms/join`. Room APIs require `Authorization: Bearer <guest token>`. Refresh a valid guest token by POSTing `{}` to `/api/guest-session` with the same header. Initial Colyseus public matchmaking routes are blocked; the invite API returns a short-lived seat reservation.
+Routes remain `/health`, `/ready`, `POST /api/guest-session`, `POST /api/rooms`, `POST /api/rooms/join`. Room APIs require a signed guest token; public Colyseus matchmaking remains blocked.
 
-## Structure and sources of truth
+## Sources of truth
 
-```text
-apps/client/src/    React UI, network adapter, and Three.js presentation
-apps/server/src/    Authentication, authoritative rooms, configuration, persistence
-packages/shared/   Safe protocol types, constants, and pure validation
-tests/e2e/         Browser lobby flows
-tests/load/        Simulated lobby clients
-scripts/           Local setup and development tooling
-assets/            Original art guidance and retained production briefs
-```
+[PRD](PRD.md), [architecture](ARCHITECTURE.md), [map specification](MAP_SPEC.md), [art direction](ART_DIRECTION.md), [implementation status](implementation_plan.md), [tasks and verification](TASKS.md), [agent rules](AGENTS.md), [contributing](CONTRIBUTING.md).
 
-- [PRD.md](PRD.md): product behavior and approved Ice-count brackets
-- [ARCHITECTURE.md](ARCHITECTURE.md): technical boundaries and implementation decisions
-- [ART_DIRECTION.md](ART_DIRECTION.md): visual language and asset rules
-- [TASKS.md](TASKS.md): current work and verification
-- [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md): contribution rules
+`apps/client` renders and captures input; `apps/server` owns outcomes; `packages/shared` holds safe types/constants/pure simulation; `tests` holds browser/load scenarios. Original procedural weapons/facility/combat audio and Frost Island archipelago geometry ship alongside the authorized Fort derivative and wooden house. Lobby character/music are retained project assets. Embedded source/license metadata and outstanding permission evidence are recorded; see [asset provenance](assets/asset-provenance.md).
 
-The project uses TypeScript, Three.js, React, Vite, Node.js, Colyseus, PostgreSQL, npm workspaces, Vitest, and Playwright. Dependencies are pinned in `package-lock.json`. The world blockout uses original repository-authored geometry and the project-owned character GLB; no third-party world assets were imported.
-
-## Contributors
-
-- Chad Bojelador — co-creator
-- Franco Perez — co-creator
+Contributors: Chad Bojelador and Franco Perez.

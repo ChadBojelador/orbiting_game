@@ -2,9 +2,11 @@ import { Room, ServerError, type AuthContext, type Client } from '@colyseus/core
 import { randomUUID } from 'node:crypto';
 import {
   GAMEPLAY,
+  arenaHalfExtentForMap,
   isEmptyPayload,
   isRecord,
   isGameMode,
+  isMapId,
   isPrimaryWeapon,
   type GameplayMessages,
   type MatchResult,
@@ -33,10 +35,7 @@ export interface RoomDependencies {
 export function createPrivateRoom({ config, sessions, directory, database }: RoomDependencies) {
   return class PrivateRoom extends Room<{ state: LobbyState; client: GuestClient }> {
     override state = new LobbyState();
-    private readonly controller = new LobbyController(
-      this.state,
-      config.countdownSeconds * 1000,
-    );
+    private readonly controller = new LobbyController(this.state, config.countdownSeconds * 1000);
     private readonly actions = new RateLimiter(4, 1000);
     private readonly matchId = randomUUID();
     private readonly gameplay = new GameplayController(this.state, (event) =>
@@ -90,7 +89,9 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
           if (!client.auth || client.auth.expiresAt <= Date.now())
             return this.fail(client, 'unauthorized', 'Guest session expired');
           const now = Date.now();
-          this.advance(now);
+          this.state.serverTime = now;
+          // Receiving client messages must not grant extra bot ticks.
+          advanceAuthoritativeTick(now, this.gameplay, this.match);
           const error = this.gameplay.handle(client.auth.playerId, type, payload, now);
           this.match.tick(now);
           if (error) this.fail(client, 'invalid-action', error);
@@ -100,35 +101,65 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
           return this.fail(client, 'rate-limit', 'Slow down and try again');
         if (!isEmptyPayload(payload))
           return this.fail(client, 'invalid-message', 'Invalid start request');
-        if (!client.auth || client.auth.expiresAt <= Date.now()) return this.fail(client, 'unauthorized', 'Guest session expired');
+        if (!client.auth || client.auth.expiresAt <= Date.now())
+          return this.fail(client, 'unauthorized', 'Guest session expired');
         const error = this.controller.start(client.auth.playerId, Date.now());
         if (error) return this.fail(client, 'cannot-start', error);
         void this.lock();
         this.phaseChanged();
       });
       this.onMessage('room/configure', (client: GuestClient, payload: unknown) => {
-        if (!client.auth || client.auth.expiresAt <= Date.now()) return this.fail(client,'unauthorized','Guest session expired');
-        if (!this.actions.take(client.sessionId)) return this.fail(client,'rate-limit','Slow down and try again');
+        if (!client.auth || client.auth.expiresAt <= Date.now())
+          return this.fail(client, 'unauthorized', 'Guest session expired');
+        if (!this.actions.take(client.sessionId))
+          return this.fail(client, 'rate-limit', 'Slow down and try again');
         if (this.state.phase !== 'lobby' || client.auth.playerId !== this.state.hostPlayerId)
-          return this.fail(client,'cannot-configure','Only the host can change the waiting room');
-        if (!isRecord(payload) || Object.keys(payload).length !== 1 || !isGameMode(payload.gameMode))
-          return this.fail(client,'invalid-message','Invalid game mode');
+          return this.fail(client, 'cannot-configure', 'Only the host can change the waiting room');
+        if (
+          !isRecord(payload) ||
+          Object.keys(payload).length < 1 ||
+          Object.keys(payload).some((key) => key !== 'gameMode' && key !== 'mapId') ||
+          (payload.gameMode !== undefined && !isGameMode(payload.gameMode)) ||
+          (payload.mapId !== undefined && !isMapId(payload.mapId))
+        )
+          return this.fail(client, 'invalid-message', 'Invalid room configuration');
         if (payload.gameMode === 'duel' && this.state.players.size > 2)
-          return this.fail(client,'cannot-configure','Duel supports at most two players');
-        this.state.gameMode = payload.gameMode;
+          return this.fail(client, 'cannot-configure', 'Duel supports at most two players');
+        if (payload.gameMode !== undefined) this.state.gameMode = payload.gameMode;
+        if (payload.mapId !== undefined) {
+          this.state.mapId = payload.mapId;
+          this.state.arenaHalfExtent = arenaHalfExtentForMap(payload.mapId);
+        }
       });
       this.onMessage('player/loadout', (client: GuestClient, payload: unknown) => {
-        if (!client.auth || client.auth.expiresAt <= Date.now()) return this.fail(client,'unauthorized','Guest session expired');
-        if (!this.actions.take(client.sessionId)) return this.fail(client,'rate-limit','Slow down and try again');
-        if (this.state.phase !== 'lobby' || !isRecord(payload) || Object.keys(payload).length !== 1 || !isPrimaryWeapon(payload.primaryWeapon))
-          return this.fail(client,'invalid-message','Choose a primary weapon in the lobby');
+        if (!client.auth || client.auth.expiresAt <= Date.now())
+          return this.fail(client, 'unauthorized', 'Guest session expired');
+        if (!this.actions.take(client.sessionId))
+          return this.fail(client, 'rate-limit', 'Slow down and try again');
+        if (
+          this.state.phase !== 'lobby' ||
+          !isRecord(payload) ||
+          Object.keys(payload).length !== 1 ||
+          !isPrimaryWeapon(payload.primaryWeapon)
+        )
+          return this.fail(client, 'invalid-message', 'Choose a primary weapon in the lobby');
         const player = this.state.players.get(client.auth.playerId);
-        if(player) player.primaryWeapon=payload.primaryWeapon;
+        if (player) player.primaryWeapon = payload.primaryWeapon;
       });
       this.onMessage('session/ping', (client: GuestClient, payload: unknown) => {
-        if(!client.auth || client.auth.expiresAt <= Date.now() || !this.actions.take(client.sessionId)) return;
-        if(isRecord(payload) && Object.keys(payload).length===1 && typeof payload.sentAt==='number' && Number.isFinite(payload.sentAt))
-          client.send('session/pong', {sentAt:payload.sentAt});
+        if (
+          !client.auth ||
+          client.auth.expiresAt <= Date.now() ||
+          !this.actions.take(client.sessionId)
+        )
+          return;
+        if (
+          isRecord(payload) &&
+          Object.keys(payload).length === 1 &&
+          typeof payload.sentAt === 'number' &&
+          Number.isFinite(payload.sentAt)
+        )
+          client.send('session/pong', { sentAt: payload.sentAt });
       });
       this.onMessage('*', (client) => this.fail(client, 'invalid-message', 'Unknown room action'));
     }
@@ -151,7 +182,8 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
       if (this.state.players.has(identity.playerId))
         throw new ServerError(409, 'This guest is already in the room');
       if (this.state.players.size >= config.maxPlayers) throw new ServerError(409, 'Room is full');
-      if (this.state.gameMode === 'duel' && this.state.players.size >= 2) throw new ServerError(409, 'Duel is full');
+      if (this.state.gameMode === 'duel' && this.state.players.size >= 2)
+        throw new ServerError(409, 'Duel is full');
       return identity;
     }
 
@@ -277,6 +309,7 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         winner: result.winner,
         resultReason: result.reason,
         gameMode: this.state.gameMode,
+        mapId: this.state.mapId,
         startedAt: new Date(startedAt),
         completedAt: new Date(completedAt),
         players: [...this.state.players.values()].map((player) => ({

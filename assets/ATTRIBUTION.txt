@@ -1,0 +1,31 @@
+Ice Ice Water! asset credits
+
+Frost Island central Fort derivative
+Source title: chicken gun pirateislands reupload
+Uploader credited in supplied GLB: amogusstrikesback2
+https://sketchfab.com/amogusstrikesback2
+https://sketchfab.com/3d-models/chicken-gun-pirateislands-reupload-893581df1abf4d35a0dd849b169722fc
+Embedded license: Creative Commons Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+Changes: extracted Fort sector; removed dense foliage, small props, other sectors,
+sea floor and water planes; baked transforms and uniformly normalized to 112 m;
+quantized vertices to centimetres; merged structural meshes; derived collision.
+The derivative is uniformly transformed to form Frost Island's central ruin.
+Surrounding islands, routes, cover, and Cryogenic Core are original project geometry.
+The user confirmed permission to reuse this supplied file. Its reupload metadata
+does not independently establish the original rightsholder's permission. See
+assets/asset-provenance.md for the current verification status.
+
+Wooden-house landmark
+Low poly Wooden house rusty 3d model free, by iGauravRajput
+https://sketchfab.com/iGauravRajput
+https://sketchfab.com/3d-models/low-poly-wooden-house-rusty-3d-model-free-abc884c3fea04b9aa4991a3691aa9a36
+Embedded license: Creative Commons Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+Changes: uniform eight-metre normalization, centering/grounding and shared outer
+box collider. User confirmed permission for the supplied file.
+
+Frostline facility, weapons, combat-player geometry, effects and synthesized
+combat audio: original repository-authored assets.
+Lobby character and music: pre-existing project-supplied assets; see provenance.
+No assets were downloaded from Veck.io for this implementation.

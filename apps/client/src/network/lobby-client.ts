@@ -9,7 +9,6 @@ import {
 
 interface WireLobby extends Omit<LobbyView, 'players'> {
   players: { values(): IterableIterator<PlayerView> };
-
 }
 export type LobbyRoom = Room<unknown, WireLobby>;
 const endpoint = new URL(import.meta.env.VITE_GAME_SERVER_URL || 'ws://localhost:2567');
@@ -105,18 +104,58 @@ export async function reconnectRoom(): Promise<LobbyRoom | null> {
 }
 export function snapshot(state: WireLobby): LobbyView {
   return {
-    inviteCode: state.inviteCode, hostPlayerId:state.hostPlayerId,phase:state.phase,
-    phaseDeadline:state.phaseDeadline,serverTime:state.serverTime,maxPlayers:state.maxPlayers,minPlayers:state.minPlayers,
-    arenaHalfExtent:state.arenaHalfExtent,gameMode:state.gameMode,iceScore:state.iceScore,waterScore:state.waterScore,
-    matchWinner:state.matchWinner,resultReason:state.resultReason,
-    players:[...state.players.values()].map(p=>({
-      playerId:p.playerId,displayName:p.displayName,team:p.team,isConnected:p.isConnected,isBot:p.isBot,reconnectDeadline:p.reconnectDeadline,
-      x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,velocityX:p.velocityX,velocityZ:p.velocityZ,verticalVelocity:p.verticalVelocity,
-      isGrounded:p.isGrounded,inputSequence:p.inputSequence,status:p.status,protectedUntil:p.protectedUntil,
-      isSliding:p.isSliding,isCrouching:p.isCrouching,slideUntil:p.slideUntil,slideReadyAt:p.slideReadyAt,
-      hp:p.hp,kills:p.kills,deaths:p.deaths,currentWeaponSlot:p.currentWeaponSlot,primaryWeapon:p.primaryWeapon,weaponId:p.weaponId,
-      ammo:p.ammo,reserveAmmo:p.reserveAmmo,reloadUntil:p.reloadUntil,fireReadyAt:p.fireReadyAt,respawnAt:p.respawnAt,
-      spawnGeneration:p.spawnGeneration,lastKillerId:p.lastKillerId,lastDeathWeapon:p.lastDeathWeapon,ping:p.ping,
+    inviteCode: state.inviteCode,
+    hostPlayerId: state.hostPlayerId,
+    phase: state.phase,
+    phaseDeadline: state.phaseDeadline,
+    serverTime: state.serverTime,
+    maxPlayers: state.maxPlayers,
+    minPlayers: state.minPlayers,
+    arenaHalfExtent: state.arenaHalfExtent,
+    gameMode: state.gameMode,
+    mapId: state.mapId,
+    iceScore: state.iceScore,
+    waterScore: state.waterScore,
+    matchWinner: state.matchWinner,
+    resultReason: state.resultReason,
+    players: [...state.players.values()].map((p) => ({
+      playerId: p.playerId,
+      displayName: p.displayName,
+      team: p.team,
+      isConnected: p.isConnected,
+      isBot: p.isBot,
+      reconnectDeadline: p.reconnectDeadline,
+      x: p.x,
+      y: p.y,
+      z: p.z,
+      yaw: p.yaw,
+      pitch: p.pitch,
+      velocityX: p.velocityX,
+      velocityZ: p.velocityZ,
+      verticalVelocity: p.verticalVelocity,
+      isGrounded: p.isGrounded,
+      inputSequence: p.inputSequence,
+      status: p.status,
+      protectedUntil: p.protectedUntil,
+      isSliding: p.isSliding,
+      isCrouching: p.isCrouching,
+      slideUntil: p.slideUntil,
+      slideReadyAt: p.slideReadyAt,
+      hp: p.hp,
+      kills: p.kills,
+      deaths: p.deaths,
+      currentWeaponSlot: p.currentWeaponSlot,
+      primaryWeapon: p.primaryWeapon,
+      weaponId: p.weaponId,
+      ammo: p.ammo,
+      reserveAmmo: p.reserveAmmo,
+      reloadUntil: p.reloadUntil,
+      fireReadyAt: p.fireReadyAt,
+      respawnAt: p.respawnAt,
+      spawnGeneration: p.spawnGeneration,
+      lastKillerId: p.lastKillerId,
+      lastDeathWeapon: p.lastDeathWeapon,
+      ping: p.ping,
     })),
   };
 }

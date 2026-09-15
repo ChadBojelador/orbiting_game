@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
-import type { MatchResult, PlayerStatus, Team, GameMode } from '@ice-water/shared';
+import type { MatchResult, PlayerStatus, Team, GameMode, MapId } from '@ice-water/shared';
 
 export interface MatchPlayerSummary {
   playerId: string;
@@ -14,6 +14,7 @@ export interface MatchSummary {
   winner: MatchResult['winner'];
   resultReason: MatchResult['reason'];
   gameMode: GameMode;
+  mapId?: MapId;
 
   startedAt: Date;
   completedAt: Date;
@@ -50,8 +51,8 @@ export async function saveMatchSummary(pool: Pool, summary: MatchSummary): Promi
     await client.query('BEGIN');
     const inserted = await client.query<{ match_id: string }>(
       `INSERT INTO arena_matches
-        (match_id, winner, result_reason, game_mode, started_at, completed_at)
-       VALUES ($1, $2, $3, $4, $5, $6)
+        (match_id, winner, result_reason, game_mode, started_at, completed_at, map_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (match_id) DO NOTHING
        RETURNING match_id`,
       [
@@ -62,6 +63,7 @@ export async function saveMatchSummary(pool: Pool, summary: MatchSummary): Promi
 
         summary.startedAt,
         summary.completedAt,
+        summary.mapId ?? 'frostline',
       ],
     );
     if (inserted.rowCount === 0) {

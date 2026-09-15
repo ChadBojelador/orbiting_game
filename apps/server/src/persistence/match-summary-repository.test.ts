@@ -10,6 +10,7 @@ function summary(matchId = randomUUID()): MatchSummary {
     winner: 'water',
     resultReason: 'time-limit',
     gameMode: 'tdm',
+    mapId: 'island',
     startedAt: new Date('2026-09-13T00:00:00.000Z'),
     completedAt: new Date('2026-09-13T00:05:25.000Z'),
     players: [
@@ -52,6 +53,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('match summary repository', () =
         winner: value.winner,
         result_reason: value.resultReason,
         game_mode: value.gameMode,
+        map_id: value.mapId,
       });
       expect(players.rows).toHaveLength(value.players.length);
       expect(players.rows).toEqual(
@@ -90,4 +92,3 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('match summary repository', () =
     }
   });
 });
-

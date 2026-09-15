@@ -12,3 +12,6 @@ ART_DIRECTION.md
 AGENTS.md
 TASKS.md
 CONTRIBUTING.md
+
+docs/archive
+packages/shared/src/simulation/island-data.ts

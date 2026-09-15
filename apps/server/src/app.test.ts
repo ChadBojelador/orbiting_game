@@ -69,7 +69,14 @@ async function enter(
   const room: TestRoom = await new Client(url).consumeSeatReservation<TestState>(reservation.seat);
   rooms.push(room);
   room.onMessage('match/phase-changed', () => {});
-  for (const type of ['weapon/fired','player/hit','player/killed','player/respawned','match/result']) room.onMessage(type,()=>{});
+  for (const type of [
+    'weapon/fired',
+    'player/hit',
+    'player/killed',
+    'player/respawned',
+    'match/result',
+  ])
+    room.onMessage(type, () => {});
   await waitFor(() => !!room.state?.players);
   return { room, code: reservation.inviteCode };
 }
@@ -192,7 +199,7 @@ describe('HTTP and real WebSocket room flow', () => {
     room.send('room/start', {});
     await waitFor(() => room.state.phase === 'countdown');
     await waitFor(() => room.state.phase === 'playing');
-    expect([...room.state.players.values()].every(p=>p.team==='none')).toBe(true);
+    expect([...room.state.players.values()].every((p) => p.team === 'none')).toBe(true);
     expect((await post('/api/rooms/join', { inviteCode: code }, intruder.token)).status).toBe(409);
     await Promise.all([room, ...others].map((client) => client.leave()));
   });
@@ -324,26 +331,45 @@ describe('HTTP and real WebSocket room flow', () => {
       .toBe(404);
   });
   it('synchronizes hits, death, respawn and dead-player reconnect through real sockets', async () => {
-    const {participants}=await startMatch('Combat');
-    const actor=participants[0]!,target=participants[1]!;
-    const serverRoom=authoritativeRoom(actor.room);
-    const a=serverRoom.state.players.get(actor.identity.playerId)!,b=serverRoom.state.players.get(target.identity.playerId)!;
-    Object.assign(a,{x:-34,z:-30,y:0,protectedUntil:0});
-    Object.assign(b,{x:-34,z:-33,y:0,hp:1,protectedUntil:0});
-    actor.room.send('action/shoot',{yaw:0,pitch:0,isAds:true});
-    await waitFor(()=>actor.room.state.players.get(target.identity.playerId)?.status==='dead');
+    const { participants } = await startMatch('Combat');
+    const actor = participants[0]!,
+      target = participants[1]!;
+    const serverRoom = authoritativeRoom(actor.room);
+    const a = serverRoom.state.players.get(actor.identity.playerId)!,
+      b = serverRoom.state.players.get(target.identity.playerId)!;
+    Object.assign(a, { x: -50, z: -30, y: 0, protectedUntil: 0 });
+    Object.assign(b, { x: -50, z: -33, y: 0, hp: 1, protectedUntil: 0 });
+    actor.room.send('action/shoot', { yaw: 0, pitch: 0, isAds: true });
+    await waitFor(() => actor.room.state.players.get(target.identity.playerId)?.status === 'dead');
     expect(actor.room.state.players.get(actor.identity.playerId)?.kills).toBe(1);
     expect(actor.room.state.players.get(target.identity.playerId)?.deaths).toBe(1);
-    const deadline=b.respawnAt;
-    const token=target.room.reconnectionToken;target.room.reconnection.enabled=false;target.room.connection.close(4010);
-    await waitFor(()=>!b.isConnected);
-    const reconnected:TestRoom=await new Client(url).reconnect<TestState>(token);rooms.push(reconnected);
-    for(const type of ['player/respawned','weapon/fired','player/hit','player/killed','match/phase-changed','match/result'])reconnected.onMessage(type,()=>{});
-    await waitFor(()=>reconnected.state?.players.get(target.identity.playerId)?.status==='dead');
+    const deadline = b.respawnAt;
+    const token = target.room.reconnectionToken;
+    target.room.reconnection.enabled = false;
+    target.room.connection.close(4010);
+    await waitFor(() => !b.isConnected);
+    const reconnected: TestRoom = await new Client(url).reconnect<TestState>(token);
+    rooms.push(reconnected);
+    for (const type of [
+      'player/respawned',
+      'weapon/fired',
+      'player/hit',
+      'player/killed',
+      'match/phase-changed',
+      'match/result',
+    ])
+      reconnected.onMessage(type, () => {});
+    await waitFor(
+      () => reconnected.state?.players.get(target.identity.playerId)?.status === 'dead',
+    );
     expect(b.respawnAt).toBe(deadline);
-    await waitFor(()=>actor.room.state.players.get(target.identity.playerId)?.status==='alive');
-    expect(b.hp).toBe(100);expect(b.deaths).toBe(1);
-    await Promise.all([reconnected.leave(),...participants.filter(p=>p!==target).map(p=>p.room.leave())]);
+    await waitFor(() => actor.room.state.players.get(target.identity.playerId)?.status === 'alive');
+    expect(b.hp).toBe(100);
+    expect(b.deaths).toBe(1);
+    await Promise.all([
+      reconnected.leave(),
+      ...participants.filter((p) => p !== target).map((p) => p.room.leave()),
+    ]);
   });
   it('keeps match results through their deadline, then disposes the room and invite once', async () => {
     const { participants, code } = await startMatch('Cleanup');
@@ -351,11 +377,11 @@ describe('HTTP and real WebSocket room flow', () => {
     const serverRoom = authoritativeRoom(observer.room);
     serverRoom.setTimestep(() => {}, 60_000);
     const reconnectToken = observer.room.reconnectionToken;
-    const writesBefore=saveMatchSummary.mock.calls.length;
-    serverRoom.state.players.get(observer.identity.playerId)!.kills=GAMEPLAY.ffaScoreLimit;
+    const writesBefore = saveMatchSummary.mock.calls.length;
+    serverRoom.state.players.get(observer.identity.playerId)!.kills = GAMEPLAY.ffaScoreLimit;
     const completedAt = Date.now();
     advanceRoom(serverRoom, completedAt);
-    await waitFor(() => ['finished','intermission'].includes(observer.room.state.phase));
+    await waitFor(() => ['finished', 'intermission'].includes(observer.room.state.phase));
     await vi.waitFor(() => expect(saveMatchSummary).toHaveBeenCalled());
     const deadline = serverRoom.state.phaseDeadline;
 
@@ -365,7 +391,7 @@ describe('HTTP and real WebSocket room flow', () => {
 
     advanceRoom(serverRoom, deadline);
     await waitFor(() => !matchMaker.getLocalRoomById(observer.room.roomId));
-    expect(saveMatchSummary).toHaveBeenCalledTimes(writesBefore+1);
+    expect(saveMatchSummary).toHaveBeenCalledTimes(writesBefore + 1);
     await expect(new Client(url).reconnect<TestState>(reconnectToken)).rejects.toThrow();
     expect(
       (await post('/api/rooms/join', { inviteCode: code }, (await guest()).token)).status,
@@ -379,4 +405,3 @@ describe('HTTP and real WebSocket room flow', () => {
     expect(responses.at(-1)?.status).toBe(429);
   });
 });
-

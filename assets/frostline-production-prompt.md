@@ -9,3 +9,5 @@
 - IP exclusions: do not copy Veck.io maps, models, UI, names, logos, music, textures, characters, or any other recognizable third-party designs. Licensed supplied files may be considered separately after recording their permission.
 - Audio: original Web Audio oscillator/noise envelopes for shots, reloads, hit/headshot/kill feedback, footsteps, jump, slide, landing. No sampled third-party recordings.
 - Review: this facility-specific palette and live map composition replace the previous cozy island. Avoid generic dashboard cards; show the actual arena and only actionable settings.
+
+Implementation adaptation (2026-09-15): the concurrent approved layout expands horizontal dimensions from 80 m to 120 m; vertical scale remains unchanged. The persistent character lobby supersedes the initial arena-preview menu composition. Frost Island and the supplied wooden house have separate provenance and shared collision documented in MAP_SPEC.md and assets/asset-provenance.md.
