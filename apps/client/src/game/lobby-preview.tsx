@@ -39,6 +39,19 @@ const CAMERA_POSES: Record<LobbySection, { position: THREE.Vector3; target: THRE
   },
 };
 
+const RIGHT_UPPER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(-0.9, 1.0, -1.5),
+);
+const RIGHT_LOWER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(-0.6, -0.2, 0.5),
+);
+const LEFT_UPPER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(-0.3, 0.3, -0.9),
+);
+const LEFT_LOWER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(0.3, 1.2, -1.5),
+);
+
 export function LobbyPreview({ section, weapon, reducedEffects, isRoomActive }: LobbyPreviewProps) {
   const ref = useRef<HTMLCanvasElement>(null),
     sceneRef = useRef<LobbyScene | undefined>(undefined);
@@ -93,6 +106,10 @@ class LobbyScene {
   });
   private readonly cleanup: Array<() => void> = [];
   private character?: CharacterInstance;
+  private upperArmR?: THREE.Object3D;
+  private lowerArmR?: THREE.Object3D;
+  private upperArmL?: THREE.Object3D;
+  private lowerArmL?: THREE.Object3D;
   private placeholder?: THREE.Group;
   private weapon = new THREE.Group();
   private snow?: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
@@ -382,7 +399,13 @@ class LobbyScene {
       leg.position.set(x, 0.45, 0);
       return leg;
     });
-    group.add(torso, head, ...legs);
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.52, 0.18), suit);
+    leftArm.position.set(-0.22, 1.3, 0.24);
+    leftArm.rotation.set(-0.7, 0.35, -0.3);
+    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.52, 0.18), suit);
+    rightArm.position.set(0.28, 1.24, 0.26);
+    rightArm.rotation.set(-0.6, -0.2, 0.25);
+    group.add(torso, head, leftArm, rightArm, ...legs);
     group.traverse((object) => {
       if (object instanceof THREE.Mesh) object.castShadow = true;
     });
@@ -397,6 +420,10 @@ class LobbyScene {
       this.character.root.scale.setScalar(0.26);
       this.character.root.rotation.y = Math.PI;
       this.character.root.position.y = 0.02;
+      this.upperArmR = this.character.root.getObjectByName('UpperArmR') ?? undefined;
+      this.lowerArmR = this.character.root.getObjectByName('LowerArmR') ?? undefined;
+      this.upperArmL = this.character.root.getObjectByName('UpperArmL') ?? undefined;
+      this.lowerArmL = this.character.root.getObjectByName('LowerArmL') ?? undefined;
       const limbMaterial = new THREE.MeshStandardMaterial({
         color: 0x1a4960,
         roughness: 0.48,
@@ -551,6 +578,12 @@ class LobbyScene {
 
   private update(now: number, delta: number): void {
     this.character?.update(delta);
+    if (this.upperArmR && this.lowerArmR && this.upperArmL && this.lowerArmL) {
+      this.upperArmR.quaternion.multiply(RIGHT_UPPER_ARM_HOLD_OFFSET);
+      this.lowerArmR.quaternion.multiply(RIGHT_LOWER_ARM_HOLD_OFFSET);
+      this.upperArmL.quaternion.multiply(LEFT_UPPER_ARM_HOLD_OFFSET);
+      this.lowerArmL.quaternion.multiply(LEFT_LOWER_ARM_HOLD_OFFSET);
+    }
     const pose = CAMERA_POSES[this.section],
       ease = 1 - Math.exp(-4.8 * delta),
       pointerScale = this.isReduced ? 0 : 1;
