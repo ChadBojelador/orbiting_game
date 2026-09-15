@@ -1,6 +1,6 @@
 # FPS Task Tracker
 
-Current product: private-room arena FPS with desktop/mobile support and Frostline and Island - Fort maps. Freeze-tag planning is archived under `docs/archive`.
+Current product: private-room arena FPS with desktop/mobile support and Frostline and Frost Island maps. Freeze-tag planning is archived under `docs/archive`.
 
 ## Completed
 
@@ -10,12 +10,14 @@ Current product: private-room arena FPS with desktop/mobile support and Frostlin
 | FPS-02 | Six weapons, ammo/reload validation, hitscan, damage, and death | Complete |
 | FPS-03 | FFA/TDM/duel, solo practice, respawn, reconnect, results, and summaries | Complete |
 | FPS-04 | Frostline geometry and wooden-house scale/collision | Complete |
-| FPS-05 | Island Fort optimization, shared triangle collision, and spawns | Complete |
+| FPS-05 | Fort optimization and shared triangle collision | Complete |
 | FPS-06 | HUD, scoreboard, feedback, desktop/mobile controls, and settings | Complete |
 | FPS-07 | Lobby loadout, preview, audio, and map selection | Complete |
 | FPS-08 | Additive FPS summary and map migrations | Complete; local migrations applied |
 | FPS-09 | Archive superseded freeze-tag sources and replace active tests | Complete |
 | FPS-10 | Update product, architecture, art, map, setup, and agent documentation | Complete |
+| FPS-19 | Island sea buoyancy, drag, swim-up input, and shared prediction tests | Complete |
+| FPS-20 | Frost Island archipelago layout, hybrid collision, outer spawns, routes, and LOD | Complete |
 
 ## Open release gates
 

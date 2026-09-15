@@ -51,6 +51,16 @@ const LEFT_UPPER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
 const LEFT_LOWER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
   new THREE.Euler(0.3, 1.2, -1.5),
 );
+const WEAPON_GRIP_POINT = new THREE.Vector3(0, -0.24, -0.16);
+const STAGE_UP = new THREE.Vector3(0, 1, 0);
+const WEAPON_PREVIEW_SCALE: Record<WeaponId, number> = {
+  'assault-rifle': 0.78,
+  smg: 0.88,
+  shotgun: 0.76,
+  sniper: 0.68,
+  pistol: 0.78,
+  'ice-pick': 0.78,
+};
 
 export function LobbyPreview({ section, weapon, reducedEffects, isRoomActive }: LobbyPreviewProps) {
   const ref = useRef<HTMLCanvasElement>(null),
@@ -110,6 +120,12 @@ class LobbyScene {
   private lowerArmR?: THREE.Object3D;
   private upperArmL?: THREE.Object3D;
   private lowerArmL?: THREE.Object3D;
+  private rightHand?: THREE.Object3D;
+  private leftHand?: THREE.Object3D;
+  private readonly handPosition = new THREE.Vector3();
+  private readonly supportHandPosition = new THREE.Vector3();
+  private readonly gripOffset = new THREE.Vector3();
+  private readonly weaponRotation = new THREE.Matrix4();
   private placeholder?: THREE.Group;
   private weapon = new THREE.Group();
   private snow?: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
@@ -424,6 +440,10 @@ class LobbyScene {
       this.lowerArmR = this.character.root.getObjectByName('LowerArmR') ?? undefined;
       this.upperArmL = this.character.root.getObjectByName('UpperArmL') ?? undefined;
       this.lowerArmL = this.character.root.getObjectByName('LowerArmL') ?? undefined;
+      this.rightHand =
+        this.character.root.getObjectByName('LowerArmR_end') ?? this.lowerArmR ?? undefined;
+      this.leftHand =
+        this.character.root.getObjectByName('LowerArmL_end') ?? this.lowerArmL ?? undefined;
       const limbMaterial = new THREE.MeshStandardMaterial({
         color: 0x1a4960,
         roughness: 0.48,
@@ -464,11 +484,12 @@ class LobbyScene {
 
   private buildWeapon(id: WeaponId): THREE.Group {
     const group = new THREE.Group(),
-      body = new THREE.MeshStandardMaterial({ color: 0x132b3b, metalness: 0.68, roughness: 0.28 }),
+      body = new THREE.MeshStandardMaterial({ color: 0x308cad, metalness: 0.58, roughness: 0.3 }),
+      dark = new THREE.MeshStandardMaterial({ color: 0x10283a, metalness: 0.72, roughness: 0.26 }),
       ice = new THREE.MeshStandardMaterial({
-        color: 0xd8f8ff,
+        color: 0x74d9ec,
         emissive: 0x47d7e9,
-        emissiveIntensity: 0.32,
+        emissiveIntensity: 0.42,
         metalness: 0.42,
         roughness: 0.22,
       }),
@@ -491,19 +512,47 @@ class LobbyScene {
       mesh.position.set(x, y, z);
       mesh.castShadow = true;
       group.add(mesh);
+      return mesh;
     };
-    box(0.24, 0.25, length, 0, 0, -length / 2, body);
-    box(0.2, 0.09, length * 0.72, 0, 0.14, -length * 0.48, ice);
-    box(0.11, 0.38, 0.16, 0, -0.24, -0.16, body);
-    box(0.075, 0.075, 0.26, 0, 0.02, -length - 0.1, ice);
-    box(0.05, 0.07, 0.08, 0, 0.25, -0.24, accent);
-    if (id === 'sniper') box(0.14, 0.14, 0.38, 0, 0.29, -0.42, body);
-    if (id === 'shotgun') box(0.28, 0.08, 0.3, 0, -0.08, -0.6, accent);
+    box(0.2, 0.18, 0.25, 0, 0, 0.03, dark);
+    box(0.24, 0.23, length * 0.46, 0, 0, -length * 0.33, body);
+    box(0.17, 0.14, length * 0.34, 0, 0.01, -length * 0.69, ice);
+    box(0.065, 0.065, length * 0.3, 0, 0.02, -length * 0.98, dark);
+    box(0.09, 0.09, 0.15, 0, 0.02, -length - 0.08, ice);
+    box(0.09, 0.34, 0.14, 0, -0.23, -0.17, dark).rotation.x = -0.12;
+    box(0.11, 0.27, 0.15, 0, -0.2, -length * 0.42, body).rotation.x = -0.16;
+    box(0.05, 0.055, length * 0.42, 0, 0.14, -length * 0.42, accent);
+    if (id === 'sniper') {
+      box(0.13, 0.13, 0.4, 0, 0.24, -0.43, dark);
+      box(0.18, 0.18, 0.08, 0, 0.24, -0.22, ice);
+    }
+    if (id === 'shotgun') box(0.11, 0.1, 0.34, 0, -0.12, -0.64, accent);
     group.name = `${WEAPONS[id].name} lobby preview`;
-    group.position.set(0.32, 1.35, 0.48);
-    group.rotation.set(0.05, 1.2, -0.17);
-    group.scale.setScalar(0.58);
+    group.position.set(0.43, 1.39, 0.44);
+    group.rotation.set(0.05, 2.1, -0.08);
+    group.scale.setScalar(WEAPON_PREVIEW_SCALE[id]);
     return group;
+  }
+
+  private snapWeaponToHands(roll: number): void {
+    if (!this.rightHand) return;
+    this.stage.updateWorldMatrix(true, true);
+    this.rightHand.getWorldPosition(this.handPosition);
+    this.stage.worldToLocal(this.handPosition);
+    if (this.leftHand) {
+      this.leftHand.getWorldPosition(this.supportHandPosition);
+      this.stage.worldToLocal(this.supportHandPosition);
+      // Keep the weapon at a low-ready angle while the raised support hand rests on its fore-end.
+      this.supportHandPosition.y = this.handPosition.y;
+      this.weaponRotation.lookAt(this.handPosition, this.supportHandPosition, STAGE_UP);
+      this.weapon.quaternion.setFromRotationMatrix(this.weaponRotation);
+      this.weapon.rotateZ(roll);
+    }
+    this.gripOffset
+      .copy(WEAPON_GRIP_POINT)
+      .multiply(this.weapon.scale)
+      .applyQuaternion(this.weapon.quaternion);
+    this.weapon.position.copy(this.handPosition).sub(this.gripOffset);
   }
 
   private bind(): void {
@@ -607,7 +656,8 @@ class LobbyScene {
     );
     const idle = this.isReduced ? 0 : Math.sin(now * 0.0017) * 0.018;
     this.stage.position.y = idle;
-    this.weapon.rotation.z = -0.13 + (this.isReduced ? 0 : Math.sin(now * 0.0013) * 0.014);
+    const weaponRoll = -0.08 + (this.isReduced ? 0 : Math.sin(now * 0.0013) * 0.014);
+    this.snapWeaponToHands(weaponRoll);
     this.fan.rotation.z += delta * 0.38;
     this.holograms.forEach((panel, index) => {
       (panel.material as THREE.MeshBasicMaterial).opacity =

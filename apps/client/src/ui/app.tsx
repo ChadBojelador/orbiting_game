@@ -290,7 +290,7 @@ export function App() {
         )}
         {!complete && scene && !scene.isMapReady && (
           <div className="pause-screen">
-            <h2>{scene.hasMapError ? 'Island failed to load' : 'Loading Island?'}</h2>
+            <h2>{scene.hasMapError ? 'Frost Island failed to load' : 'Loading Frost Island…'}</h2>
             {scene.hasMapError && <button onClick={() => leave()}>Back to lobby</button>}
           </div>
         )}
@@ -301,7 +301,7 @@ export function App() {
           !scene.isLocked &&
           !isSettings && (
             <div className="pause-screen">
-              <h2>Frostline</h2>
+              <h2>{view.mapId === 'island' ? 'Frost Island' : 'Frostline'}</h2>
               <p>Click to aim. Esc releases your cursor.</p>
               <button className="primary" onClick={() => scene.lock()}>
                 Enter arena

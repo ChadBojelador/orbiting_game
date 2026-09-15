@@ -234,7 +234,7 @@ test('loadout, duel mode and local settings survive their intended boundaries', 
   await page.getByRole('button', { name: 'Leave room' }).click();
 });
 
-test('Island loads its optimized Fort and uses the selected authoritative map', async ({
+test('Frost Island loads its central Fort and uses the selected authoritative map', async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -243,6 +243,7 @@ test('Island loads its optimized Fort and uses the selected authoritative map', 
   await page.getByLabel('Map', { exact: true }).selectOption('island');
   const { room } = await create(page);
   await expect.poll(() => room.state.mapId).toBe('island');
+  await expect.poll(() => room.state.arenaHalfExtent).toBe(80);
   const loaded = page.waitForResponse(
     (response) => response.url().includes('island-fort.glb') && response.status() === 200,
   );
@@ -250,7 +251,7 @@ test('Island loads its optimized Fort and uses the selected authoritative map', 
   await loaded;
   await page.getByRole('button', { name: 'Enter arena' }).click();
   const player = room.state.players.get(room.state.hostPlayerId)!;
-  expect(player.y).toBeGreaterThan(0.3);
+  expect(player.y).toBeCloseTo(0.25);
   const before = { x: player.x, z: player.z };
   await page.keyboard.down('KeyW');
   await expect

@@ -2,7 +2,7 @@
 
 A browser arena FPS with desktop and mobile touch controls, private invite rooms, and server-authoritative combat.
 
-The implementation plan's FPS pivot is implemented as a playable prototype: Frostline and Island - Fort arenas, movement/jump/slide/crouch/sprint, six weapons, reload/ADS/headshots, death/respawn, FFA/TDM/duel scoring, settings, scoreboard, sound cues, and PostgreSQL summaries. Freeze-tag is replaced; historical specifications and superseded sources/tests are retained for reference.
+The implementation plan's FPS pivot is implemented as a playable prototype: Frostline and Frost Island arenas, movement/jump/swim/slide/crouch/sprint, six weapons, reload/ADS/headshots, death/respawn, FFA/TDM/duel scoring, settings, scoreboard, sound cues, and PostgreSQL summaries. Frost Island is a 160-metre combat archipelago with a central Fort/Cryogenic Core battlefield and specialized outer islands. Freeze-tag is replaced; historical specifications and superseded sources/tests are retained for reference.
 
 ## Run locally
 
@@ -42,18 +42,18 @@ Optional `DEV_BOT_COUNT=5` fills five seats with wandering targets. Bots have no
 
 ## Commands and checks
 
-| Command                    | Purpose                                                                    |
-| -------------------------- | -------------------------------------------------------------------------- |
-| `npm run dev`              | Client and authoritative server                                            |
-| `npm test`                 | Rules, real WebSocket security/lifecycle, database integration             |
-| `npm run test:e2e`         | Desktop and mobile join/play/combat/results/settings flows                 |
-| `npm run test:load`        | 20/50/100/150-client five-second gameplay smoke checks                     |
-| `npm run test:load -- 150` | One staged population                                                      |
-| `npm run lint`             | ESLint and Prettier                                                        |
-| `npm run typecheck`        | Strict TypeScript, including tests                                         |
-| `npm run build`            | All production packages and SQL migrations                                 |
-| `npm run assets:island`    | Rebuild optimized Fort geometry, collision and spawns from supplied source |
-| `npm run db:migrate`       | Transactional checksummed migrations                                       |
+| Command                    | Purpose                                                                   |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `npm run dev`              | Client and authoritative server                                           |
+| `npm test`                 | Rules, real WebSocket security/lifecycle, database integration            |
+| `npm run test:e2e`         | Desktop and mobile join/play/combat/results/settings flows                |
+| `npm run test:load`        | 20/50/100/150-client five-second gameplay smoke checks                    |
+| `npm run test:load -- 150` | One staged population                                                     |
+| `npm run lint`             | ESLint and Prettier                                                       |
+| `npm run typecheck`        | Strict TypeScript, including tests                                        |
+| `npm run build`            | All production packages and SQL migrations                                |
+| `npm run assets:island`    | Rebuild Fort geometry/collision and validate authored Frost Island spawns |
+| `npm run db:migrate`       | Transactional checksummed migrations                                      |
 
 Playwright starts an isolated Vite on 5174 and a real server inside the test worker on 2568, with zero bots and a test persistence stub. Its test-only server fixture controls poses/deadlines for combat/results assertions; no control endpoint or client-authoritative shortcut ships. Install Chromium with `npx playwright install chromium`, or set `PLAYWRIGHT_CHANNEL=chrome`/`msedge` for an installed signed browser. Restricted Windows runners need permission to terminate test child processes. Touch input is tested through CDP multitouch; this runner may report no touch capability despite emulation.
 
@@ -84,6 +84,6 @@ Routes remain `/health`, `/ready`, `POST /api/guest-session`, `POST /api/rooms`,
 
 [PRD](PRD.md), [architecture](ARCHITECTURE.md), [map specification](MAP_SPEC.md), [art direction](ART_DIRECTION.md), [implementation status](implementation_plan.md), [tasks and verification](TASKS.md), [agent rules](AGENTS.md), [contributing](CONTRIBUTING.md).
 
-`apps/client` renders and captures input; `apps/server` owns outcomes; `packages/shared` holds safe types/constants/pure simulation; `tests` holds browser/load scenarios. Original procedural weapons/facility/combat audio ships alongside the authorized Island Fort derivative and wooden house. Lobby character/music are retained project assets. Embedded source/license metadata and outstanding permission evidence are recorded; see [asset provenance](assets/asset-provenance.md).
+`apps/client` renders and captures input; `apps/server` owns outcomes; `packages/shared` holds safe types/constants/pure simulation; `tests` holds browser/load scenarios. Original procedural weapons/facility/combat audio and Frost Island archipelago geometry ship alongside the authorized Fort derivative and wooden house. Lobby character/music are retained project assets. Embedded source/license metadata and outstanding permission evidence are recorded; see [asset provenance](assets/asset-provenance.md).
 
 Contributors: Chad Bojelador and Franco Perez.

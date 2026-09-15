@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GAMEPLAY, WEAPONS, type GameplayEvent } from '@ice-water/shared';
+import { GAMEPLAY, WEAPONS, isSwimming, type GameplayEvent } from '@ice-water/shared';
 import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { GameplayController } from './gameplay-controller.js';
 import { fireHitscan } from './damage-system.js';
@@ -118,6 +118,32 @@ describe('authoritative FPS combat', () => {
     for (let i = 6; i <= 40; i++)
       error = controller.handle('a', 'input/move', { x: 0, z: 0, sequence: i }, 1500);
     expect(error).toContain('Too many');
+  });
+  it('applies Island buoyancy and swim-up input on the authoritative tick', () => {
+    const { state, a, controller } = fixture();
+    state.mapId = 'island';
+    Object.assign(a, {
+      x: 20,
+      y: GAMEPLAY.waterSurfaceY,
+      z: -54,
+      verticalVelocity: 0,
+      isGrounded: true,
+    });
+    for (let tick = 1; tick <= 40; tick++) controller.advance(1000 + tick * GAMEPLAY.tickMs);
+    expect(a.y).toBeLessThan(-0.4);
+    expect(a.isGrounded).toBe(false);
+    expect(isSwimming(a, 'island')).toBe(true);
+
+    const floatingY = a.y;
+    for (let tick = 41; tick <= 55; tick++) {
+      const now = 1000 + tick * GAMEPLAY.tickMs;
+      expect(
+        controller.handle('a', 'input/move', { x: 0, z: 0, jump: true, sequence: tick - 40 }, now),
+      ).toBeNull();
+      controller.advance(now);
+    }
+    expect(a.y).toBeGreaterThan(floatingY + 0.2);
+    expect(a.y).toBeLessThanOrEqual(GAMEPLAY.waterSurfaceY);
   });
   it('enforces per-slot ammo, reload deadlines, cooldown across switching and protection removal', () => {
     const p = new PlayerState();

@@ -1,6 +1,6 @@
 # Ice Ice Water! Art Direction
 
-The approved FPS pivot establishes **Frostline: a bright frozen research facility** and the user-approved **Island - Fort** arena. Previous art direction and concept images are historical in `docs/archive` and `assets/concepts`.
+The approved FPS pivot establishes **Frostline: a bright frozen research facility** and **Frost Island: a frozen combat archipelago**. Previous art direction and concept images are historical in `docs/archive` and `assets/concepts`.
 
 ## Visual language
 - Crisp, readable low-poly painted metal, polar-white walls, navy structural blocks, cyan ice, amber route paint, and coral opponents.
@@ -13,9 +13,9 @@ The approved FPS pivot establishes **Frostline: a bright frozen research facilit
 - The lobby may borrow broad staging quality from modern multiplayer games but must not copy any third-party layout, faction, character, weapon, icon set, logo, or progression system. Profile, party, social, and cosmetics surfaces must label unavailable backend services honestly.
 
 ## Production assets
-The retained structured brief is [Frostline production prompt](assets/frostline-production-prompt.md). Frostline facility geometry, weapons, combat players, effects, and synthesized combat cues are repository-authored. The supplied wooden house is an eight-metre closed landmark with a shared conservative collider. Island uses the optimized Fort sector with its original painted sand/stone/wood palette and shallow cyan water. The lobby uses the retained project character model and music. Vite public-directory copying is disabled; assets ship only through explicit imports.
+The retained structured briefs are [Frostline production prompt](assets/frostline-production-prompt.md) and [Frost Island archipelago production brief](assets/frost-island-archipelago-production-prompt.md). Frostline facility geometry, Frost Island outer islands/routes/cover, weapons, combat players, effects, and synthesized combat cues are repository-authored. The supplied wooden house is an eight-metre closed landmark with a shared conservative collider. Frost Island preserves the optimized Fort derivative as its scaled central ruin, surrounded by snow, ice, dock, research, industrial, harbor, and flank geometry in the project palette. The lobby uses the retained project character model and music. Vite public-directory copying is disabled; assets ship only through explicit imports.
 
 Veck.io is a gameplay/visual reference. The user confirmed reuse authorization for both supplied GLBs. Embedded Sketchfab attribution, modifications, hashes, and the unresolved underlying permission evidence are recorded in [asset provenance](assets/asset-provenance.md). The Island source calls itself a reupload; that metadata alone does not establish original-rightsholder permission. No assets were downloaded from Veck.io.
 
 ## Constraints and review
-Share geometry/materials, cap transient effects, and keep recorded attribution with imported models. Rendered cover and collision must match the selected shared map definition. Island uses a reproducible geometry/collision bake; see MAP_SPEC.md. Decorative paint/trim cannot create misleading cover. Color is supplemented by text, protection labels, damage direction, silhouettes, and sound. Device performance, full crowd readability, and final visual polish require playtesting.
+Share geometry/materials, instance repeated map blocks, apply LOD to distant detail, cap transient effects, and keep recorded attribution with imported models. Rendered cover and collision must match the selected shared map definition. Frost Island uses a preserved geometry/collision bake plus a shared procedural layout; see MAP_SPEC.md. Decorative paint/trim cannot create misleading cover. Color is supplemented by text, protection labels, damage direction, silhouettes, and sound. Device performance, route readability, full crowd readability, and final visual polish require playtesting.

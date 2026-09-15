@@ -8,6 +8,11 @@
     "title": "chicken gun pirateislands reupload"
   },
   "selectedSector": "Fort",
+  "runtimeUse": "Frost Island central ruin",
+  "runtimeTransform": {
+    "uniformScale": 0.52,
+    "yOffset": 0.25
+  },
   "scale": 0.30316504035961445,
   "seaLevel": -18.773349,
   "sourceCenter": {
@@ -15,7 +20,8 @@
     "y": -5.436573956730353,
     "z": -110.47561246255557
   },
-  "playableHalfExtent": 60,
+  "derivativeSourceHalfExtent": 60,
+  "playableHalfExtent": 80,
   "triangles": 61396,
   "drawCalls": 1,
   "runtimeBytes": 4937100,

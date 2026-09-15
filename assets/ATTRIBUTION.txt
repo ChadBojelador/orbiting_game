@@ -1,6 +1,6 @@
 Ice Ice Water! asset credits
 
-Island - Fort
+Frost Island central Fort derivative
 Source title: chicken gun pirateislands reupload
 Uploader credited in supplied GLB: amogusstrikesback2
 https://sketchfab.com/amogusstrikesback2
@@ -10,6 +10,8 @@ https://creativecommons.org/licenses/by/4.0/
 Changes: extracted Fort sector; removed dense foliage, small props, other sectors,
 sea floor and water planes; baked transforms and uniformly normalized to 112 m;
 quantized vertices to centimetres; merged structural meshes; derived collision.
+The derivative is uniformly transformed to form Frost Island's central ruin.
+Surrounding islands, routes, cover, and Cryogenic Core are original project geometry.
 The user confirmed permission to reuse this supplied file. Its reupload metadata
 does not independently establish the original rightsholder's permission. See
 assets/asset-provenance.md for the current verification status.

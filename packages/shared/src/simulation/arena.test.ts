@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { GAMEPLAY } from '../constants/gameplay.js';
 import {
   ARENA,
   SPAWN_POINTS,
@@ -6,6 +7,8 @@ import {
   moveKinematic,
   isWalkable,
   terrainHeightAt,
+  surfaceAt,
+  isSwimming,
   worldRayDistance,
   lookDirection,
   type MovementState,
@@ -93,5 +96,76 @@ describe('Frostline movement and collision', () => {
       worldRayDistance({ x: -43.5, y: 1, z: -24 }, lookDirection(Math.PI, 0), 20),
     ).toBeLessThan(7);
     expect(worldRayDistance({ x: 0, y: 2, z: -51 }, { x: 0, y: -1, z: 0 }, 100)).toBe(2);
+  });
+});
+
+describe('Island water physics', () => {
+  const waterMotion = (): MovementState => ({
+    ...motion(20, -54),
+    y: GAMEPLAY.waterSurfaceY,
+  });
+
+  it('settles a player at the configured buoyant depth', () => {
+    let p = waterMotion();
+    expect(surfaceAt(p, 'island')).toBe('water');
+    for (let tick = 1; tick <= 60; tick++)
+      p = simulateMovement(p, { x: 0, z: 0, sequence: tick }, tick * 50, 0.05, 1, 'island');
+    expect(p.y).toBeCloseTo(-GAMEPLAY.waterFloatDepth, 2);
+    expect(p.verticalVelocity).toBeCloseTo(0, 2);
+    expect(p.isGrounded).toBe(false);
+    expect(isSwimming(p, 'island')).toBe(true);
+  });
+
+  it('uses jump to swim upward and ignores sprint and slide boosts', () => {
+    let floating = waterMotion();
+    for (let tick = 1; tick <= 40; tick++)
+      floating = simulateMovement(
+        floating,
+        { x: 0, z: 0, sequence: tick },
+        tick * 50,
+        0.05,
+        1,
+        'island',
+      );
+    const startY = floating.y;
+    for (let tick = 41; tick <= 60; tick++)
+      floating = simulateMovement(
+        floating,
+        { x: 0, z: 0, jump: true, sequence: tick },
+        tick * 50,
+        0.05,
+        1,
+        'island',
+      );
+    expect(floating.y).toBeGreaterThan(startY + 0.25);
+    expect(floating.y).toBeLessThanOrEqual(GAMEPLAY.waterSurfaceY);
+
+    const normal = simulateMovement(
+      waterMotion(),
+      { x: 1, z: 0, sequence: 1 },
+      50,
+      0.05,
+      1,
+      'island',
+    );
+    const sprinting = simulateMovement(
+      waterMotion(),
+      { x: 1, z: 0, sprint: true, slide: true, sequence: 1 },
+      50,
+      0.05,
+      1,
+      'island',
+    );
+    expect(sprinting.velocityX).toBeCloseTo(normal.velocityX);
+    expect(sprinting.isSliding).toBe(false);
+  });
+
+  it('lets a submerged player climb onto a low shoreline', () => {
+    let p: MovementState = { ...waterMotion(), x: 13, z: -23 };
+    for (let tick = 1; tick <= 20; tick++)
+      p = simulateMovement(p, { x: -1, z: 0, sequence: tick }, tick * 50, 0.05, 1, 'island');
+    expect(surfaceAt(p, 'island')).toBe('metal');
+    expect(p.y).toBeCloseTo(0.25);
+    expect(p.isGrounded).toBe(true);
   });
 });

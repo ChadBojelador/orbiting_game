@@ -2,6 +2,7 @@ import { Room, ServerError, type AuthContext, type Client } from '@colyseus/core
 import { randomUUID } from 'node:crypto';
 import {
   GAMEPLAY,
+  arenaHalfExtentForMap,
   isEmptyPayload,
   isRecord,
   isGameMode,
@@ -125,7 +126,10 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         if (payload.gameMode === 'duel' && this.state.players.size > 2)
           return this.fail(client, 'cannot-configure', 'Duel supports at most two players');
         if (payload.gameMode !== undefined) this.state.gameMode = payload.gameMode;
-        if (payload.mapId !== undefined) this.state.mapId = payload.mapId;
+        if (payload.mapId !== undefined) {
+          this.state.mapId = payload.mapId;
+          this.state.arenaHalfExtent = arenaHalfExtentForMap(payload.mapId);
+        }
       });
       this.onMessage('player/loadout', (client: GuestClient, payload: unknown) => {
         if (!client.auth || client.auth.expiresAt <= Date.now())

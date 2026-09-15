@@ -1,4 +1,4 @@
-import { GAMEPLAY, WEAPONS, surfaceAt, type PlayerView } from '@ice-water/shared';
+import { GAMEPLAY, WEAPONS, isSwimming, surfaceAt, type PlayerView } from '@ice-water/shared';
 import {
   Scene,
   PerspectiveCamera,
@@ -65,6 +65,7 @@ export class GameScene {
   private lastStep = 0;
   private remoteSteps = new Map<string, number>();
   private wasGrounded = true;
+  private wasSwimming = false;
   private wasSliding = false;
   private wasReloading = false;
   private emptyAt = 0;
@@ -236,6 +237,7 @@ export class GameScene {
       : Math.min(1, this.settings.volume * this.settings.sfxVolume * 1.35);
     if (p) {
       const predicted = session.prediction.motion;
+      const swimming = isSwimming(predicted, session.view.mapId);
       const pos = this.presentation.update(
         { ...predicted, yaw: input.cameraYaw },
         seconds,
@@ -264,18 +266,20 @@ export class GameScene {
         }
         if (
           Math.hypot(predicted.velocityX, predicted.velocityZ) > 1 &&
-          predicted.isGrounded &&
-          now - this.lastStep > 320
+          (predicted.isGrounded || swimming) &&
+          now - this.lastStep > (swimming ? 450 : 320)
         ) {
           this.audio.play(surfaceAt(predicted, session.view.mapId));
           this.lastStep = now;
         }
-        if (this.wasGrounded && !predicted.isGrounded) this.audio.play('jump');
-        if (!this.wasGrounded && predicted.isGrounded) this.audio.play('land');
+        if (!this.wasSwimming && swimming) this.audio.play('water');
+        if (this.wasGrounded && !predicted.isGrounded && !swimming) this.audio.play('jump');
+        if (!this.wasGrounded && predicted.isGrounded && !this.wasSwimming) this.audio.play('land');
         if (!this.wasSliding && predicted.isSliding) this.audio.play('slide');
         if (!this.wasReloading && p.reloadUntil > serverNow) this.audio.play('reload');
       }
       this.wasGrounded = predicted.isGrounded;
+      this.wasSwimming = swimming;
       this.wasSliding = predicted.isSliding;
       this.wasReloading = p.reloadUntil > serverNow;
     }
@@ -297,13 +301,20 @@ export class GameScene {
       if (
         model.visible &&
         Math.hypot(remote.velocityX, remote.velocityZ) > 1 &&
-        remote.isGrounded &&
         p &&
-        Math.hypot(remote.x - p.x, remote.z - p.z) < 35 &&
-        now - (this.remoteSteps.get(remote.playerId) ?? 0) > 380
+        Math.hypot(remote.x - p.x, remote.z - p.z) < 35
       ) {
-        this.audio.play(surfaceAt(remote, session.view.mapId), remote);
-        this.remoteSteps.set(remote.playerId, now);
+        const remoteIsSwimming = isSwimming(position, session.view.mapId);
+        if (
+          (remote.isGrounded || remoteIsSwimming) &&
+          now - (this.remoteSteps.get(remote.playerId) ?? 0) > (remoteIsSwimming ? 500 : 380)
+        ) {
+          this.audio.play(
+            remoteIsSwimming ? 'water' : surfaceAt(remote, session.view.mapId),
+            remote,
+          );
+          this.remoteSteps.set(remote.playerId, now);
+        }
       }
     }
     for (const event of session.events.splice(0)) {

@@ -443,7 +443,7 @@ function SoloPanel(props: SoloPanelProps) {
           onChange={(event) => props.setMapId(event.target.value as MapId)}
         >
           <option value="frostline">Frostline</option>
-          <option value="island">Island ? Fort</option>
+          <option value="island">Frost Island</option>
         </select>
       </div>
       <LoadoutScreen value={props.primary} onChange={props.setPrimary} />
@@ -576,7 +576,7 @@ function RoomAwarePanel(props: RoomAwareProps) {
           onChange={(event) => room.send('room/configure', { mapId: event.target.value as MapId })}
         >
           <option value="frostline">Frostline</option>
-          <option value="island">Island ? Fort</option>
+          <option value="island">Frost Island</option>
         </select>
       </div>
       <ul className="roster">

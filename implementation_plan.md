@@ -17,7 +17,7 @@ The original seven-phase plan is archived at `docs/archive/approved-fps-implemen
 | Movement and camera          | Authoritative movement, jump, slide, crouch, sprint, surfaces, prediction, pointer lock, and touch look      | `packages/shared/src/simulation`; `game-input`; `first-person-camera`; `player-motion` |
 | Combat                       | Six weapons, ammo, reload, ADS, spread, falloff, headshots, authoritative damage/death, and feedback         | `weapons`; `weapon-controller`; `damage-system`; `weapon-renderer`                     |
 | Match loop                   | FFA/TDM/duel, solo practice, score/time limits, teams, respawn protection, reconnect, results, and summaries | `match-controller`; `gameplay-controller`; `spawn-manager`; `private-room`             |
-| Maps                         | Frostline analytic collision plus optimized Island - Fort triangle collision and closed-house bounds         | `arena`; `island-collision`; `FrostlineMap`; `IslandMap`; asset scripts                |
+| Maps                         | Frostline plus hybrid Frost Island archipelago collision, outer spawns, routes, Fort ruin, and closed house  | `arena`; `island-layout`; `island-collision`; `FrostlineMap`; `IslandMap`              |
 | HUD and controls             | Health, ammo, timer, score, feed, crosshair, indicators, scoreboard, results, and mobile controls            | `apps/client/src/ui`; `hit-effects`; `touch-controls`                                  |
 | Loadout, settings, and audio | Loadout selection, persistent settings, lobby preview, synthesized combat cues, and retained lobby audio     | `lobby-screen`; `settings-panel`; `fps-settings`; `audio-manager`; `lobby-audio`       |
 
@@ -25,7 +25,7 @@ The original seven-phase plan is archived at `docs/archive/approved-fps-implemen
 
 The server owns movement outcomes, aim validation, health, ammunition, cooldowns, hits, deaths, respawns, scores, deadlines, and results. Clients send input and action intent only. All current weapons use authoritative hitscan, including the short-range melee trace. Bots wander as optional practice targets and do not shoot. There is no public matchmaking, ranking, store, progression, or legacy freeze-tag mode.
 
-Island uses the Fort sector of the supplied archipelago. The 136.6 MB source remains unchanged; the runtime derivative is approximately 4.9 MB and uses the same baked coordinates for rendering, movement, spawn height, and hitscan. Run `npm run assets:island` after changing the source or selection. Do not independently rescale the rendered model or edit generated collision data.
+Frost Island preserves the approximately 4.9 MB optimized Fort derivative as its central ruin and applies one shared 0.52 scale/Y transform to rendering and triangle collision. Original procedural geometry adds six separate outer/flank islands, multi-route bridges and ice paths, specialized facilities/cover, an 80-metre half-extent, and sixteen outer spawns. The original 136.6 MB source referenced by the build report is absent from the current tree, so rebuilding that derivative is blocked until the source is restored. Edit the shared layout rather than independently moving rendered or collision geometry.
 
 ## Verification status
 

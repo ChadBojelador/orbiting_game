@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BufferGeometry,
+  BoxGeometry,
   Float32BufferAttribute,
+  Group,
   Mesh,
   MeshBasicMaterial,
   DoubleSide,
@@ -11,14 +13,20 @@ import {
 } from 'three';
 import {
   ISLAND_SPAWN_POINTS,
+  ISLAND_ARENA,
+  ISLAND_COVER,
+  ISLAND_FORT_SCALE,
+  ISLAND_FORT_Y,
+  ISLAND_SURFACES,
   GAMEPLAY,
   isWalkable,
+  surfaceAt,
   terrainHeightAt,
   worldRayDistance,
   simulateMovement,
 } from '@ice-water/shared';
 
-function renderedMesh(): Mesh {
+function renderedWorld(): Group {
   const bytes = fs.readFileSync(new URL('./generated/island-fort.glb', import.meta.url));
   const length = bytes.readUInt32LE(12);
   const model = JSON.parse(bytes.subarray(20, 20 + length).toString()) as {
@@ -50,10 +58,59 @@ function renderedMesh(): Mesh {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
   geometry.setIndex(index);
-  return new Mesh(geometry, new MeshBasicMaterial({ side: DoubleSide }));
+  const group = new Group(),
+    fort = new Mesh(geometry, new MeshBasicMaterial({ side: DoubleSide }));
+  fort.scale.setScalar(ISLAND_FORT_SCALE);
+  fort.position.y = ISLAND_FORT_Y;
+  group.add(fort);
+  for (const block of [...ISLAND_SURFACES, ...ISLAND_COVER]) {
+    const mesh = new Mesh(
+      new BoxGeometry(block.width, block.height, block.depth),
+      new MeshBasicMaterial({ side: DoubleSide }),
+    );
+    mesh.position.set(block.x, block.y + block.height / 2, block.z);
+    group.add(mesh);
+  }
+  group.updateMatrixWorld(true);
+  return group;
+}
+
+function disposeWorld(group: Group): void {
+  group.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    object.geometry.dispose();
+    (object.material as MeshBasicMaterial).dispose();
+  });
 }
 
 describe('Island render and authoritative geometry', () => {
+  it('keeps six outer regions separate around the larger central battlefield', () => {
+    const regions = new Set(
+      ISLAND_SURFACES.filter((surface) => surface.region !== 'route').map(
+        (surface) => surface.region,
+      ),
+    );
+    expect(regions).toEqual(
+      new Set(['central', 'north', 'west', 'east', 'south', 'southwest', 'southeast']),
+    );
+    expect(ISLAND_SURFACES.filter((surface) => surface.region === 'central')).toHaveLength(4);
+    expect(ISLAND_SURFACES.filter((surface) => surface.region === 'route').length).toBeGreaterThan(
+      15,
+    );
+    expect(terrainHeightAt({ x: 45, z: -25 }, 'island')).toBe(0);
+    expect(surfaceAt({ x: 45, z: -25 }, 'island')).toBe('water');
+    expect(terrainHeightAt({ x: 0, z: -43 }, 'island')).toBeCloseTo(0.25);
+    expect(surfaceAt({ x: 0, z: -43 }, 'island')).toBe('ice');
+    expect(
+      ISLAND_SPAWN_POINTS.every((spawn) => Math.max(Math.abs(spawn.x), Math.abs(spawn.z)) >= 43),
+    ).toBe(true);
+    expect(
+      ISLAND_SPAWN_POINTS.every((spawn) => {
+        const secondsToCore = Math.hypot(spawn.x, spawn.z) / GAMEPLAY.moveSpeed;
+        return secondsToCore >= 5 && secondsToCore <= 7;
+      }),
+    ).toBe(true);
+  });
   it('lets every spawn walk forward out of its initial position', () => {
     for (const spawn of ISLAND_SPAWN_POINTS) {
       const length = Math.hypot(spawn.x, spawn.z);
@@ -84,26 +141,26 @@ describe('Island render and authoritative geometry', () => {
       ).toBeGreaterThan(1.5);
     }
   });
-  it('grounds all sixteen spawns on the rendered mesh with room for a standing player', () => {
-    const mesh = renderedMesh();
+  it('grounds all sixteen outer spawns in the rendered world with standing room', () => {
+    const world = renderedWorld();
     expect(ISLAND_SPAWN_POINTS).toHaveLength(16);
     for (const p of ISLAND_SPAWN_POINTS) {
       const y = terrainHeightAt(p, 'island');
       const hits = new Raycaster(new Vector3(p.x, 30, p.z), new Vector3(0, -1, 0)).intersectObject(
-        mesh,
+        world,
+        true,
       );
       expect(hits[0]!.point.y).toBeCloseTo(y, 4);
-      expect(isWalkable(p, 60, y, GAMEPLAY.playerHeight, 'island')).toBe(true);
+      expect(isWalkable(p, ISLAND_ARENA.halfExtent, y, GAMEPLAY.playerHeight, 'island')).toBe(true);
     }
-    mesh.geometry.dispose();
-    (mesh.material as MeshBasicMaterial).dispose();
+    disposeWorld(world);
   });
   it('blocks shots on actual Fort walls, without phantom Frostline blocks', () => {
-    const mesh = renderedMesh();
+    const world = renderedWorld();
     for (const origin of [
-      { x: 0, y: 2, z: 0 },
-      { x: -16, y: 4, z: 0 },
-      { x: 0, y: 3, z: 4 },
+      { x: 8, y: 2, z: -8 },
+      { x: -8, y: 3, z: 0 },
+      { x: 6, y: 3, z: 8 },
     ]) {
       for (const direction of [
         { x: 1, y: 0, z: 0 },
@@ -115,7 +172,7 @@ describe('Island render and authoritative geometry', () => {
           new Vector3(direction.x, direction.y, direction.z),
           0,
           80,
-        ).intersectObject(mesh);
+        ).intersectObject(world, true);
         expect(worldRayDistance(origin, direction, 80, 'island')).toBeCloseTo(
           hits[0]?.distance ?? 80,
           4,
@@ -123,11 +180,31 @@ describe('Island render and authoritative geometry', () => {
       }
     }
     expect(
-      worldRayDistance({ x: 0, y: 2, z: 0 }, { x: 1, y: 0, z: 0 }, 20, 'island'),
+      worldRayDistance({ x: 8, y: 2, z: -8 }, { x: 1, y: 0, z: 0 }, 20, 'island'),
     ).toBeGreaterThan(1);
     expect(worldRayDistance({ x: 0, y: 2, z: 0 }, { x: 1, y: 0, z: 0 }, 20, 'frostline')).toBe(0);
-    mesh.geometry.dispose();
-    (mesh.material as MeshBasicMaterial).dispose();
+    disposeWorld(world);
+  });
+  it('matches rendered hybrid collision for diagonal shots across grid-cell boundaries', () => {
+    const world = renderedWorld();
+    for (const spawn of ISLAND_SPAWN_POINTS.slice(0, 4)) {
+      const origin = { ...spawn, y: terrainHeightAt(spawn, 'island') + 1.6 };
+      for (let index = 0; index < 8; index++) {
+        const angle = (index * Math.PI) / 4,
+          direction = { x: Math.cos(angle), y: 0, z: Math.sin(angle) };
+        const hits = new Raycaster(
+          new Vector3(origin.x, origin.y, origin.z),
+          new Vector3(direction.x, direction.y, direction.z),
+          0,
+          80,
+        ).intersectObject(world, true);
+        expect(worldRayDistance(origin, direction, 80, 'island')).toBeCloseTo(
+          hits[0]?.distance ?? 80,
+          4,
+        );
+      }
+    }
+    disposeWorld(world);
   });
   it('keeps a moving player grounded and prevents walking through Fort walls', () => {
     const spawn = ISLAND_SPAWN_POINTS[0]!;
@@ -146,7 +223,9 @@ describe('Island render and authoritative geometry', () => {
     for (let tick = 1; tick <= 80; tick++) {
       p = simulateMovement(p, { x: 1, z: 0, sequence: tick }, tick * 50, 0.05, 1, 'island');
       expect(p.y).toBeGreaterThanOrEqual(0);
-      expect(isWalkable(p, 60, p.y, GAMEPLAY.playerHeight, 'island')).toBe(true);
+      expect(isWalkable(p, ISLAND_ARENA.halfExtent, p.y, GAMEPLAY.playerHeight, 'island')).toBe(
+        true,
+      );
     }
   });
 });

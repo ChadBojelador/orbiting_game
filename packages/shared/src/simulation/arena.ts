@@ -6,6 +6,7 @@ import {
   islandCeilingAt,
   ISLAND_SPAWNS,
 } from './island-collision.js';
+import { ISLAND_HALF_EXTENT, islandSurfaceAt } from './island-layout.js';
 import { GAMEPLAY } from '../constants/gameplay.js';
 import type { MapId, Position, SpatialPosition, MoveInput } from '../protocol/gameplay.js';
 
@@ -24,6 +25,10 @@ export interface ArenaRamp extends Position {
 }
 const MAP_SCALE = 1.5;
 export const ARENA = { halfExtent: 40 * MAP_SCALE } as const;
+export const ISLAND_ARENA = { halfExtent: ISLAND_HALF_EXTENT } as const;
+export function arenaHalfExtentForMap(mapId: MapId): number {
+  return mapId === 'island' ? ISLAND_ARENA.halfExtent : ARENA.halfExtent;
+}
 export const HOUSE_LANDMARK: ArenaBlock = {
   id: 'wooden-house',
   x: -30,
@@ -136,10 +141,27 @@ export const WATER_PATCHES = [
 const inside = (p: Position, b: Position & { width: number; depth: number }, margin = 0) =>
   Math.abs(p.x - b.x) <= b.width / 2 + margin && Math.abs(p.z - b.z) <= b.depth / 2 + margin;
 export function surfaceAt(p: Position, mapId: MapId = 'frostline'): 'metal' | 'ice' | 'water' {
-  if (mapId === 'island') return islandHeightAt(p) < 0.1 ? 'water' : 'metal';
+  if (mapId === 'island') {
+    if (islandSurfaceAt(p)?.surface === 'ice') return 'ice';
+    return islandHeightAt(p) < 0.1 ? 'water' : 'metal';
+  }
   if (terrainHeightAt(p) > 0.1) return 'metal';
   if (ICE_PATCHES.some((b) => inside(p, b))) return 'ice';
   return WATER_PATCHES.some((b) => inside(p, b)) ? 'water' : 'metal';
+}
+function isSwimmingOnSurface(
+  p: SpatialPosition,
+  mapId: MapId,
+  surface: ReturnType<typeof surfaceAt>,
+): boolean {
+  return (
+    mapId === 'island' &&
+    p.y <= GAMEPLAY.waterSurfaceY + GAMEPLAY.waterEntryHeight &&
+    surface === 'water'
+  );
+}
+export function isSwimming(p: SpatialPosition, mapId: MapId = 'frostline'): boolean {
+  return isSwimmingOnSurface(p, mapId, surfaceAt(p, mapId));
 }
 export function terrainHeightAt(
   p: Position,
@@ -232,6 +254,23 @@ export function advanceVerticalMotion(
   mapId: MapId = 'frostline',
   height: number = GAMEPLAY.playerHeight,
 ): VerticalMotion {
+  if (isSwimming({ ...position, y: previous.y }, mapId)) {
+    const targetY =
+      GAMEPLAY.waterSurfaceY - (wantsJump ? GAMEPLAY.waterSwimDepth : GAMEPLAY.waterFloatDepth);
+    const acceleration =
+      (targetY - previous.y) * GAMEPLAY.waterBuoyancy -
+      previous.verticalVelocity * GAMEPLAY.waterVerticalDrag;
+    const verticalVelocity = Math.max(
+      -GAMEPLAY.waterMaxSinkSpeed,
+      Math.min(GAMEPLAY.waterMaxRiseSpeed, previous.verticalVelocity + acceleration * seconds),
+    );
+    const y = previous.y + verticalVelocity * seconds;
+    return {
+      y: Math.min(GAMEPLAY.waterSurfaceY, y),
+      verticalVelocity,
+      isGrounded: false,
+    };
+  }
   const floor =
     mapId === 'island'
       ? islandSupportHeightAt(position, previous.y + 0.32, GAMEPLAY.playerRadius)
@@ -271,6 +310,7 @@ export function simulateMovement(
   speedMultiplier = 1,
   mapId: MapId = 'frostline',
 ): MovementState {
+  const halfExtent = arenaHalfExtentForMap(mapId);
   const next: MovementState = {
     x: p.x,
     y: p.y,
@@ -288,9 +328,11 @@ export function simulateMovement(
   const x = input.x / length,
     z = input.z / length;
   const surface = surfaceAt(p, mapId);
-  if (next.isSliding && (now >= next.slideUntil || input.jump)) next.isSliding = false;
+  const swimming = isSwimmingOnSurface(p, mapId, surface);
+  if (next.isSliding && (now >= next.slideUntil || input.jump || swimming)) next.isSliding = false;
   if (
     input.slide &&
+    !swimming &&
     !next.isSliding &&
     p.isGrounded &&
     now >= p.slideReadyAt &&
@@ -309,12 +351,12 @@ export function simulateMovement(
       GAMEPLAY.slideSpeed *
       (surface === 'ice' ? GAMEPLAY.slideIceBonus : 1);
   }
-  next.isCrouching = !!input.crouch && !next.isSliding;
+  next.isCrouching = !swimming && !!input.crouch && !next.isSliding;
   if (
     !next.isSliding &&
     !next.isCrouching &&
     (p.isCrouching || p.isSliding) &&
-    !isWalkable(p, ARENA.halfExtent, p.y, GAMEPLAY.playerHeight, mapId)
+    !isWalkable(p, halfExtent, p.y, GAMEPLAY.playerHeight, mapId)
   )
     next.isCrouching = true;
   if (next.isSliding) {
@@ -327,11 +369,17 @@ export function simulateMovement(
       speedMultiplier *
       (next.isCrouching
         ? GAMEPLAY.crouchMultiplier
-        : input.sprint
+        : input.sprint && !swimming
           ? GAMEPLAY.sprintMultiplier
           : 1) *
       (surface === 'water' ? GAMEPLAY.waterSpeedPenalty : 1);
-    const alpha = p.isGrounded ? (surface === 'ice' ? 0.08 : 0.82) : GAMEPLAY.airControlFactor;
+    const alpha = swimming
+      ? GAMEPLAY.waterControlFactor
+      : p.isGrounded
+        ? surface === 'ice'
+          ? 0.08
+          : 0.82
+        : GAMEPLAY.airControlFactor;
     next.velocityX += (x * speed - next.velocityX) * alpha;
     next.velocityZ += (z * speed - next.velocityZ) * alpha;
   }
@@ -343,9 +391,9 @@ export function simulateMovement(
       z: travelSpeed ? next.velocityZ / travelSpeed : 0,
     },
     seconds,
-    ARENA.halfExtent,
+    halfExtent,
     travelSpeed,
-    p.y,
+    swimming ? GAMEPLAY.waterSurfaceY : p.y,
     bodyHeight(next),
     mapId,
   );

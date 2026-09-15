@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { LobbyController } from '../rooms/lobby-controller.js';
 import { GameplayController } from '../gameplay/gameplay-controller.js';
@@ -79,5 +79,45 @@ describe('BotRunner and solo playtest', () => {
       'Development bots exceed room capacity',
     );
     expect(state.players.size).toBe(1);
+  });
+
+  it('processes Island bot movement and human fire in the same authoritative tick', () => {
+    const state = new LobbyState();
+    state.mapId = 'island';
+    state.maxPlayers = 6;
+    state.phase = 'playing';
+    state.phaseDeadline = 60_000;
+    const host = new PlayerState();
+    host.playerId = 'human-host';
+    host.displayName = 'Island Host';
+    host.team = 'none';
+    state.players.set(host.playerId, host);
+
+    const gameplay = new GameplayController(state, () => {}),
+      bots = new BotRunner(state, gameplay, 5);
+    bots.start();
+    for (const player of state.players.values()) player.team = 'none';
+    gameplay.start(1_000);
+    const positions = new Map(
+      [...state.players.values()].map((player) => [player.playerId, { x: player.x, z: player.z }]),
+    );
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      bots.tick(1_050);
+      gameplay.advance(1_050);
+    } finally {
+      random.mockRestore();
+    }
+
+    const botPlayers = [...state.players.values()].filter((player) => player.isBot);
+    expect(botPlayers.every((player) => player.inputSequence === 1)).toBe(true);
+    expect(
+      botPlayers.some((player) => {
+        const before = positions.get(player.playerId)!;
+        return Math.hypot(player.x - before.x, player.z - before.z) > 0.01;
+      }),
+    ).toBe(true);
+    expect(gameplay.handle(host.playerId, 'action/shoot', { yaw: 0, pitch: 0 }, 1_051)).toBeNull();
+    expect(host.ammo).toBe(29);
   });
 });

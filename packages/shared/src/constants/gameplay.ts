@@ -37,6 +37,15 @@ export const GAMEPLAY = {
   groundFriction: 0.88,
   iceFriction: 0.97,
   waterSpeedPenalty: 0.7,
+  waterControlFactor: 0.38,
+  waterSurfaceY: 0,
+  waterFloatDepth: 0.55,
+  waterSwimDepth: 0.08,
+  waterBuoyancy: 18,
+  waterVerticalDrag: 6,
+  waterMaxRiseSpeed: 3,
+  waterMaxSinkSpeed: 2,
+  waterEntryHeight: 0.18,
 
   // ── Health ──
   maxHp: 100,

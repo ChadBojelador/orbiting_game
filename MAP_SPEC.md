@@ -1,6 +1,6 @@
 # FPS Map Specification
 
-The FPS pivot replaces the legacy procedural freeze-tag world, archived under `docs/archive`. The user also approved integrating the supplied Island and correcting scale/collision. Both maps support FFA, TDM and duel without player-to-player collision.
+The FPS pivot replaces the legacy procedural freeze-tag world, archived under `docs/archive`. The user approved the supplied Fort derivative and the later Frost Island archipelago redesign. Both maps support FFA, TDM and duel without player-to-player collision.
 
 ## Frostline
 
@@ -13,21 +13,26 @@ The FPS pivot replaces the legacy procedural freeze-tag world, archived under `d
 - Wooden house at (-30,-30): uniformly normalized to 8 m wide, 6.55957 m deep and 5.62012 m tall, centered and grounded. This is a closed landmark with a conservative outer-box collider including its roof volume. Decorative openings are not traversable.
 - Sixteen authored spawn candidates. Selection scores enemy distance, line of sight and recent death location.
 
-## Island - Fort
+## Frost Island
 
-The 136.6 MB supplied GLB contains a complete pirate archipelago, thousands of objects, and water planes almost 5,900 source units wide. Bounding the entire file produced the erroneous 220,000 m scale. The FPS release uses its Fort sector as the playable Island map; the full original remains available as source.
+Frost Island is a 160 × 160 metre combat archipelago. It preserves the optimized supplied Fort derivative as the recognizable central ruin and adds original procedural land, routes, facilities, and cover from `island-layout.ts`. The 136.6 MB source referenced by the original build report is absent from the current working tree; do not claim it is retained or attempt to extract additional source sectors until it is restored and inspected.
 
-- Extract Fort structural buildings and rock/beach/flat terrain. Remove dense foliage, tiny props, other islands, source sea floor and giant water planes.
-- Bake node transforms, center X/Z and uniformly scale retained geometry to 112 m across its longest horizontal dimension. Source sea level -18.773349 becomes Y=0. Transformation/hash: `assets/island-build-report.json`.
-- Play boundary X/Z ±60 m. Water at Y=0 is shallow, walkable and slows movement. Low visible markers show the boundary; there is no swimming mechanic.
-- Derivative: 61,396 triangles, one material draw call, 4,937,100-byte GLB. Collision uses the same centimetre-quantized triangles, 1,105,128 bytes before base64 encoding.
-- Sixteen offline-selected spawns on flat land with standing clearance and a two-metre clear exit toward their initial facing direction. Some occupy elevated surfaces. Server safety scoring remains dynamic.
-- Feet sample support across their radius to prevent sinking into ledges. Floor queries are bounded by current feet/step height to preserve roof/interior separation. Body clearance uses substepped cross-sections and ceiling rays; shots intersect exact triangles. Standing is deferred beneath low ceilings until there is clearance.
+- Coordinate boundary: X/Z ±80 m; Y up; -Z north and +X east. Water surface Y=0.
+- Central battlefield: overlapping snow platforms span roughly X ±29 and Z -27 to +20. The retained Fort is uniformly transformed by scale 0.52 and Y offset 0.25 in both rendering and collision. A five-metre Cryogenic Core at the origin, damaged facility blocks, containers, barriers, and machinery create close/medium lanes and interrupt cross-map sightlines.
+- North island: X 0 / Z -68, observation platform and asymmetric ice ridges. Two metal bridges and a narrow ice path approach the center. Two stair routes counter the elevated position.
+- West island: X -68 / Z 0, frozen warehouse, containers, pipeline, and loader. North bridge, south bridge, and central ice route support medium-range rotations.
+- East island: X +68 / Z 0, two research blocks, connecting facility lane, and generator. North bridge, south bridge, and central ice route provide separate approaches.
+- South island: X 0 / Z +68, trapped-vessel silhouette, cargo, crane base, and broken dock. Two dock bridges and one ice route connect to the center.
+- Southwest/southeast islands: compact flanking land masses around (±47,+47). Each has an L-shaped center route and a second harbor rotation so players can bypass the central approach.
+- Land masses remain visibly separate above cyan ocean. Bridges and ice paths are fast routes; water is a slower fallback. Sea movement uses deterministic buoyancy/drag: players float 0.55 m below the surface, hold jump to rise, move at 70% base speed, and receive no sprint or slide boost.
+- All sixteen spawn candidates are on outer islands. Spawns have clear inward exits and are approximately five seconds from the central core at base movement speed. Dynamic server scoring still accounts for enemy distance, visibility, and recent death position.
+- The Fort derivative remains 61,396 triangles, one material draw call, and 4,937,100 bytes. Procedural surfaces and cover are instanced by region/material for frustum culling; the Cryogenic Core uses distance-based LOD. No new runtime dependency or downloaded asset is introduced.
+- Feet sample support across their radius. Floor queries remain bounded by current feet/step height; body clearance uses substepped cross-sections and ceiling rays. Shots intersect both exact transformed Fort triangles and authored analytic blocks.
 
 ## Build and invariants
 
-Run `npm run assets:island` after changing the source, selection or scale. It rebuilds the runtime GLB, triangle data, report and spawn candidates. Rebuild shared before other checks. Never independently rescale the rendered Island. `scripts/prepare-island.mjs` is deterministic; runtime geometry is indexed by four-metre X/Z cells.
+Edit `island-layout.ts` for Frost Island land, routes, cover, bounds, and the single shared Fort transform. Do not separately transform the rendered Fort or generated collision. Fort triangle data is indexed by three-metre X/Z cells and combined with the analytic layout at query time. `npm run assets:island` rebuilds the retained Fort derivative only after the missing original source GLB has been restored; it must not overwrite the authored outer-island spawn plan.
 
-The selected map must reach rendering, authoritative movement, prediction, surface audio, spawn height/visibility and hitscan. Map choice is host-only in the lobby and frozen at countdown. Tests independently raycast the generated GLB and verify every spawn can walk forward. Frostline uses shared analytic blocks and solid ramp wedges. Maximum step-up is 0.32 m; movement substeps prevent tunneling.
+The selected map must reach rendering, authoritative movement, prediction, swimming/surface audio, spawn height/visibility and hitscan. Map choice is host-only in the lobby and frozen at countdown; `arenaHalfExtent` updates with it. Tests independently raycast the transformed GLB plus procedural blocks, verify the archipelago topology, and verify every spawn can walk forward. Frostline uses shared analytic blocks and solid ramp wedges. Maximum step-up is 0.32 m; movement substeps prevent tunneling.
 
-Trim/paint are cosmetic. Do not introduce misleading cover without collision. Narrow edges, interior/ceiling traversal, population density, spawn camping, mobile FPS and sustained capacity require playtesting.
+Trim, core rings, and distant LOD detail are cosmetic and stay inside visible colliders. Do not introduce misleading cover without collision. Underground interiors, jump pads, ziplines, pickups, deep-water elimination, narrow edges, population density, spawn camping, sightline balance, mobile FPS, and sustained capacity require later implementation or playtesting.
