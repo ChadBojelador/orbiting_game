@@ -1,9 +1,9 @@
 // Indexed collision baked from the restored renderer, including terrain and solid landmarks.
 import { ORIGINAL_TRIANGLES_BASE64 } from './original-data.js';
-import { SEA_LEVEL } from './original-topology.js';
+import { WATER_BOTTOM } from './original-topology.js';
 import type { Position, SpatialPosition } from '../protocol/gameplay.js';
 const CELL_SIZE = 3;
-const SEABED = SEA_LEVEL - 0.55;
+const SEABED = WATER_BOTTOM;
 function decodeTriangles(encoded: string): Float32Array {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   const bytes: number[] = [];

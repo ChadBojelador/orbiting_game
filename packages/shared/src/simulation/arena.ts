@@ -183,6 +183,13 @@ function isSwimmingOnSurface(
 export function isSwimming(p: SpatialPosition, mapId: MapId = 'frostline'): boolean {
   return isSwimmingOnSurface(p, mapId, surfaceAt(p, mapId));
 }
+export function isUnderwater(p: SpatialPosition, mapId: MapId = 'frostline'): boolean {
+  return (
+    (mapId === 'island' || mapId === 'original') &&
+    p.y < waterSurfaceYForMap(mapId) - 0.05 &&
+    surfaceAt(p, mapId) === 'water'
+  );
+}
 export function terrainHeightAt(
   p: Position,
   mapId: MapId = 'frostline',
@@ -278,10 +285,16 @@ export function advanceVerticalMotion(
   wantsJump: boolean,
   mapId: MapId = 'frostline',
   height: number = GAMEPLAY.playerHeight,
+  wantsDive = false,
 ): VerticalMotion {
   if (isSwimming({ ...position, y: previous.y }, mapId)) {
     const surfaceY = waterSurfaceYForMap(mapId);
-    const targetY = surfaceY - (wantsJump ? GAMEPLAY.waterSwimDepth : GAMEPLAY.waterFloatDepth);
+    const targetDepth = wantsJump
+      ? GAMEPLAY.waterSwimDepth
+      : wantsDive && mapId === 'original'
+        ? GAMEPLAY.originalWaterDiveDepth
+        : GAMEPLAY.waterFloatDepth;
+    const targetY = surfaceY - targetDepth;
     const acceleration =
       (targetY - previous.y) * GAMEPLAY.waterBuoyancy -
       previous.verticalVelocity * GAMEPLAY.waterVerticalDrag;
@@ -425,7 +438,7 @@ export function simulateMovement(
   Object.assign(
     next,
     moved,
-    advanceVerticalMotion(p, moved, seconds, !!input.jump, mapId, bodyHeight(next)),
+    advanceVerticalMotion(p, moved, seconds, !!input.jump, mapId, bodyHeight(next), !!input.crouch),
   );
   return next;
 }

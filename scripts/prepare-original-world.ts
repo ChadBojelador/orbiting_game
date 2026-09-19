@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import { Mesh, Scene, Vector3 } from 'three';
 import { OriginalWorldMap } from '../apps/client/src/world/original-world-map.js';
 
-// Bake the same procedural meshes the browser renders. Water ribbons are shallow
-// walkable channels; the ocean, route paint, and boundary remain presentation.
+// Bake the same procedural meshes the browser renders. Closed water ribbons are
+// shallow walkable channels; the ocean volume, route paint, and boundary remain
+// presentation. The deep ocean floor is handled by the shared analytic plane.
 const world = new OriginalWorldMap(new Scene());
 world.group.updateMatrixWorld(true);
 const coordinates: number[] = [];
@@ -11,7 +12,7 @@ const vertex = new Vector3();
 world.group.traverse((object) => {
   if (!(object instanceof Mesh)) return;
   if (
-    object.name === 'OCEAN' ||
+    object.name.startsWith('OCEAN') ||
     object.name === 'frost-wall' ||
     object.name.startsWith('PATH_') ||
     object.name.startsWith('WF_')

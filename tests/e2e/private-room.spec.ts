@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { matchMaker, type Room } from '@colyseus/core';
-import type { RoomReservation } from '@ice-water/shared';
+import { GAMEPLAY, isUnderwater, originalTopology, type RoomReservation } from '@ice-water/shared';
 import type { LobbyState } from '../../apps/server/src/rooms/lobby-state.js';
 import { startServer } from '../../apps/server/src/app.js';
 import { readConfig } from '../../apps/server/src/config/environment.js';
@@ -132,6 +132,56 @@ for (const mapId of ['frostline', 'original'] as const)
       }
     },
   );
+
+test('Original World ocean supports underwater presentation and buoyant resurfacing', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await identify(page, 'Ocean Diver');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Controls').selectOption('touch');
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByLabel('Map', { exact: true }).selectOption('original');
+  const { room } = await create(page);
+  await start(page);
+  const player = room.state.players.get(room.state.hostPlayerId)!;
+  Object.assign(player, {
+    x: -50,
+    y: originalTopology.SEA_LEVEL,
+    z: 80,
+    yaw: -Math.PI / 2,
+    pitch: 0,
+    velocityX: 0,
+    velocityZ: 0,
+    verticalVelocity: 0,
+    isGrounded: false,
+    spawnGeneration: player.spawnGeneration + 1,
+  });
+  room.broadcastPatch();
+  const dive = page.getByRole('button', { name: 'Crouch / Dive' });
+  await expect(dive).toBeVisible();
+
+  await dive.click();
+  await expect
+    .poll(() => player.y, { timeout: 5000 })
+    .toBeLessThan(originalTopology.SEA_LEVEL - GAMEPLAY.originalWaterDiveDepth + 0.2);
+  expect(
+    isUnderwater({ x: player.x, y: player.y + GAMEPLAY.playerEyeHeight, z: player.z }, 'original'),
+  ).toBe(true);
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: 'test-results/fps-original-underwater.png' });
+
+  await dive.click();
+  await expect
+    .poll(() => player.y, { timeout: 5000 })
+    .toBeGreaterThan(originalTopology.SEA_LEVEL - GAMEPLAY.waterFloatDepth - 0.2);
+  expect(
+    isUnderwater({ x: player.x, y: player.y + GAMEPLAY.playerEyeHeight, z: player.z }, 'original'),
+  ).toBe(false);
+  expect(errors).toEqual([]);
+});
+
 for (const mapId of ['frostline', 'island', 'original'] as const)
   test(
     'mobile ' + mapId + ' supports simultaneous movement, look and fire without overflow',

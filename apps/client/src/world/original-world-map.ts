@@ -9,6 +9,7 @@ const {
   ROUTE_CORRIDORS,
   SEA_LEVEL,
   terrainHeightAt,
+  WATER_BOTTOM,
   WORLD_MAX,
   WORLD_MIN,
 } = originalTopology;
@@ -16,6 +17,7 @@ import type { Position } from '@ice-water/shared';
 
 const PALETTE = {
   ocean: 0x35cddd,
+  seabed: 0x398f89,
   river: 0x64e7ef,
   grass: 0x79d49a,
   meadow: 0xa8df7e,
@@ -37,7 +39,7 @@ const PALETTE = {
 } as const;
 
 const TERRAIN_STEP = 3.125;
-const CLIFF_BOTTOM = SEA_LEVEL - 0.55;
+const CLIFF_BOTTOM = WATER_BOTTOM;
 
 function addTriangle(
   positions: number[],
@@ -219,6 +221,91 @@ function createRibbonGeometry(
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** Closed shallow volume used for water channels instead of an open top sheet. */
+function createRibbonVolumeGeometry(
+  points: readonly Position[],
+  width: number,
+  elevation: (point: Position) => number,
+  depth = 0.35,
+): THREE.BufferGeometry {
+  const samples = ribbonPoints(points);
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  for (let index = 0; index < samples.length; index += 1) {
+    const current = samples[index];
+    const previous = samples[Math.max(0, index - 1)];
+    const next = samples[Math.min(samples.length - 1, index + 1)];
+    if (!current || !previous || !next) continue;
+    const dx = next.x - previous.x;
+    const dz = next.z - previous.z;
+    const length = Math.max(0.001, Math.hypot(dx, dz));
+    const sideX = (-dz / length) * (width / 2);
+    const sideZ = (dx / length) * (width / 2);
+    const top = elevation(current);
+    const bottom = top - depth;
+    positions.push(
+      current.x + sideX,
+      top,
+      current.z + sideZ,
+      current.x - sideX,
+      top,
+      current.z - sideZ,
+      current.x + sideX,
+      bottom,
+      current.z + sideZ,
+      current.x - sideX,
+      bottom,
+      current.z - sideZ,
+    );
+    const v = index / Math.max(1, samples.length - 1);
+    uvs.push(0, v, 1, v, 0, v, 1, v);
+  }
+
+  const indices: number[] = [];
+  for (let index = 0; index < samples.length - 1; index += 1) {
+    const offset = index * 4;
+    const next = offset + 4;
+    // Top, bottom, left and right faces. Every winding points out of the volume.
+    indices.push(
+      offset,
+      next,
+      offset + 1,
+      next,
+      next + 1,
+      offset + 1,
+      offset + 2,
+      offset + 3,
+      next + 2,
+      offset + 3,
+      next + 3,
+      next + 2,
+      offset,
+      offset + 2,
+      next,
+      offset + 2,
+      next + 2,
+      next,
+      offset + 1,
+      next + 1,
+      offset + 3,
+      next + 1,
+      next + 3,
+      offset + 3,
+    );
+  }
+  const end = (samples.length - 1) * 4;
+  indices.push(0, 1, 2, 1, 3, 2, end, end + 2, end + 1, end + 1, end + 2, end + 3);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
   return geometry;
 }
 
@@ -570,19 +657,49 @@ export class OriginalWorldMap {
   }
 
   private build(): void {
+    const oceanDepth = SEA_LEVEL - WATER_BOTTOM;
     const oceanMaterial = new THREE.MeshPhysicalMaterial({
       color: PALETTE.ocean,
       roughness: 0.22,
       transparent: true,
       opacity: 0.86,
+      transmission: 0.04,
       depthWrite: false,
       side: THREE.FrontSide,
     });
-    const ocean = mesh(new THREE.CircleGeometry(205, 64), oceanMaterial, 'OCEAN');
-    ocean.rotation.x = -Math.PI / 2;
-    ocean.position.y = SEA_LEVEL;
+    const ocean = mesh(
+      new THREE.CylinderGeometry(205, 205, oceanDepth, 64, 1, false),
+      oceanMaterial,
+      'OCEAN',
+      new THREE.Vector3(0, WATER_BOTTOM + oceanDepth / 2, 0),
+    );
+    ocean.castShadow = false;
     ocean.receiveShadow = true;
-    this.group.add(ocean);
+
+    // The closed ocean column has outward faces. A separate downward-facing
+    // surface lets submerged cameras see the waterline without DoubleSide.
+    const undersideMaterial = oceanMaterial.clone();
+    undersideMaterial.color.setHex(0x218fa8);
+    undersideMaterial.opacity = 0.68;
+    const underside = mesh(
+      new THREE.CircleGeometry(205, 64),
+      undersideMaterial,
+      'OCEAN_UNDERSIDE',
+      new THREE.Vector3(0, SEA_LEVEL - 0.015, 0),
+    );
+    underside.rotation.x = Math.PI / 2;
+    underside.castShadow = false;
+    underside.renderOrder = 2;
+
+    const seabed = mesh(
+      new THREE.CylinderGeometry(205, 205, 0.3, 64),
+      new THREE.MeshStandardMaterial({ color: PALETTE.seabed, roughness: 0.98 }),
+      'OCEAN_FLOOR',
+      new THREE.Vector3(0, WATER_BOTTOM - 0.15, 0),
+    );
+    seabed.castShadow = false;
+    seabed.receiveShadow = true;
+    this.group.add(ocean, underside, seabed);
 
     const terrainMaterial = new THREE.MeshStandardMaterial({
       vertexColors: true,
@@ -614,7 +731,7 @@ export class OriginalWorldMap {
 
     for (const branch of RIVER_BRANCHES) {
       const river = mesh(
-        createRibbonGeometry(branch, 4.6, (point) => riverElevation(point) + 0.08),
+        createRibbonVolumeGeometry(branch, 4.6, (point) => riverElevation(point) + 0.08),
         this.waterMaterial,
         'WATER_NETWORK',
       );

@@ -29,6 +29,8 @@ export interface BridgeFootprint extends Position {
 }
 
 export const SEA_LEVEL = 1.5;
+/** Shared visual and collision floor for the Original World ocean volume. */
+export const WATER_BOTTOM = SEA_LEVEL - 6;
 export const WORLD_MIN = -125;
 export const WORLD_MAX = 125;
 

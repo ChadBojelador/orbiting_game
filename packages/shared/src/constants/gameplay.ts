@@ -41,6 +41,8 @@ export const GAMEPLAY = {
   waterSurfaceY: 0,
   waterFloatDepth: 0.55,
   waterSwimDepth: 0.08,
+  /** Feet depth while crouch/dive is held in deep Original World water. */
+  originalWaterDiveDepth: 2.4,
   waterBuoyancy: 18,
   waterVerticalDrag: 6,
   waterMaxRiseSpeed: 3,

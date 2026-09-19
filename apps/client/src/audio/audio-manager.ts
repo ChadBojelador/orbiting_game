@@ -15,14 +15,31 @@ export type SoundCue =
 export class AudioManager {
   private context?: AudioContext;
   private gain?: GainNode;
+  private lowPass?: BiquadFilterNode;
+  private isUnderwater = false;
   volume = 0.65;
   unlock(): void {
     this.context ??= new AudioContext();
     if (!this.gain) {
       this.gain = this.context.createGain();
-      this.gain.connect(this.context.destination);
+      this.lowPass = this.context.createBiquadFilter();
+      this.lowPass.type = 'lowpass';
+      this.lowPass.Q.value = 0.72;
+      this.lowPass.frequency.value = this.isUnderwater ? 850 : 22_000;
+      this.gain.connect(this.lowPass);
+      this.lowPass.connect(this.context.destination);
     }
     void this.context.resume().catch(() => {});
+  }
+  setUnderwater(isUnderwater: boolean): void {
+    if (this.isUnderwater === isUnderwater) return;
+    this.isUnderwater = isUnderwater;
+    if (!this.context || !this.lowPass) return;
+    this.lowPass.frequency.setTargetAtTime(
+      isUnderwater ? 850 : 22_000,
+      this.context.currentTime,
+      0.08,
+    );
   }
   listener(position: SpatialPosition, yaw: number): void {
     const l = this.context?.listener;

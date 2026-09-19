@@ -13,6 +13,7 @@ import {
   GAMEPLAY,
   arenaHalfExtentForMap,
   isSwimming,
+  isUnderwater,
   isWalkable,
   originalTopology,
   simulateMovement,
@@ -188,7 +189,7 @@ describe('restored Original World', () => {
       world.group.traverse((object) => {
         if (
           !(object instanceof Mesh) ||
-          object.name === 'OCEAN' ||
+          object.name.startsWith('OCEAN') ||
           object.name === 'frost-wall' ||
           object.name.startsWith('PATH_') ||
           object.name.startsWith('WF_')
@@ -248,7 +249,7 @@ describe('restored Original World', () => {
       });
       expect(geometryTopology(mesh.geometry).signedVolume).toBeGreaterThan(0);
 
-      const bottom = originalTopology.SEA_LEVEL - 0.55;
+      const bottom = originalTopology.WATER_BOTTOM;
       const upward = new Raycaster(new Vector3(-10, bottom - 1, 0), new Vector3(0, 1, 0), 0, 2);
       expect(upward.intersectObject(mesh, false)[0]?.distance).toBeCloseTo(1, 4);
     } finally {
@@ -262,7 +263,7 @@ describe('restored Original World', () => {
       const terrain = world.group.getObjectByName('TERRAIN_BLOCKOUT') as Mesh<BufferGeometry>;
       world.group.updateMatrixWorld(true);
       const step = 3.125;
-      const bottom = originalTopology.SEA_LEVEL - 0.55;
+      const bottom = originalTopology.WATER_BOTTOM;
       const sides = [
         { dx: 0, dz: -1 },
         { dx: 1, dz: 0 },
@@ -323,17 +324,19 @@ describe('restored Original World', () => {
     }
   });
 
-  it('keeps all solid world meshes closed while preserving intentional surface sheets', () => {
+  it('keeps all solid world and water meshes closed while preserving intentional sheets', () => {
     const world = new OriginalWorldMap(new Scene());
     world.group.updateMatrixWorld(true);
     const arch = world.group.getObjectByName('LM_BEACH_ARCH');
     if (!arch) throw new Error('Beach arch is missing');
+    expect(world.group.getObjectByName('OCEAN')).toBeDefined();
+    expect(world.group.getObjectByName('OCEAN_UNDERSIDE')).toBeDefined();
+    expect(world.group.getObjectByName('OCEAN_FLOOR')).toBeDefined();
     const audits = [{ name: arch.name, geometry: combinedGeometry(arch) }];
     world.group.traverse((object) => {
       if (!(object instanceof Mesh)) return;
       if (
-        object.name === 'OCEAN' ||
-        object.name === 'WATER_NETWORK' ||
+        object.name === 'OCEAN_UNDERSIDE' ||
         object.name.startsWith('PATH_') ||
         object.name.startsWith('WF_')
       )
@@ -419,5 +422,43 @@ describe('restored Original World', () => {
     for (let t = 50; t <= 1000; t += 50)
       p = simulateMovement(p, { x: 0, z: 1, sequence: t, sprint: true }, t, 0.05, 1, 'original');
     expect(p.z).toBeLessThan(-10);
+  });
+
+  it('dives below the waterline, remains buoyant, and returns to surface float', () => {
+    let p: MovementState = {
+      x: -110,
+      y: originalTopology.SEA_LEVEL,
+      z: 80,
+      velocityX: 0,
+      velocityZ: 0,
+      verticalVelocity: 0,
+      isGrounded: false,
+      isSliding: false,
+      isCrouching: false,
+      slideUntil: 0,
+      slideReadyAt: 0,
+    };
+    expect(terrainHeightAt(p, 'original')).toBeCloseTo(originalTopology.WATER_BOTTOM);
+    expect(worldRayDistance(p, { x: 0, y: -1, z: 0 }, 100, 'original')).toBeCloseTo(
+      originalTopology.SEA_LEVEL - originalTopology.WATER_BOTTOM,
+    );
+
+    for (let tick = 1; tick <= 80; tick++)
+      p = simulateMovement(
+        p,
+        { x: 0, z: 0, crouch: true, sequence: tick },
+        tick * 50,
+        0.05,
+        1,
+        'original',
+      );
+    expect(p.y).toBeCloseTo(originalTopology.SEA_LEVEL - GAMEPLAY.originalWaterDiveDepth, 1);
+    expect(isUnderwater({ ...p, y: p.y + GAMEPLAY.playerEyeHeight }, 'original')).toBe(true);
+    expect(p.verticalVelocity).toBeCloseTo(0, 1);
+
+    for (let tick = 81; tick <= 160; tick++)
+      p = simulateMovement(p, { x: 0, z: 0, sequence: tick }, tick * 50, 0.05, 1, 'original');
+    expect(p.y).toBeCloseTo(originalTopology.SEA_LEVEL - GAMEPLAY.waterFloatDepth, 1);
+    expect(isUnderwater({ ...p, y: p.y + GAMEPLAY.playerEyeHeight }, 'original')).toBe(false);
   });
 });
