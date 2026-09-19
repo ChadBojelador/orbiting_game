@@ -40,6 +40,10 @@ const PALETTE = {
 
 const TERRAIN_STEP = 3.125;
 const CLIFF_BOTTOM = WATER_BOTTOM;
+// River cells are removed by their center point, so a removed square can reach
+// more than half its diagonal beyond the authored channel. This overlap closes
+// that grid-sized bank gap and leaves room for the player's collision radius.
+const RIVER_SUPPORT_WIDTH = 10.4;
 
 function addTriangle(
   positions: number[],
@@ -178,6 +182,27 @@ function ribbonPoints(points: readonly Position[], samplesPerSegment = 5): Posit
   return sampled;
 }
 
+function extendRibbonEnds(points: readonly Position[], distance: number): Position[] {
+  if (points.length < 2) return [...points];
+  const first = points[0]!;
+  const second = points[1]!;
+  const previous = points[points.length - 2]!;
+  const last = points[points.length - 1]!;
+  const firstLength = Math.max(0.001, Math.hypot(second.x - first.x, second.z - first.z));
+  const lastLength = Math.max(0.001, Math.hypot(last.x - previous.x, last.z - previous.z));
+  return [
+    {
+      x: first.x - ((second.x - first.x) / firstLength) * distance,
+      z: first.z - ((second.z - first.z) / firstLength) * distance,
+    },
+    ...points,
+    {
+      x: last.x + ((last.x - previous.x) / lastLength) * distance,
+      z: last.z + ((last.z - previous.z) / lastLength) * distance,
+    },
+  ];
+}
+
 function createRibbonGeometry(
   points: readonly Position[],
   width: number,
@@ -229,7 +254,7 @@ function createRibbonVolumeGeometry(
   points: readonly Position[],
   width: number,
   elevation: (point: Position) => number,
-  depth = 0.35,
+  bottomElevation: (point: Position, top: number) => number,
 ): THREE.BufferGeometry {
   const samples = ribbonPoints(points);
   const positions: number[] = [];
@@ -245,37 +270,36 @@ function createRibbonVolumeGeometry(
     const sideX = (-dz / length) * (width / 2);
     const sideZ = (dx / length) * (width / 2);
     const top = elevation(current);
-    const bottom = top - depth;
+    const left = { x: current.x + sideX, z: current.z + sideZ };
+    const right = { x: current.x - sideX, z: current.z - sideZ };
+    const bottomLeft = bottomElevation(left, top);
+    const bottomRight = bottomElevation(right, top);
     positions.push(
-      current.x + sideX,
+      left.x,
       top,
-      current.z + sideZ,
-      current.x - sideX,
+      left.z,
+      right.x,
       top,
-      current.z - sideZ,
-      current.x + sideX,
-      bottom,
-      current.z + sideZ,
-      current.x - sideX,
-      bottom,
-      current.z - sideZ,
+      right.z,
+      left.x,
+      bottomLeft,
+      left.z,
+      right.x,
+      bottomRight,
+      right.z,
     );
     const v = index / Math.max(1, samples.length - 1);
     uvs.push(0, v, 1, v, 0, v, 1, v);
   }
 
-  const indices: number[] = [];
+  const topIndices: number[] = [];
+  const shellIndices: number[] = [];
   for (let index = 0; index < samples.length - 1; index += 1) {
     const offset = index * 4;
     const next = offset + 4;
-    // Top, bottom, left and right faces. Every winding points out of the volume.
-    indices.push(
-      offset,
-      next,
-      offset + 1,
-      next,
-      next + 1,
-      offset + 1,
+    topIndices.push(offset, next, offset + 1, next, next + 1, offset + 1);
+    // Bottom, left and right faces. Every winding points out of the volume.
+    shellIndices.push(
       offset + 2,
       offset + 3,
       next + 2,
@@ -297,12 +321,14 @@ function createRibbonVolumeGeometry(
     );
   }
   const end = (samples.length - 1) * 4;
-  indices.push(0, 1, 2, 1, 3, 2, end, end + 2, end + 1, end + 1, end + 2, end + 3);
+  shellIndices.push(0, 1, 2, 1, 3, 2, end, end + 2, end + 1, end + 1, end + 2, end + 3);
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
+  geometry.setIndex([...topIndices, ...shellIndices]);
+  geometry.addGroup(0, topIndices.length, 0);
+  geometry.addGroup(topIndices.length, shellIndices.length, 1);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
@@ -316,13 +342,16 @@ function riverElevation(point: Position): number {
     terrainHeightAt({ x: point.x, z: point.z + 3.4 }),
     terrainHeightAt({ x: point.x, z: point.z - 3.4 }),
   ].filter((height) => height > SEA_LEVEL);
-  if (samples.length === 0) return SEA_LEVEL + 0.05;
-  return Math.max(SEA_LEVEL + 0.05, Math.max(...samples) - 1.05);
+  const authoredHeight =
+    samples.length === 0
+      ? SEA_LEVEL + 0.05
+      : Math.max(SEA_LEVEL + 0.05, Math.max(...samples) - 1.05);
+  return authoredHeight + 0.08;
 }
 
 function mesh(
   geometry: THREE.BufferGeometry,
-  material: THREE.Material,
+  material: THREE.Material | THREE.Material[],
   name: string,
   position?: THREE.Vector3,
 ): THREE.Mesh {
@@ -338,6 +367,15 @@ function createCrystal(material: THREE.Material, radius: number, height: number)
   const crystal = mesh(new THREE.OctahedronGeometry(radius, 0), material, 'crystal-shard');
   crystal.scale.y = height / (radius * 2);
   return crystal;
+}
+
+function createCrystalLight(name: string, intensity: number, distance: number): THREE.PointLight {
+  const light = new THREE.PointLight(0x69c8ff, intensity, distance, 2);
+  light.name = name;
+  // Three bounded, shadowless lights keep the crystals useful on mobile
+  // without multiplying shadow-map renders for the entire world.
+  light.castShadow = false;
+  return light;
 }
 
 function createBeachArch(material: THREE.Material): THREE.Group {
@@ -373,9 +411,9 @@ function createLandmarks(): THREE.Group {
   group.name = 'WORLD_LANDMARKS';
   const crystalMaterial = new THREE.MeshStandardMaterial({
     color: PALETTE.crystalBlue,
-    emissive: PALETTE.crystalDeep,
-    emissiveIntensity: 0.22,
-    roughness: 0.28,
+    emissive: 0x3b8dff,
+    emissiveIntensity: 2.4,
+    roughness: 0.2,
     metalness: 0.05,
   });
   const iceMaterial = new THREE.MeshStandardMaterial({
@@ -405,6 +443,9 @@ function createLandmarks(): THREE.Group {
     shard.rotation.z = tilt;
     villageCrystal.add(shard);
   }
+  const villageLight = createCrystalLight('CRYSTAL_LIGHT_VILLAGE', 135, 34);
+  villageLight.position.set(0, 1.5, 0);
+  villageCrystal.add(villageLight);
   group.add(villageCrystal);
 
   const ancientTree = new THREE.Group();
@@ -449,6 +490,9 @@ function createLandmarks(): THREE.Group {
     shard.rotation.z = tilt;
     crystalSpire.add(shard);
   }
+  const spireLight = createCrystalLight('CRYSTAL_LIGHT_SPIRE', 230, 48);
+  spireLight.position.set(0, 8, 0);
+  crystalSpire.add(spireLight);
   group.add(crystalSpire);
 
   const iceSummit = new THREE.Group();
@@ -507,7 +551,9 @@ function createLandmarks(): THREE.Group {
   const moonstone = createCrystal(crystalMaterial, 2.2, 7);
   moonstone.name = 'LM_ISLAND_MOONSTONE';
   moonstone.position.set(37, terrainHeightAt({ x: 37, z: 116 }) + 3.5, 116);
-  group.add(moonstone);
+  const moonstoneLight = createCrystalLight('CRYSTAL_LIGHT_MOONSTONE', 105, 30);
+  moonstoneLight.position.copy(moonstone.position).add(new THREE.Vector3(0, 1.5, 0));
+  group.add(moonstone, moonstoneLight);
 
   return group;
 }
@@ -729,14 +775,39 @@ export class OriginalWorldMap {
       this.group.add(path);
     }
 
+    const riverbankMaterial = new THREE.MeshStandardMaterial({
+      color: PALETTE.cliff,
+      roughness: 0.96,
+      metalness: 0,
+      side: THREE.FrontSide,
+    });
     for (const branch of RIVER_BRANCHES) {
+      // Transparent water needs a real upward-facing bed beneath it. The
+      // volume's exterior bottom correctly faces downward, so it is culled
+      // when viewed through the surface and cannot double as the visible bed.
+      // Keeping this bed close to the authored surface makes steep channel
+      // transitions read as water over solid terrain instead of empty glass.
+      const riverbed = mesh(
+        createRibbonVolumeGeometry(
+          extendRibbonEnds(branch, TERRAIN_STEP + 0.5),
+          RIVER_SUPPORT_WIDTH,
+          (point) => riverElevation(point) - 0.32,
+          (point, top) =>
+            Math.max(WATER_BOTTOM, Math.min(top - 0.18, terrainHeightAt(point) - 0.04)),
+        ),
+        [riverbankMaterial, riverbankMaterial],
+        'RIVERBED_NETWORK',
+      );
+      riverbed.receiveShadow = true;
       const river = mesh(
-        createRibbonVolumeGeometry(branch, 4.6, (point) => riverElevation(point) + 0.08),
-        this.waterMaterial,
+        createRibbonVolumeGeometry(branch, 4.6, riverElevation, (point, top) =>
+          Math.max(WATER_BOTTOM, Math.min(top - 0.18, terrainHeightAt(point) - 0.04)),
+        ),
+        [this.waterMaterial, riverbankMaterial],
         'WATER_NETWORK',
       );
       river.renderOrder = 2;
-      this.group.add(river);
+      this.group.add(riverbed, river);
     }
 
     for (const bridge of BRIDGES)

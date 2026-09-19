@@ -2,8 +2,11 @@ import fs from 'node:fs';
 import { Mesh, Scene, Vector3 } from 'three';
 import { OriginalWorldMap } from '../apps/client/src/world/original-world-map.js';
 
-// Bake the same procedural meshes the browser renders. Closed water ribbons are
-// shallow walkable channels; the ocean volume, route paint, and boundary remain
+// Bake the same procedural meshes the browser renders. River tops remain the
+// authored walkable channel floors. The riverbank beds overlap the grid cells
+// removed around each channel, so their top groups enter collision to close bank
+// gaps; their opaque support skirts remain presentation so they cannot become
+// invisible movement barriers. The ocean volume, route paint, and boundary remain
 // presentation. The deep ocean floor is handled by the shared analytic plane.
 const world = new OriginalWorldMap(new Scene());
 world.group.updateMatrixWorld(true);
@@ -20,7 +23,16 @@ world.group.traverse((object) => {
     return;
   const positions = object.geometry.getAttribute('position');
   const indices = object.geometry.index;
-  for (let i = 0; i < (indices?.count ?? positions.count); i++) {
+  const channelTop =
+    object.name === 'WATER_NETWORK' || object.name === 'RIVERBED_NETWORK'
+      ? object.geometry.groups.find(
+          (group: { materialIndex?: number }) => group.materialIndex === 0,
+        )
+      : undefined;
+  const start = channelTop?.start ?? 0;
+  const count = channelTop?.count ?? indices?.count ?? positions.count;
+  for (let offset = 0; offset < count; offset++) {
+    const i = start + offset;
     vertex.fromBufferAttribute(positions, indices ? indices.getX(i) : i);
     vertex.applyMatrix4(object.matrixWorld);
     for (const value of [vertex.x, vertex.y, vertex.z]) {

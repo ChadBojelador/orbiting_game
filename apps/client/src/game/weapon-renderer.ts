@@ -1,6 +1,11 @@
-import { WEAPONS, type WeaponId } from '@ice-water/shared';
+import { WEAPONS, type SpatialPosition, type WeaponId } from '@ice-water/shared';
 import {
   BoxGeometry,
+  AdditiveBlending,
+  OctahedronGeometry,
+  PointLight,
+  SphereGeometry,
+  Vector3,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -10,22 +15,50 @@ import {
 export class WeaponRenderer {
   private readonly root = new Group();
   private model = new Group();
-  private readonly flash = new Mesh(
-    new BoxGeometry(0.09, 0.09, 0.13),
-    new MeshBasicMaterial({ color: 0xffde92 }),
+  private readonly flash = new Group();
+  private readonly flashCore = new Mesh(
+    new OctahedronGeometry(0.115, 0),
+    new MeshBasicMaterial({
+      color: 0xfff4cf,
+      blending: AdditiveBlending,
+      transparent: true,
+      opacity: 0.98,
+      depthWrite: false,
+      toneMapped: false,
+    }),
   );
+  private readonly flashHalo = new Mesh(
+    new SphereGeometry(0.17, 8, 5),
+    new MeshBasicMaterial({
+      color: 0xf3b747,
+      blending: AdditiveBlending,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  );
+  private readonly flashLight = new PointLight(0xffd27a, 3.5, 1.8, 2);
   private current: WeaponId | undefined;
   private kick = 0;
   private flashUntil = 0;
   private switchAt = 0;
   constructor(camera: PerspectiveCamera) {
     camera.add(this.root);
+    this.flashCore.scale.z = 1.75;
+    this.flash.add(this.flashHalo, this.flashCore, this.flashLight);
     this.root.add(this.flash);
     this.flash.visible = false;
   }
   fire(now: number): void {
     this.kick = 1;
-    this.flashUntil = now + 65;
+    this.flashUntil = now + 130;
+  }
+  muzzleWorldPosition(): SpatialPosition {
+    const position = new Vector3();
+    this.flash.updateWorldMatrix(true, false);
+    this.flash.getWorldPosition(position);
+    return { x: position.x, y: position.y, z: position.z };
   }
   update(
     id: WeaponId,
@@ -55,8 +88,10 @@ export class WeaponRenderer {
   }
   destroy(): void {
     this.clear();
-    this.flash.geometry.dispose();
-    (this.flash.material as MeshBasicMaterial).dispose();
+    this.flashCore.geometry.dispose();
+    (this.flashCore.material as MeshBasicMaterial).dispose();
+    this.flashHalo.geometry.dispose();
+    (this.flashHalo.material as MeshBasicMaterial).dispose();
     this.root.removeFromParent();
   }
   private clear(): void {
@@ -99,6 +134,6 @@ export class WeaponRenderer {
       box(0.025, 0.035, 0.04, 0, 0.11, -0.22, 0xf3b747);
       if (id === 'sniper') box(0.07, 0.07, 0.22, 0, 0.14, -0.28, 0x308cad);
     }
-    this.flash.position.set(0, 0.01, -length - 0.13);
+    this.flash.position.set(0, 0.015, -length - 0.16);
   }
 }

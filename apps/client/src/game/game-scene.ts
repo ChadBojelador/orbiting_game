@@ -16,6 +16,7 @@ import {
   DirectionalLight,
   Group,
   Mesh,
+  Sprite,
   BoxGeometry,
   MeshStandardMaterial,
   SRGBColorSpace,
@@ -33,6 +34,11 @@ import { AudioManager } from '../audio/audio-manager.js';
 import { readSettings, type FpsSettings } from './fps-settings.js';
 import { renderPixelRatio } from './render-performance.js';
 import { waterEnvironmentFor } from './water-presentation.js';
+import {
+  createPlayerNameplate,
+  disposePlayerNameplate,
+  setNameplateTone,
+} from './player-nameplate.js';
 export class GameScene {
   readonly session: GameSession;
   settings: FpsSettings = readSettings();
@@ -64,6 +70,7 @@ export class GameScene {
   private effects: HitEffects;
   private audio = new AudioManager();
   private readonly players = new Map<string, Group>();
+  private readonly nameplates = new Map<string, Sprite>();
   private readonly materials = new Map<string, MeshStandardMaterial>();
   private body = new BoxGeometry(0.65, 1.15, 0.42);
   private head = new BoxGeometry(0.5, 0.45, 0.48);
@@ -93,10 +100,21 @@ export class GameScene {
     });
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.applyWaterEnvironment(false);
-    this.scene.add(new HemisphereLight(0xedfaff, 0x41617b, 2.5));
-    const sun = new DirectionalLight(0xfff0d0, 2);
-    sun.position.set(-30, 60, 20);
-    this.scene.add(sun);
+    const isOriginalNight = this.session.view.mapId === 'original';
+    this.scene.add(
+      new HemisphereLight(
+        isOriginalNight ? 0x8fb9ff : 0xedfaff,
+        isOriginalNight ? 0x07111f : 0x41617b,
+        isOriginalNight ? 0.52 : 2.5,
+      ),
+    );
+    const keyLight = new DirectionalLight(
+      isOriginalNight ? 0xc9dcff : 0xfff0d0,
+      isOriginalNight ? 0.72 : 2,
+    );
+    keyLight.name = isOriginalNight ? 'moonlight' : 'sunlight';
+    keyLight.position.set(isOriginalNight ? 45 : -30, isOriginalNight ? 85 : 60, -35);
+    this.scene.add(keyLight);
     if (this.session.view.mapId === 'island') {
       this.island = new IslandMap(this.scene);
       void this.island.ready.then(() => {
@@ -152,6 +170,8 @@ export class GameScene {
     this.body.dispose();
     this.head.dispose();
     this.materials.forEach((m) => m.dispose());
+    this.nameplates.forEach(disposePlayerNameplate);
+    this.nameplates.clear();
     this.renderer.dispose();
   }
   private bindControls(): void {
@@ -225,6 +245,9 @@ export class GameScene {
     model.add(torso, head);
     this.scene.add(model);
     this.players.set(player.playerId, model);
+    const nameplate = createPlayerNameplate(player.displayName);
+    this.scene.add(nameplate);
+    this.nameplates.set(player.playerId, nameplate);
     return model;
   }
   private material(key: string, color: number): MeshStandardMaterial {
@@ -322,6 +345,16 @@ export class GameScene {
         key,
         key === 'protected' ? 0xf3b747 : friend ? 0x308cad : 0xe96958,
       );
+      const nameplate = this.nameplates.get(remote.playerId);
+      if (nameplate) {
+        nameplate.visible = model.visible;
+        nameplate.position.set(
+          position.x,
+          position.y + (remote.isCrouching || remote.isSliding ? 1.28 : 2.03),
+          position.z,
+        );
+        setNameplateTone(nameplate, key);
+      }
       if (
         model.visible &&
         Math.hypot(remote.velocityX, remote.velocityZ) > 1 &&
@@ -344,8 +377,13 @@ export class GameScene {
     for (const event of session.events.splice(0)) {
       const local = session.playerId;
       if (event.type === 'weapon/fired') {
-        if (!this.settings.reducedEffects)
-          this.effects.shot(event.payload.origin, event.payload.end, now);
+        if (!this.settings.reducedEffects) {
+          const visualOrigin =
+            event.payload.playerId === local
+              ? this.weapon.muzzleWorldPosition()
+              : event.payload.origin;
+          this.effects.shot(visualOrigin, event.payload.end, now);
+        }
         this.audio.play(
           'shot',
           event.payload.playerId === local ? undefined : event.payload.origin,

@@ -53,6 +53,36 @@ describe('authoritative FPS combat', () => {
     );
     expect(b.hp).toBe(56);
   });
+  it('lets an aimed firearm hit across Frostline while retaining long-range damage falloff', () => {
+    const { state, a, b, events } = fixture();
+    Object.assign(a, { x: -50, y: 0, z: 50, weaponId: 'assault-rifle' });
+    Object.assign(b, { x: -50, y: 0, z: -50 });
+
+    fireHitscan(state, a, { yaw: 0, pitch: 0, isAds: true }, 2000, (event) => events.push(event));
+
+    // The level shot crosses the upper hitbox, so the minimum-range damage is
+    // doubled as a headshot (11 * 2) rather than using the full 44 damage.
+    expect(b.hp).toBe(78);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'player/hit',
+        payload: expect.objectContaining({
+          attackerId: 'a',
+          victimId: 'b',
+          damage: 22,
+          isHeadshot: true,
+        }),
+      }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: 'weapon/fired',
+        payload: expect.objectContaining({
+          end: expect.objectContaining({ z: expect.any(Number) }),
+        }),
+      }),
+    );
+  });
   it('blocks protected and friendly bodies without giving kill credit', () => {
     const { state, a, b } = fixture();
     b.protectedUntil = 3000;
