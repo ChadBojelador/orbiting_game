@@ -253,6 +253,34 @@ function createCrystal(material: THREE.Material, radius: number, height: number)
   return crystal;
 }
 
+function createBeachArch(material: THREE.Material): THREE.Group {
+  const radius = 7;
+  const tube = 1.45;
+  const radialSegments = 8;
+  const arch = new THREE.Group();
+  arch.name = 'LM_BEACH_ARCH';
+  arch.add(
+    mesh(
+      new THREE.TorusGeometry(radius, tube, radialSegments, 20, Math.PI),
+      material,
+      'beach-arch-body',
+    ),
+  );
+  for (const x of [-radius, radius]) {
+    const cap = mesh(
+      new THREE.CircleGeometry(tube, radialSegments),
+      material,
+      'beach-arch-cap',
+      new THREE.Vector3(x, 0, 0),
+    );
+    // Both ends of the upper semicircle terminate toward local -Y. Closing
+    // them prevents the landmark from exposing its hollow tube at ground level.
+    cap.rotation.x = Math.PI / 2;
+    arch.add(cap);
+  }
+  return arch;
+}
+
 function createLandmarks(): THREE.Group {
   const group = new THREE.Group();
   group.name = 'WORLD_LANDMARKS';
@@ -384,11 +412,7 @@ function createLandmarks(): THREE.Group {
   windmill.add(hub);
   group.add(windmill);
 
-  const beachArch = mesh(
-    new THREE.TorusGeometry(7, 1.45, 8, 20, Math.PI),
-    creamMaterial,
-    'LM_BEACH_ARCH',
-  );
+  const beachArch = createBeachArch(creamMaterial);
   beachArch.position.set(35, terrainHeightAt({ x: 35, z: 103 }) + 0.3, 103);
   beachArch.rotation.y = Math.PI / 2;
   group.add(beachArch);

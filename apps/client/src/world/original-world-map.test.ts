@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { BufferGeometry, FrontSide, Mesh, Raycaster, Scene, Vector3 } from 'three';
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  FrontSide,
+  Mesh,
+  Object3D,
+  Raycaster,
+  Scene,
+  Vector3,
+} from 'three';
 import {
   GAMEPLAY,
   arenaHalfExtentForMap,
@@ -20,8 +29,12 @@ function geometryTopology(geometry: BufferGeometry): {
   windingErrors: number;
   degenerateTriangles: number;
   signedVolume: number;
+  connectedComponents: number;
+  unreferencedVertices: number;
+  invalidNormals: number;
 } {
   const positions = geometry.getAttribute('position');
+  const normals = geometry.getAttribute('normal');
   const indices = geometry.index;
   if (!indices) throw new Error('Expected indexed terrain geometry');
   const welded = new Map<string, number>();
@@ -39,6 +52,8 @@ function geometryTopology(geometry: BufferGeometry): {
   }
 
   const edges = new Map<string, number[]>();
+  const adjacency = new Map<number, Set<number>>();
+  const referencedVertices = new Set<number>();
   const a = new Vector3();
   const b = new Vector3();
   const c = new Vector3();
@@ -53,12 +68,21 @@ function geometryTopology(geometry: BufferGeometry): {
     const directions = edges.get(key) ?? [];
     directions.push(from === low ? 1 : -1);
     edges.set(key, directions);
+    const fromNeighbors = adjacency.get(from) ?? new Set<number>();
+    const toNeighbors = adjacency.get(to) ?? new Set<number>();
+    fromNeighbors.add(to);
+    toNeighbors.add(from);
+    adjacency.set(from, fromNeighbors);
+    adjacency.set(to, toNeighbors);
   };
 
   for (let offset = 0; offset < indices.count; offset += 3) {
     const ai = indices.getX(offset);
     const bi = indices.getX(offset + 1);
     const ci = indices.getX(offset + 2);
+    referencedVertices.add(ai);
+    referencedVertices.add(bi);
+    referencedVertices.add(ci);
     a.fromBufferAttribute(positions, ai);
     b.fromBufferAttribute(positions, bi);
     c.fromBufferAttribute(positions, ci);
@@ -79,7 +103,59 @@ function geometryTopology(geometry: BufferGeometry): {
     else if (directions.length !== 2) nonManifoldEdges += 1;
     else if (directions[0] === directions[1]) windingErrors += 1;
   }
-  return { boundaryEdges, nonManifoldEdges, windingErrors, degenerateTriangles, signedVolume };
+
+  let connectedComponents = 0;
+  const visited = new Set<number>();
+  for (const start of adjacency.keys()) {
+    if (visited.has(start)) continue;
+    connectedComponents += 1;
+    const pending = [start];
+    while (pending.length > 0) {
+      const vertex = pending.pop()!;
+      if (visited.has(vertex)) continue;
+      visited.add(vertex);
+      for (const neighbor of adjacency.get(vertex) ?? []) pending.push(neighbor);
+    }
+  }
+
+  let invalidNormals = 0;
+  for (let index = 0; index < normals.count; index += 1) {
+    const length = Math.hypot(normals.getX(index), normals.getY(index), normals.getZ(index));
+    if (!Number.isFinite(length) || length < 0.5) invalidNormals += 1;
+  }
+  return {
+    boundaryEdges,
+    nonManifoldEdges,
+    windingErrors,
+    degenerateTriangles,
+    signedVolume,
+    connectedComponents,
+    unreferencedVertices: positions.count - referencedVertices.size,
+    invalidNormals,
+  };
+}
+
+function combinedGeometry(root: Object3D): BufferGeometry {
+  root.updateMatrixWorld(true);
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const vertex = new Vector3();
+  root.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    const sourcePositions = object.geometry.getAttribute('position');
+    const sourceIndices = object.geometry.index;
+    for (let index = 0; index < (sourceIndices?.count ?? sourcePositions.count); index += 1) {
+      const sourceIndex = sourceIndices ? sourceIndices.getX(index) : index;
+      vertex.fromBufferAttribute(sourcePositions, sourceIndex).applyMatrix4(object.matrixWorld);
+      indices.push(positions.length / 3);
+      positions.push(vertex.x, vertex.y, vertex.z);
+    }
+  });
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 describe('restored Original World', () => {
@@ -166,6 +242,9 @@ describe('restored Original World', () => {
         windingErrors: 0,
         degenerateTriangles: 0,
         signedVolume: expect.any(Number),
+        connectedComponents: 1,
+        unreferencedVertices: 0,
+        invalidNormals: 0,
       });
       expect(geometryTopology(mesh.geometry).signedVolume).toBeGreaterThan(0);
 
@@ -235,11 +314,48 @@ describe('restored Original World', () => {
         const a = new Vector3().fromBufferAttribute(positions, indices.getX(0));
         const b = new Vector3().fromBufferAttribute(positions, indices.getX(1));
         const c = new Vector3().fromBufferAttribute(positions, indices.getX(2));
-        expect(new Vector3().subVectors(b, a).cross(new Vector3().subVectors(c, a)).y).toBeGreaterThan(
-          0,
-        );
+        expect(
+          new Vector3().subVectors(b, a).cross(new Vector3().subVectors(c, a)).y,
+        ).toBeGreaterThan(0);
       }
     } finally {
+      world.destroy();
+    }
+  });
+
+  it('keeps all solid world meshes closed while preserving intentional surface sheets', () => {
+    const world = new OriginalWorldMap(new Scene());
+    world.group.updateMatrixWorld(true);
+    const arch = world.group.getObjectByName('LM_BEACH_ARCH');
+    if (!arch) throw new Error('Beach arch is missing');
+    const audits = [{ name: arch.name, geometry: combinedGeometry(arch) }];
+    world.group.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      if (
+        object.name === 'OCEAN' ||
+        object.name === 'WATER_NETWORK' ||
+        object.name.startsWith('PATH_') ||
+        object.name.startsWith('WF_')
+      )
+        return;
+      for (let ancestor = object.parent; ancestor; ancestor = ancestor.parent)
+        if (ancestor === arch) return;
+      audits.push({ name: object.name, geometry: combinedGeometry(object) });
+    });
+    try {
+      for (const audit of audits) {
+        const topology = geometryTopology(audit.geometry);
+        expect(topology.boundaryEdges, audit.name).toBe(0);
+        expect(topology.nonManifoldEdges, audit.name).toBe(0);
+        expect(topology.windingErrors, audit.name).toBe(0);
+        expect(topology.degenerateTriangles, audit.name).toBe(0);
+        expect(topology.unreferencedVertices, audit.name).toBe(0);
+        expect(topology.invalidNormals, audit.name).toBe(0);
+        expect(topology.connectedComponents, audit.name).toBe(1);
+        expect(topology.signedVolume, audit.name).toBeGreaterThan(0);
+      }
+    } finally {
+      audits.forEach((audit) => audit.geometry.dispose());
       world.destroy();
     }
   });
