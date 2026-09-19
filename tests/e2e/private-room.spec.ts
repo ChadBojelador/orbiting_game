@@ -156,15 +156,26 @@ test('Original World ocean renders underwater and resurfaces buoyantly', async (
     velocityZ: 0,
     verticalVelocity: 0,
     isGrounded: false,
+    status: 'spectator',
     spawnGeneration: player.spawnGeneration + 1,
   });
+  // Spectator status pauses movement only inside this test worker, giving the
+  // smoothed camera time to settle at the authoritative submerged position.
   room.broadcastPatch();
+  await page.waitForTimeout(250);
+  const submergedEye = {
+    x: player.x,
+    y: player.y + GAMEPLAY.playerEyeHeight,
+    z: player.z,
+  };
   expect(
-    isUnderwater({ x: player.x, y: player.y + GAMEPLAY.playerEyeHeight, z: player.z }, 'original'),
+    isUnderwater(submergedEye, 'original'),
+    JSON.stringify({ player: { x: player.x, y: player.y, z: player.z }, submergedEye }),
   ).toBe(true);
-  await page.waitForTimeout(80);
   await page.screenshot({ path: 'test-results/fps-original-underwater.png' });
 
+  player.status = 'alive';
+  room.broadcastPatch();
   await expect
     .poll(() => player.y, { timeout: 5000 })
     .toBeGreaterThan(originalTopology.SEA_LEVEL - GAMEPLAY.waterFloatDepth - 0.2);
@@ -172,6 +183,8 @@ test('Original World ocean renders underwater and resurfaces buoyantly', async (
     isUnderwater({ x: player.x, y: player.y + GAMEPLAY.playerEyeHeight, z: player.z }, 'original'),
   ).toBe(false);
   expect(errors).toEqual([]);
+  await page.getByRole('button', { name: 'Leave room' }).click();
+  await room.disconnect();
 });
 
 for (const mapId of ['frostline', 'island', 'original'] as const)
