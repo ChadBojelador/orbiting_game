@@ -42,13 +42,29 @@ const CLIFF_BOTTOM = SEA_LEVEL - 0.55;
 function addTriangle(
   positions: number[],
   colors: number[],
+  indices: number[],
+  vertices: Map<string, number>,
   a: THREE.Vector3,
   b: THREE.Vector3,
   c: THREE.Vector3,
   color: THREE.Color,
 ): void {
-  positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
-  for (let index = 0; index < 3; index += 1) colors.push(color.r, color.g, color.b);
+  const colorKey = color.getHex();
+  for (const vertex of [a, b, c]) {
+    // Position and face color define a render vertex. This welds the many
+    // duplicate grid vertices while retaining the original hard biome colors.
+    const key = `${Math.round(vertex.x * 1000)},${Math.round(vertex.y * 1000)},${Math.round(
+      vertex.z * 1000,
+    )},${colorKey}`;
+    let index = vertices.get(key);
+    if (index === undefined) {
+      index = positions.length / 3;
+      vertices.set(key, index);
+      positions.push(vertex.x, vertex.y, vertex.z);
+      colors.push(color.r, color.g, color.b);
+    }
+    indices.push(index);
+  }
 }
 
 function surfaceColor(x: number, z: number, elevation: number): THREE.Color {
@@ -60,15 +76,27 @@ function surfaceColor(x: number, z: number, elevation: number): THREE.Color {
   return new THREE.Color(PALETTE.grass);
 }
 
-function createTerrainGeometry(): THREE.BufferGeometry {
+function hasTerrainCell(position: Position): boolean {
+  return (
+    position.x >= WORLD_MIN &&
+    position.x < WORLD_MAX &&
+    position.z >= WORLD_MIN &&
+    position.z < WORLD_MAX &&
+    isPermanentLand(position)
+  );
+}
+
+export function createTerrainGeometry(): THREE.BufferGeometry {
   const positions: number[] = [];
   const colors: number[] = [];
+  const indices: number[] = [];
+  const vertices = new Map<string, number>();
   const cliffColor = new THREE.Color(PALETTE.cliff);
 
   for (let x = WORLD_MIN; x < WORLD_MAX; x += TERRAIN_STEP) {
     for (let z = WORLD_MIN; z < WORLD_MAX; z += TERRAIN_STEP) {
       const center = { x: x + TERRAIN_STEP / 2, z: z + TERRAIN_STEP / 2 };
-      if (!isPermanentLand(center)) continue;
+      if (!hasTerrainCell(center)) continue;
 
       const nw = new THREE.Vector3(x, terrainHeightAt({ x, z }), z);
       const ne = new THREE.Vector3(
@@ -87,25 +115,36 @@ function createTerrainGeometry(): THREE.BufferGeometry {
         z + TERRAIN_STEP,
       );
       const color = surfaceColor(center.x, center.z, terrainHeightAt(center));
-      addTriangle(positions, colors, nw, sw, ne, color);
-      addTriangle(positions, colors, ne, sw, se, color);
+      addTriangle(positions, colors, indices, vertices, nw, sw, ne, color);
+      addTriangle(positions, colors, indices, vertices, ne, sw, se, color);
+
+      // A closed bottom cap makes every land section a solid volume instead of
+      // a top sheet. It is shared by adjacent cells and sits below the sea.
+      const bottomNw = new THREE.Vector3(nw.x, CLIFF_BOTTOM, nw.z);
+      const bottomNe = new THREE.Vector3(ne.x, CLIFF_BOTTOM, ne.z);
+      const bottomSe = new THREE.Vector3(se.x, CLIFF_BOTTOM, se.z);
+      const bottomSw = new THREE.Vector3(sw.x, CLIFF_BOTTOM, sw.z);
+      addTriangle(positions, colors, indices, vertices, bottomNw, bottomNe, bottomSw, cliffColor);
+      addTriangle(positions, colors, indices, vertices, bottomNe, bottomSe, bottomSw, cliffColor);
 
       const edges: Array<{
         neighbor: Position;
         a: THREE.Vector3;
         b: THREE.Vector3;
       }> = [
-        { neighbor: { x: center.x, z: center.z - TERRAIN_STEP }, a: nw, b: ne },
-        { neighbor: { x: center.x + TERRAIN_STEP, z: center.z }, a: ne, b: se },
-        { neighbor: { x: center.x, z: center.z + TERRAIN_STEP }, a: se, b: sw },
-        { neighbor: { x: center.x - TERRAIN_STEP, z: center.z }, a: sw, b: nw },
+        // Boundary edges run opposite the old order so their front faces and
+        // computed normals point away from the land volume on every side.
+        { neighbor: { x: center.x, z: center.z - TERRAIN_STEP }, a: ne, b: nw },
+        { neighbor: { x: center.x + TERRAIN_STEP, z: center.z }, a: se, b: ne },
+        { neighbor: { x: center.x, z: center.z + TERRAIN_STEP }, a: sw, b: se },
+        { neighbor: { x: center.x - TERRAIN_STEP, z: center.z }, a: nw, b: sw },
       ];
       for (const edge of edges) {
-        if (isPermanentLand(edge.neighbor)) continue;
+        if (hasTerrainCell(edge.neighbor)) continue;
         const bottomA = new THREE.Vector3(edge.a.x, CLIFF_BOTTOM, edge.a.z);
         const bottomB = new THREE.Vector3(edge.b.x, CLIFF_BOTTOM, edge.b.z);
-        addTriangle(positions, colors, edge.a, bottomA, edge.b, cliffColor);
-        addTriangle(positions, colors, edge.b, bottomA, bottomB, cliffColor);
+        addTriangle(positions, colors, indices, vertices, edge.a, bottomA, edge.b, cliffColor);
+        addTriangle(positions, colors, indices, vertices, edge.b, bottomA, bottomB, cliffColor);
       }
     }
   }
@@ -113,7 +152,9 @@ function createTerrainGeometry(): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
   geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -169,7 +210,9 @@ function createRibbonGeometry(
   const indices: number[] = [];
   for (let index = 0; index < samples.length - 1; index += 1) {
     const offset = index * 2;
-    indices.push(offset, offset + 1, offset + 2, offset + 2, offset + 1, offset + 3);
+    // Face upward so paths and rivers render correctly with normal front-face
+    // culling instead of relying on a double-sided material.
+    indices.push(offset, offset + 2, offset + 1, offset + 2, offset + 3, offset + 1);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -479,6 +522,7 @@ export class OriginalWorldMap {
     metalness: 0,
     transmission: 0.08,
     depthWrite: false,
+    side: THREE.FrontSide,
   });
   private currentHalfExtent: number;
 
@@ -508,6 +552,7 @@ export class OriginalWorldMap {
       transparent: true,
       opacity: 0.86,
       depthWrite: false,
+      side: THREE.FrontSide,
     });
     const ocean = mesh(new THREE.CircleGeometry(205, 64), oceanMaterial, 'OCEAN');
     ocean.rotation.x = -Math.PI / 2;
@@ -520,13 +565,14 @@ export class OriginalWorldMap {
       flatShading: true,
       roughness: 0.91,
       metalness: 0,
+      side: THREE.FrontSide,
     });
     this.group.add(mesh(createTerrainGeometry(), terrainMaterial, 'TERRAIN_BLOCKOUT'));
 
     const pathMaterial = new THREE.MeshStandardMaterial({
       color: PALETTE.path,
       roughness: 0.96,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     });
     for (const route of ROUTE_CORRIDORS) {
       const path = mesh(

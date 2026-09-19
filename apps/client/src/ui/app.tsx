@@ -86,6 +86,7 @@ export function App() {
   }, []);
   useEffect(() => {
     const audio = lobbyAudio.current;
+    audio?.start();
     return () => audio?.destroy();
   }, []);
   useEffect(() => {
@@ -115,8 +116,7 @@ export function App() {
     saveSettings(settings);
     if (scene) scene.settings = settings;
     lobbyAudio.current?.setSettings(settings);
-    lobbyAudio.current?.setActive(!isInGame);
-  }, [settings, scene, isInGame]);
+  }, [settings, scene]);
   useEffect(() => {
     if (!scene) return;
     scene.isPaused = isSettings;
