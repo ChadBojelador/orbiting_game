@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GAMEPLAY, WEAPONS, isSwimming, type GameplayEvent } from '@ice-water/shared';
+import {
+  GAMEPLAY,
+  WEAPONS,
+  isSwimming,
+  isUnderwater,
+  originalTopology,
+  type GameplayEvent,
+} from '@ice-water/shared';
 import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { GameplayController } from './gameplay-controller.js';
 import { fireHitscan } from './damage-system.js';
@@ -144,6 +151,29 @@ describe('authoritative FPS combat', () => {
     }
     expect(a.y).toBeGreaterThan(floatingY + 0.2);
     expect(a.y).toBeLessThanOrEqual(GAMEPLAY.waterSurfaceY);
+  });
+  it('applies Original World dive input and buoyantly returns to the surface', () => {
+    const { state, a, controller } = fixture();
+    state.mapId = 'original';
+    Object.assign(a, {
+      x: -50,
+      y: originalTopology.SEA_LEVEL,
+      z: 80,
+      verticalVelocity: 0,
+      isGrounded: false,
+    });
+    for (let tick = 1; tick <= 60; tick++) {
+      const now = 1000 + tick * GAMEPLAY.tickMs;
+      expect(
+        controller.handle('a', 'input/move', { x: 0, z: 0, crouch: true, sequence: tick }, now),
+      ).toBeNull();
+      controller.advance(now);
+    }
+    expect(a.y).toBeCloseTo(originalTopology.SEA_LEVEL - GAMEPLAY.originalWaterDiveDepth, 1);
+    expect(isUnderwater({ ...a, y: a.y + GAMEPLAY.playerEyeHeight }, 'original')).toBe(true);
+
+    for (let tick = 61; tick <= 120; tick++) controller.advance(1000 + tick * GAMEPLAY.tickMs);
+    expect(a.y).toBeCloseTo(originalTopology.SEA_LEVEL - GAMEPLAY.waterFloatDepth, 1);
   });
   it('enforces per-slot ammo, reload deadlines, cooldown across switching and protection removal', () => {
     const p = new PlayerState();
