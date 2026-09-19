@@ -118,7 +118,7 @@ export function TouchControls({ input, slot }: { input: GameInput; slot: number 
             input.isTouchCrouching = !input.isTouchCrouching;
           }}
         >
-          Crouch
+          Crouch / Dive
         </button>
         <button
           aria-pressed={input.isTouchSprinting}

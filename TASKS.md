@@ -1,6 +1,6 @@
 # FPS Task Tracker
 
-Current product: private-room arena FPS with desktop/mobile support and Frostline and Frost Island maps. Freeze-tag planning is archived under `docs/archive`.
+Current product: private-room arena FPS with desktop/mobile support and Frostline, Frost Island, and Original World maps. Freeze-tag planning is archived under `docs/archive`.
 
 ## Completed
 
@@ -17,13 +17,14 @@ Current product: private-room arena FPS with desktop/mobile support and Frostlin
 | FPS-09 | Archive superseded freeze-tag sources and replace active tests | Complete |
 | FPS-10 | Update product, architecture, art, map, setup, and agent documentation | Complete |
 | FPS-19 | Island sea buoyancy, drag, swim-up input, and shared prediction tests | Complete |
+| FPS-21 | Restore first GitHub procedural world as a selectable FPS map with shared collision and additive migration | Complete; verification recorded below |
 | FPS-20 | Frost Island archipelago layout, hybrid collision, outer spawns, routes, and LOD | Complete |
 
 ## Open release gates
 
 | ID | Priority | Acceptance |
 |---|---|---|
-| FPS-11 | P0 | Independent-process full-match load at 20/50/100/150 on both maps; tune the cap from evidence |
+| FPS-11 | P0 | Independent-process full-match load at 20/50/100/150 on all three maps; tune the cap from evidence |
 | FPS-12 | P0 | Physical Android/iOS portrait/landscape and desktop GPU checks at the target frame rate |
 | FPS-13 | P1 | Multiplayer route, spawn/camping, interior/ceiling, and weapon-balance playtest |
 | FPS-14 | P1 | Latency and fairness study before rewind or transport changes |
@@ -55,4 +56,12 @@ Five seconds of active input/firing, real WebSockets, same-process driver/server
 | 100 | 3359 | 18 | 61 | 40 |
 | 150, encoder rerun | 6224 | 29 | 126 | 38 |
 
-The first 150-client run overflowed the 32 KiB schema buffer. A 64 KiB buffer removed that failure on rerun. Larger populations did not sustain the target tick rate; the configured 150-player cap is not verified production capacity. Independent-process full-match profiling on both maps, physical-device performance, balance, accessibility and asset-permission evidence remain open.
+The first 150-client run overflowed the 32 KiB schema buffer. A 64 KiB buffer removed that failure on rerun. Larger populations did not sustain the target tick rate; the configured 150-player cap is not verified production capacity. Independent-process full-match profiling on all three maps, physical-device performance, balance, accessibility and asset-permission evidence remain open.
+
+### Original World verification ? 2026-09-15
+
+- npm test: 92 passed; five PostgreSQL checks failed with ECONNREFUSED on local port 55432. Docker is not running, so migration 005 could not be applied or database-verified. Tests retain their assertions.
+- npm run test:e2e: all seven browser flows passed in installed Chrome, including Original World desktop damage/death/respawn/results and simultaneous mobile controls in portrait/landscape.
+- npm run lint, npm run typecheck, npm run build: passed. Existing bundle-size advisories remain; physical-device performance and full-match capacity are unverified.
+- npm run assets:original: regenerated 9,912 matching collision triangles / 178,416 bytes. Independent renderer raycasts and sixteen inward spawn exits passed; desktop/mobile screenshots inspected.
+- Repaired the malformed NUL-encoded trailing GLB ignore rule, which had become a wildcard hiding all new files. Previously hidden existing island-layout.ts and the Frost Island production brief are preserved.

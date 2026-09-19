@@ -15,14 +15,31 @@ export type SoundCue =
 export class AudioManager {
   private context?: AudioContext;
   private gain?: GainNode;
-  volume = 0.35;
+  private lowPass?: BiquadFilterNode;
+  private isUnderwater = false;
+  volume = 0.65;
   unlock(): void {
     this.context ??= new AudioContext();
     if (!this.gain) {
       this.gain = this.context.createGain();
-      this.gain.connect(this.context.destination);
+      this.lowPass = this.context.createBiquadFilter();
+      this.lowPass.type = 'lowpass';
+      this.lowPass.Q.value = 0.72;
+      this.lowPass.frequency.value = this.isUnderwater ? 850 : 22_000;
+      this.gain.connect(this.lowPass);
+      this.lowPass.connect(this.context.destination);
     }
     void this.context.resume().catch(() => {});
+  }
+  setUnderwater(isUnderwater: boolean): void {
+    if (this.isUnderwater === isUnderwater) return;
+    this.isUnderwater = isUnderwater;
+    if (!this.context || !this.lowPass) return;
+    this.lowPass.frequency.setTargetAtTime(
+      isUnderwater ? 850 : 22_000,
+      this.context.currentTime,
+      0.08,
+    );
   }
   listener(position: SpatialPosition, yaw: number): void {
     const l = this.context?.listener;
@@ -65,7 +82,7 @@ export class AudioManager {
       frequency[cue] * (cue === 'kill' ? 1.6 : 0.35),
       now + duration,
     );
-    gain.gain.setValueAtTime(cue === 'shot' ? 0.16 : 0.09, now);
+    gain.gain.setValueAtTime(cue === 'shot' ? 0.26 : 0.15, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
     oscillator.connect(gain);
     let panner: PannerNode | undefined;

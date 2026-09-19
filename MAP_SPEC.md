@@ -1,6 +1,6 @@
 # FPS Map Specification
 
-The FPS pivot replaces the legacy procedural freeze-tag world, archived under `docs/archive`. The user approved the supplied Fort derivative and the later Frost Island archipelago redesign. Both maps support FFA, TDM and duel without player-to-player collision.
+The FPS pivot replaced freeze-tag gameplay, archived under `docs/archive`; the first procedural map is now restored as Original World under current FPS rules. The user approved the supplied Fort derivative and the later Frost Island archipelago redesign. All three maps support FFA, TDM and duel without player-to-player collision.
 
 ## Frostline
 
@@ -36,3 +36,14 @@ Edit `island-layout.ts` for Frost Island land, routes, cover, bounds, and the si
 The selected map must reach rendering, authoritative movement, prediction, swimming/surface audio, spawn height/visibility and hitscan. Map choice is host-only in the lobby and frozen at countdown; `arenaHalfExtent` updates with it. Tests independently raycast the transformed GLB plus procedural blocks, verify the archipelago topology, and verify every spawn can walk forward. Frostline uses shared analytic blocks and solid ramp wedges. Maximum step-up is 0.32 m; movement substeps prevent tunneling.
 
 Trim, core rings, and distant LOD detail are cosmetic and stay inside visible colliders. Do not introduce misleading cover without collision. Underground interiors, jump pads, ziplines, pickups, deep-water elimination, narrow edges, population density, spawn camping, sightline balance, mobile FPS, and sustained capacity require later implementation or playtesting.
+
+## Original World
+
+Restored from GitHub commit [87a8893](https://github.com/ChadBojelador/orbiting_game/commit/87a8893f6b84acc39f9b2df709153abe26079cdd), the first arena world foundation, before the Version 2 expansion. Select Original World before room creation or as the connected lobby host. Identifier: original.
+
+- Original X/Z authored envelope ?125 m, fixed throughout the FPS match; ocean Y=1.5. Original colorful palette, irregular terrain and elevations are retained.
+- Nine land regions: village, forest, Crystal Valley, Ice Peaks, meadow, beach, and three coastal islands. Retains the village crystal, ancient tree, crystal spire, ice summit, meadow windmill, beach arch, original river network, two waterfalls and four bridges.
+- Original village cover is rendered as solid wooden blocks. Mesh terrain, bridge decks/rails, landmarks, vegetation, and cover share baked triangle collision. River ribbons are closed shallow volumes that provide channel floors. The ocean is a closed six-metre-deep water column with a matching analytic seabed; hold crouch to dive, hold jump to rise, or release both to return to the normal surface float depth.
+- The 3.125 m terrain grid is an indexed, welded, closed volume: top faces point upward, exposed coast/river/world-envelope walls point outward, and a shared underside closes each land section at `WATER_BOTTOM`. Coast walls continue to that seabed so underwater cameras cannot see through the landmass. Terrain, paths, rivers, and ocean use normal front-face culling. The ocean has an explicit downward-facing interior surface; only presentation sheets such as waterfalls and the boundary remain intentionally double-sided.
+- Sixteen distinct village/inner-approach spawns have clear inward exits; server scoring accounts for enemies, visibility, and last death. The restored layout is not yet validated for 150-player combat.
+- Edit original-topology.ts / OriginalWorldMap and run npm run assets:original together. The generated original-data.ts is collision only. Independent renderer raycasts, closed-manifold/winding checks, and spawn movement tests verify the bake. Boundary and paint remain cosmetic; the windmill blades stay at their baked pose. No freeze-tag behavior returns.

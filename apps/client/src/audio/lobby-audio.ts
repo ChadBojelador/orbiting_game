@@ -12,8 +12,7 @@ export class LobbyAudio {
   private musicSource?: AudioBufferSourceNode;
   private ambience?: { wind: AudioBufferSourceNode; hum: OscillatorNode };
   private loadPromise?: Promise<void>;
-  private stopTimer = 0;
-  private isActive = false;
+  private isStarted = false;
   private isDestroyed = false;
   private lastHoverAt = 0;
 
@@ -24,19 +23,14 @@ export class LobbyAudio {
     this.applyLevels(0.08);
   }
 
-  setActive(isActive: boolean): void {
-    this.isActive = isActive;
-    window.clearTimeout(this.stopTimer);
-    if (isActive) {
-      void this.unlock();
-      return;
-    }
-    this.fadeLobby(0, 0.32);
-    this.stopTimer = window.setTimeout(() => this.stopLobbySources(), 380);
+  start(): void {
+    if (this.isDestroyed || this.isStarted) return;
+    this.isStarted = true;
+    void this.unlock();
   }
 
   async unlock(): Promise<void> {
-    if (this.isDestroyed || !this.isActive) return;
+    if (this.isDestroyed || !this.isStarted) return;
     this.ensureGraph();
     const context = this.context;
     if (!context) return;
@@ -47,13 +41,13 @@ export class LobbyAudio {
     }
     if (context.state !== 'running') return;
     await this.loadMusic();
-    if (!this.isActive || this.isDestroyed) return;
+    if (this.isDestroyed) return;
     this.startLobbySources();
   }
 
   cue(kind: InterfaceCue): void {
     const context = this.context;
-    if (!this.isActive || !context || context.state !== 'running' || !this.sfxGain) return;
+    if (!this.isStarted || !context || context.state !== 'running' || !this.sfxGain) return;
     if (kind === 'hover' && performance.now() - this.lastHoverAt < 90) return;
     if (kind === 'hover') this.lastHoverAt = performance.now();
     const oscillator = context.createOscillator(),
@@ -69,7 +63,7 @@ export class LobbyAudio {
       kind === 'deploy' ? 880 : kind === 'select' ? 760 : 710,
       now + duration,
     );
-    gain.gain.setValueAtTime(kind === 'deploy' ? 0.07 : 0.025, now);
+    gain.gain.setValueAtTime(kind === 'deploy' ? 0.12 : 0.04, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     oscillator.connect(gain);
     gain.connect(this.sfxGain);
@@ -84,8 +78,7 @@ export class LobbyAudio {
   destroy(): void {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
-    this.isActive = false;
-    window.clearTimeout(this.stopTimer);
+    this.isStarted = false;
     this.stopLobbySources();
     void this.context?.close().catch(() => {});
   }
@@ -117,17 +110,8 @@ export class LobbyAudio {
     music.gain.cancelScheduledValues(context.currentTime);
     sfx.gain.cancelScheduledValues(context.currentTime);
     master.gain.linearRampToValueAtTime(this.settings.isMuted ? 0 : this.settings.volume, at);
-    music.gain.linearRampToValueAtTime(this.isActive ? this.settings.musicVolume * 0.65 : 0, at);
+    music.gain.linearRampToValueAtTime(this.isStarted ? this.settings.musicVolume * 0.85 : 0, at);
     sfx.gain.linearRampToValueAtTime(this.settings.sfxVolume, at);
-  }
-
-  private fadeLobby(level: number, duration: number): void {
-    const context = this.context,
-      gain = this.musicGain;
-    if (!context || !gain) return;
-    gain.gain.cancelScheduledValues(context.currentTime);
-    gain.gain.setValueAtTime(gain.gain.value, context.currentTime);
-    gain.gain.linearRampToValueAtTime(level, context.currentTime + duration);
   }
 
   private loadMusic(): Promise<void> {
@@ -184,7 +168,7 @@ export class LobbyAudio {
     windFilter.frequency.value = 280;
     windFilter.Q.value = 0.35;
     const windGain = context.createGain();
-    windGain.gain.value = 0.035;
+    windGain.gain.value = 0.05;
     wind.connect(windFilter);
     windFilter.connect(windGain);
     windGain.connect(musicGain);
@@ -193,7 +177,7 @@ export class LobbyAudio {
     hum.type = 'sine';
     hum.frequency.value = 47;
     const humGain = context.createGain();
-    humGain.gain.value = 0.018;
+    humGain.gain.value = 0.025;
     hum.connect(humGain);
     humGain.connect(musicGain);
     hum.start();

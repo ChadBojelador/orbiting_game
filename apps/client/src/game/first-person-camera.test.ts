@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { FirstPersonCamera, clampPitch } from './first-person-camera.js';
-import { parseSettings } from './fps-settings.js';
+import { DEFAULT_SETTINGS, parseSettings } from './fps-settings.js';
 it('clamps vertical look and camera height eases into sliding', () => {
   expect(clampPitch(100)).toBeLessThan(Math.PI / 2);
   const camera = new FirstPersonCamera(),
@@ -35,4 +35,10 @@ it('sanitizes persisted settings against invalid numbers and CSS values', () => 
     reducedEffects: true,
     controls: 'auto',
   });
+});
+it('uses an audible default mix when no settings have been persisted', () => {
+  expect(parseSettings(null)).toEqual(DEFAULT_SETTINGS);
+  expect(DEFAULT_SETTINGS.volume).toBeGreaterThanOrEqual(0.6);
+  expect(DEFAULT_SETTINGS.musicVolume).toBeGreaterThanOrEqual(0.6);
+  expect(DEFAULT_SETTINGS.sfxVolume).toBe(1);
 });

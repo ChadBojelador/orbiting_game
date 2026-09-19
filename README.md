@@ -2,7 +2,7 @@
 
 A browser arena FPS with desktop and mobile touch controls, private invite rooms, and server-authoritative combat.
 
-The implementation plan's FPS pivot is implemented as a playable prototype: Frostline and Frost Island arenas, movement/jump/swim/slide/crouch/sprint, six weapons, reload/ADS/headshots, death/respawn, FFA/TDM/duel scoring, settings, scoreboard, sound cues, and PostgreSQL summaries. Frost Island is a 160-metre combat archipelago with a central Fort/Cryogenic Core battlefield and specialized outer islands. Freeze-tag is replaced; historical specifications and superseded sources/tests are retained for reference.
+The implementation plan's FPS pivot is implemented as a playable prototype: Frostline, Frost Island, and Original World arenas, movement/jump/swim/slide/crouch/sprint, six weapons, reload/ADS/headshots, death/respawn, FFA/TDM/duel scoring, settings, scoreboard, sound cues, and PostgreSQL summaries. Frost Island is a 160-metre combat archipelago with a central Fort/Cryogenic Core battlefield and specialized outer islands. Freeze-tag is replaced; historical specifications and superseded sources/tests are retained for reference.
 
 ## Run locally
 
@@ -18,7 +18,7 @@ npm run dev
 
 Open **http://localhost:5173** (or **http://127.0.0.1:5173**). Server: **127.0.0.1:2567**. Keep the terminal running. On PowerShell, use `npm.cmd` if `npm.ps1` is blocked. Setup creates an ignored `.env` and preserves an existing one. Never put secrets in browser-visible `VITE_` variables.
 
-The existing local database uses port 55432. Docker must be running. If port 5432 is reserved, set both `POSTGRES_PORT` and the port in `DATABASE_URL` to 55432. `db:down` retains data. Gameplay runs without PostgreSQL, but summary writes fail and `/ready` reports 503. Migrations 003/004 add FPS tables and map identity while preserving freeze-tag history.
+The existing local database uses port 55432. Docker must be running. If port 5432 is reserved, set both `POSTGRES_PORT` and the port in `DATABASE_URL` to 55432. `db:down` retains data. Gameplay runs without PostgreSQL, but summary writes fail and `/ready` reports 503. Migrations 003/004/005 add FPS tables and map identity, including Original World while preserving freeze-tag history.
 
 ## Play
 
@@ -53,6 +53,7 @@ Optional `DEV_BOT_COUNT=5` fills five seats with wandering targets. Bots have no
 | `npm run typecheck`        | Strict TypeScript, including tests                                        |
 | `npm run build`            | All production packages and SQL migrations                                |
 | `npm run assets:island`    | Rebuild Fort geometry/collision and validate authored Frost Island spawns |
+| `npm run assets:original`  | Bake collision from the restored first procedural world                   |
 | `npm run db:migrate`       | Transactional checksummed migrations                                      |
 
 Playwright starts an isolated Vite on 5174 and a real server inside the test worker on 2568, with zero bots and a test persistence stub. Its test-only server fixture controls poses/deadlines for combat/results assertions; no control endpoint or client-authoritative shortcut ships. Install Chromium with `npx playwright install chromium`, or set `PLAYWRIGHT_CHANNEL=chrome`/`msedge` for an installed signed browser. Restricted Windows runners need permission to terminate test child processes. Touch input is tested through CDP multitouch; this runner may report no touch capability despite emulation.
@@ -87,3 +88,7 @@ Routes remain `/health`, `/ready`, `POST /api/guest-session`, `POST /api/rooms`,
 `apps/client` renders and captures input; `apps/server` owns outcomes; `packages/shared` holds safe types/constants/pure simulation; `tests` holds browser/load scenarios. Original procedural weapons/facility/combat audio and Frost Island archipelago geometry ship alongside the authorized Fort derivative and wooden house. Lobby character/music are retained project assets. Embedded source/license metadata and outstanding permission evidence are recorded; see [asset provenance](assets/asset-provenance.md).
 
 Contributors: Chad Bojelador and Franco Perez.
+
+## Restored first map
+
+Choose **Original World** in the Map selector before creating a room, or change it as host while the room is in the lobby. This restores the first village/forest/crystal/mountain/meadow/beach layout from GitHub commit 87a8893 alongside the existing FPS maps. Apply migration 005 with npm run db:migrate so its completed matches can be saved. When editing its topology or renderer, regenerate shared collision with npm run assets:original.

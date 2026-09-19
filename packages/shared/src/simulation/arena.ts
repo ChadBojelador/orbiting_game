@@ -1,4 +1,16 @@
 import {
+  originalHeightAt,
+  originalSupportHeightAt,
+  originalRayDistance,
+  isOriginalBodyClear,
+  originalCeilingAt,
+} from './original-collision.js';
+import {
+  WORLD_MAX as ORIGINAL_HALF_EXTENT,
+  SEA_LEVEL as ORIGINAL_SEA_LEVEL,
+} from './original-topology.js';
+import { ORIGINAL_SPAWN_POINTS } from './original-spawns.js';
+import {
   islandHeightAt,
   islandSupportHeightAt,
   islandRayDistance,
@@ -27,6 +39,7 @@ const MAP_SCALE = 1.5;
 export const ARENA = { halfExtent: 40 * MAP_SCALE } as const;
 export const ISLAND_ARENA = { halfExtent: ISLAND_HALF_EXTENT } as const;
 export function arenaHalfExtentForMap(mapId: MapId): number {
+  if (mapId === 'original') return ORIGINAL_HALF_EXTENT;
   return mapId === 'island' ? ISLAND_ARENA.halfExtent : ARENA.halfExtent;
 }
 export const HOUSE_LANDMARK: ArenaBlock = {
@@ -141,6 +154,10 @@ export const WATER_PATCHES = [
 const inside = (p: Position, b: Position & { width: number; depth: number }, margin = 0) =>
   Math.abs(p.x - b.x) <= b.width / 2 + margin && Math.abs(p.z - b.z) <= b.depth / 2 + margin;
 export function surfaceAt(p: Position, mapId: MapId = 'frostline'): 'metal' | 'ice' | 'water' {
+  if (mapId === 'original') {
+    const floor = originalHeightAt(p);
+    return floor <= ORIGINAL_SEA_LEVEL ? 'water' : p.z < -55 ? 'ice' : 'metal';
+  }
   if (mapId === 'island') {
     if (islandSurfaceAt(p)?.surface === 'ice') return 'ice';
     return islandHeightAt(p) < 0.1 ? 'water' : 'metal';
@@ -149,25 +166,36 @@ export function surfaceAt(p: Position, mapId: MapId = 'frostline'): 'metal' | 'i
   if (ICE_PATCHES.some((b) => inside(p, b))) return 'ice';
   return WATER_PATCHES.some((b) => inside(p, b)) ? 'water' : 'metal';
 }
+export function waterSurfaceYForMap(mapId: MapId): number {
+  return mapId === 'original' ? ORIGINAL_SEA_LEVEL : GAMEPLAY.waterSurfaceY;
+}
 function isSwimmingOnSurface(
   p: SpatialPosition,
   mapId: MapId,
   surface: ReturnType<typeof surfaceAt>,
 ): boolean {
   return (
-    mapId === 'island' &&
-    p.y <= GAMEPLAY.waterSurfaceY + GAMEPLAY.waterEntryHeight &&
+    (mapId === 'island' || mapId === 'original') &&
+    p.y <= waterSurfaceYForMap(mapId) + GAMEPLAY.waterEntryHeight &&
     surface === 'water'
   );
 }
 export function isSwimming(p: SpatialPosition, mapId: MapId = 'frostline'): boolean {
   return isSwimmingOnSurface(p, mapId, surfaceAt(p, mapId));
 }
+export function isUnderwater(p: SpatialPosition, mapId: MapId = 'frostline'): boolean {
+  return (
+    (mapId === 'island' || mapId === 'original') &&
+    p.y < waterSurfaceYForMap(mapId) - 0.05 &&
+    surfaceAt(p, mapId) === 'water'
+  );
+}
 export function terrainHeightAt(
   p: Position,
   mapId: MapId = 'frostline',
   maximum = Infinity,
 ): number {
+  if (mapId === 'original') return originalHeightAt(p, maximum);
   if (mapId === 'island') return islandHeightAt(p, maximum);
   for (const ramp of ARENA_RAMPS)
     if (inside(p, ramp))
@@ -179,6 +207,7 @@ export function createSpawnPoints(): Position[] {
   return SPAWN_POINTS.map((p) => ({ ...p }));
 }
 export function spawnPointsForMap(mapId: MapId): readonly Position[] {
+  if (mapId === 'original') return ORIGINAL_SPAWN_POINTS;
   return mapId === 'island' ? ISLAND_SPAWN_POINTS : SPAWN_POINTS;
 }
 export function distanceSquared(a: Position, b: Position): number {
@@ -206,6 +235,7 @@ export function isWalkable(
 ): boolean {
   const r = GAMEPLAY.playerRadius;
   if (Math.abs(p.x) > halfExtent - r || Math.abs(p.z) > halfExtent - r) return false;
+  if (mapId === 'original') return isOriginalBodyClear(p, y, height, r);
   if (mapId === 'island') return isIslandBodyClear(p, y, height, r);
   if (ARENA_BLOCKS.some((b) => inside(p, b, r) && y + 0.32 < b.y + b.height && y + height > b.y))
     return false;
@@ -233,13 +263,15 @@ export function moveKinematic(
     if (isWalkable(x, halfExtent, floor, height, mapId)) next.x = x.x;
     const z = { x: next.x, z: next.z + dz / steps };
     if (isWalkable(z, halfExtent, floor, height, mapId)) next.z = z.z;
-    const sampled =
-      mapId === 'island'
-        ? islandSupportHeightAt(next, floor + 0.32, GAMEPLAY.playerRadius)
-        : terrainHeightAt(next, mapId, floor + 0.32);
+    const sampled = supportHeightAt(next, floor + 0.32, mapId);
     if (sampled <= floor + 0.32 && sampled > floor) floor = sampled;
   }
   return next;
+}
+function supportHeightAt(p: Position, maximum: number, mapId: MapId): number {
+  if (mapId === 'island') return islandSupportHeightAt(p, maximum, GAMEPLAY.playerRadius);
+  if (mapId === 'original') return originalSupportHeightAt(p, maximum, GAMEPLAY.playerRadius);
+  return terrainHeightAt(p, mapId, maximum);
 }
 export interface VerticalMotion {
   y: number;
@@ -253,10 +285,16 @@ export function advanceVerticalMotion(
   wantsJump: boolean,
   mapId: MapId = 'frostline',
   height: number = GAMEPLAY.playerHeight,
+  wantsDive = false,
 ): VerticalMotion {
   if (isSwimming({ ...position, y: previous.y }, mapId)) {
-    const targetY =
-      GAMEPLAY.waterSurfaceY - (wantsJump ? GAMEPLAY.waterSwimDepth : GAMEPLAY.waterFloatDepth);
+    const surfaceY = waterSurfaceYForMap(mapId);
+    const targetDepth = wantsJump
+      ? GAMEPLAY.waterSwimDepth
+      : wantsDive && mapId === 'original'
+        ? GAMEPLAY.originalWaterDiveDepth
+        : GAMEPLAY.waterFloatDepth;
+    const targetY = surfaceY - targetDepth;
     const acceleration =
       (targetY - previous.y) * GAMEPLAY.waterBuoyancy -
       previous.verticalVelocity * GAMEPLAY.waterVerticalDrag;
@@ -266,15 +304,12 @@ export function advanceVerticalMotion(
     );
     const y = previous.y + verticalVelocity * seconds;
     return {
-      y: Math.min(GAMEPLAY.waterSurfaceY, y),
+      y: Math.min(surfaceY, y),
       verticalVelocity,
       isGrounded: false,
     };
   }
-  const floor =
-    mapId === 'island'
-      ? islandSupportHeightAt(position, previous.y + 0.32, GAMEPLAY.playerRadius)
-      : terrainHeightAt(position, mapId, previous.y + 0.32);
+  const floor = supportHeightAt(position, previous.y + 0.32, mapId);
   let velocity = previous.verticalVelocity;
   if (wantsJump && previous.isGrounded) velocity = GAMEPLAY.jumpSpeed;
   let y = previous.y;
@@ -284,8 +319,9 @@ export function advanceVerticalMotion(
     y += velocity * seconds - 0.5 * GAMEPLAY.gravity * seconds * seconds;
     velocity -= GAMEPLAY.gravity * seconds;
   }
-  if (mapId === 'island' && y > previous.y) {
-    const ceiling = islandCeilingAt(position, previous.y + height, y - previous.y + 0.01);
+  if ((mapId === 'island' || mapId === 'original') && y > previous.y) {
+    const ceilingAt = mapId === 'original' ? originalCeilingAt : islandCeilingAt;
+    const ceiling = ceilingAt(position, previous.y + height, y - previous.y + 0.01);
     if (y + height > ceiling) {
       y = Math.max(previous.y, ceiling - height);
       velocity = 0;
@@ -393,7 +429,7 @@ export function simulateMovement(
     seconds,
     halfExtent,
     travelSpeed,
-    swimming ? GAMEPLAY.waterSurfaceY : p.y,
+    swimming ? waterSurfaceYForMap(mapId) : p.y,
     bodyHeight(next),
     mapId,
   );
@@ -402,7 +438,7 @@ export function simulateMovement(
   Object.assign(
     next,
     moved,
-    advanceVerticalMotion(p, moved, seconds, !!input.jump, mapId, bodyHeight(next)),
+    advanceVerticalMotion(p, moved, seconds, !!input.jump, mapId, bodyHeight(next), !!input.crouch),
   );
   return next;
 }
@@ -437,6 +473,7 @@ export function worldRayDistance(
   range: number,
   mapId: MapId = 'frostline',
 ): number {
+  if (mapId === 'original') return originalRayDistance(origin, direction, range);
   if (mapId === 'island') return islandRayDistance(origin, direction, range);
   let nearest = range;
   if (direction.y < 0) nearest = Math.min(nearest, Math.max(0, -origin.y / direction.y));

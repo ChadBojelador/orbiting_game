@@ -86,6 +86,7 @@ export function App() {
   }, []);
   useEffect(() => {
     const audio = lobbyAudio.current;
+    audio?.start();
     return () => audio?.destroy();
   }, []);
   useEffect(() => {
@@ -115,8 +116,7 @@ export function App() {
     saveSettings(settings);
     if (scene) scene.settings = settings;
     lobbyAudio.current?.setSettings(settings);
-    lobbyAudio.current?.setActive(!isInGame);
-  }, [settings, scene, isInGame]);
+  }, [settings, scene]);
   useEffect(() => {
     if (!scene) return;
     scene.isPaused = isSettings;
@@ -301,7 +301,13 @@ export function App() {
           !scene.isLocked &&
           !isSettings && (
             <div className="pause-screen">
-              <h2>{view.mapId === 'island' ? 'Frost Island' : 'Frostline'}</h2>
+              <h2>
+                {view.mapId === 'original'
+                  ? 'Original World'
+                  : view.mapId === 'island'
+                    ? 'Frost Island'
+                    : 'Frostline'}
+              </h2>
               <p>Click to aim. Esc releases your cursor.</p>
               <button className="primary" onClick={() => scene.lock()}>
                 Enter arena

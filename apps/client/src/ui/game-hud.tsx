@@ -112,7 +112,7 @@ export function GameHud({
         <span>{p.reloadUntil > serverNow ? 'Reloading…' : `Slot ${p.currentWeaponSlot + 1}`}</span>
       </div>
       <div className="desktop-controls">
-        WASD move · Mouse aim · Space jump · Shift slide · C crouch · Ctrl sprint
+        WASD move · Mouse aim · Space jump/swim · Shift slide · C crouch/dive · Ctrl sprint
         <br />
         Click fire · Right-click aim · R reload · 1/2/3 weapons · Tab scores · Esc pause
       </div>

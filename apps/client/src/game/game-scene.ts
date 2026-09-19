@@ -1,4 +1,11 @@
-import { GAMEPLAY, WEAPONS, isSwimming, surfaceAt, type PlayerView } from '@ice-water/shared';
+import {
+  GAMEPLAY,
+  WEAPONS,
+  isSwimming,
+  isUnderwater,
+  surfaceAt,
+  type PlayerView,
+} from '@ice-water/shared';
 import {
   Scene,
   PerspectiveCamera,
@@ -17,6 +24,7 @@ import { GameSession } from '../network/game-session.js';
 import type { LobbyRoom } from '../network/lobby-client.js';
 import { LocalPresentation } from '../network/player-motion.js';
 import { FrostlineMap } from '../world/frostline-map.js';
+import { OriginalWorldMap } from '../world/original-world-map.js';
 import { IslandMap } from '../world/island-map.js';
 import { FirstPersonCamera } from './first-person-camera.js';
 import { WeaponRenderer } from './weapon-renderer.js';
@@ -24,6 +32,7 @@ import { HitEffects } from './hit-effects.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { readSettings, type FpsSettings } from './fps-settings.js';
 import { renderPixelRatio } from './render-performance.js';
+import { waterEnvironmentFor } from './water-presentation.js';
 export class GameScene {
   readonly session: GameSession;
   settings: FpsSettings = readSettings();
@@ -47,7 +56,7 @@ export class GameScene {
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(96, 1, 0.05, 320);
   private renderer: WebGLRenderer;
-  private world?: FrostlineMap;
+  private world?: FrostlineMap | OriginalWorldMap;
   private island?: IslandMap;
   private cameraMotion = new FirstPersonCamera();
   private presentation = new LocalPresentation();
@@ -68,6 +77,7 @@ export class GameScene {
   private wasSwimming = false;
   private wasSliding = false;
   private wasReloading = false;
+  private wasUnderwater = false;
   private emptyAt = 0;
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -82,8 +92,7 @@ export class GameScene {
       powerPreference: 'high-performance',
     });
     this.renderer.outputColorSpace = SRGBColorSpace;
-    this.scene.background = new Color(0xc5e4ef);
-    this.scene.fog = new Fog(0xc5e4ef, 150, 300);
+    this.applyWaterEnvironment(false);
     this.scene.add(new HemisphereLight(0xedfaff, 0x41617b, 2.5));
     const sun = new DirectionalLight(0xfff0d0, 2);
     sun.position.set(-30, 60, 20);
@@ -93,6 +102,10 @@ export class GameScene {
       void this.island.ready.then(() => {
         if (!this.destroyed) this.onMapStatusChange?.();
       });
+    } else if (this.session.view.mapId === 'original') {
+      this.world = new OriginalWorldMap(this.scene);
+      this.camera.far = 600;
+      this.camera.updateProjectionMatrix();
     } else this.world = new FrostlineMap(this.scene);
     this.scene.add(this.camera);
     this.weapon = new WeaponRenderer(this.camera);
@@ -222,6 +235,11 @@ export class GameScene {
     }
     return material;
   }
+  private applyWaterEnvironment(isCameraUnderwater: boolean): void {
+    const environment = waterEnvironmentFor(this.session.view.mapId, isCameraUnderwater);
+    this.scene.background = new Color(environment.background);
+    this.scene.fog = new Fog(environment.fogColor, environment.fogNear, environment.fogFar);
+  }
   private loop(now: number): void {
     if (this.destroyed) return;
     const seconds = Math.min(0.05, Math.max(0, (now - this.previous) / 1000));
@@ -247,6 +265,12 @@ export class GameScene {
       this.camera.position.set(eye.x, eye.y, eye.z);
       this.camera.rotation.order = 'YXZ';
       this.camera.rotation.set(input.cameraPitch, input.cameraYaw, 0);
+      const cameraIsUnderwater = isUnderwater(eye, session.view.mapId);
+      if (cameraIsUnderwater !== this.wasUnderwater) {
+        this.wasUnderwater = cameraIsUnderwater;
+        this.applyWaterEnvironment(cameraIsUnderwater);
+        this.audio.setUnderwater(cameraIsUnderwater);
+      }
       const fov = input.isAds ? WEAPONS[p.weaponId].adsZoomFov : this.settings.fov;
       this.camera.fov += (fov - this.camera.fov) * (1 - Math.exp(-18 * seconds));
       this.camera.updateProjectionMatrix();
@@ -340,6 +364,7 @@ export class GameScene {
       if (event.type === 'player/killed' && event.payload.killerId === local)
         this.audio.play('kill');
     }
+    if (this.world instanceof OriginalWorldMap) this.world.update(now / 1000);
     this.effects.update(now);
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame((t) => this.loop(t));
