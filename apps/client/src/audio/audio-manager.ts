@@ -15,7 +15,7 @@ export type SoundCue =
 export class AudioManager {
   private context?: AudioContext;
   private gain?: GainNode;
-  volume = 0.35;
+  volume = 0.65;
   unlock(): void {
     this.context ??= new AudioContext();
     if (!this.gain) {
@@ -65,7 +65,7 @@ export class AudioManager {
       frequency[cue] * (cue === 'kill' ? 1.6 : 0.35),
       now + duration,
     );
-    gain.gain.setValueAtTime(cue === 'shot' ? 0.16 : 0.09, now);
+    gain.gain.setValueAtTime(cue === 'shot' ? 0.26 : 0.15, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
     oscillator.connect(gain);
     let panner: PannerNode | undefined;

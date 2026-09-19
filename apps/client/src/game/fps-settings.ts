@@ -12,9 +12,9 @@ export interface FpsSettings {
 export const DEFAULT_SETTINGS: FpsSettings = {
   sensitivity: 1,
   fov: 96,
-  volume: 0.35,
-  musicVolume: 0.55,
-  sfxVolume: 0.8,
+  volume: 0.65,
+  musicVolume: 0.7,
+  sfxVolume: 1,
   isMuted: false,
   crosshair: '#ffffff',
   reducedEffects: false,
@@ -30,9 +30,9 @@ export function parseSettings(value: unknown): FpsSettings {
   return {
     sensitivity: number('sensitivity', 0.2, 3, 1),
     fov: number('fov', 90, 110, 96),
-    volume: number('volume', 0, 1, 0.35),
-    musicVolume: number('musicVolume', 0, 1, 0.55),
-    sfxVolume: number('sfxVolume', 0, 1, 0.8),
+    volume: number('volume', 0, 1, DEFAULT_SETTINGS.volume),
+    musicVolume: number('musicVolume', 0, 1, DEFAULT_SETTINGS.musicVolume),
+    sfxVolume: number('sfxVolume', 0, 1, DEFAULT_SETTINGS.sfxVolume),
     isMuted: v.isMuted === true,
     crosshair:
       typeof v.crosshair === 'string' && /^#[0-9a-f]{6}$/i.test(v.crosshair)
