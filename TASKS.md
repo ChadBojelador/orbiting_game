@@ -19,7 +19,7 @@ Current product: private-room arena FPS with desktop/mobile support and Frostlin
 | FPS-19 | Island sea buoyancy, drag, swim-up input, and shared prediction tests | Complete |
 | FPS-21 | Restore first GitHub procedural world as a selectable FPS map with shared collision and additive migration | Complete; verification recorded below |
 | FPS-20 | Frost Island archipelago layout, hybrid collision, outer spawns, routes, and LOD | Complete |
-| FPS-22 | Original World moonlighting, regional materials, warm accents, water and bounded atmosphere while preserving collision | Implemented; verification below |
+| FPS-22 | Original World moonlighting, regional materials, warm accents, water and bounded atmosphere while preserving collision | Complete; code verification below, visual/device review unperformed by request |
 
 ## Open release gates
 
@@ -51,6 +51,7 @@ The Windows Chrome runner uses CDP touch events because reported touch capabilit
 - Preserved the existing topology, spawn logic and all baked collision triangles, including the existing working-tree river/coast fixes. Added a byte-for-byte collision regression and retained manifold, winding, raycast, spawn and water checks.
 - One bounded player-centered moon shadow map, five shadowless local lights, blended biome colors, procedural material/water detail, warm inset cover/bridge/windmill accents and fewer than 800 GPU-animated particles. Reduced effects disables shadows/particles/animation; touch halves particles and uses a 1024 shadow map. No new dependency, imported asset, transmission pass or bloom compositor.
 - Full unit/integration run: 108 passed; five database tests could not connect to PostgreSQL at local port 55432. No database assertions were changed.
+- Final focused Original World run: all 15 tests passed. `npm run lint`, `npm run typecheck`, and `npm run build` passed. These checks do not compile shaders on a real GPU or establish runtime frame rates.
 - No browser automation, screenshots or visual review were performed, per the user's instruction. Shader appearance, player-level readability and device/GPU performance remain unverified; full-match/device release gates remain open.
 
 ### Staged load smoke evidence — 2026-09-14
