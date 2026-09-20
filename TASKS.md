@@ -19,6 +19,7 @@ Current product: private-room arena FPS with desktop/mobile support and Frostlin
 | FPS-19 | Island sea buoyancy, drag, swim-up input, and shared prediction tests | Complete |
 | FPS-21 | Restore first GitHub procedural world as a selectable FPS map with shared collision and additive migration | Complete; verification recorded below |
 | FPS-20 | Frost Island archipelago layout, hybrid collision, outer spawns, routes, and LOD | Complete |
+| FPS-22 | Original World moonlighting, regional materials, warm accents, water and bounded atmosphere while preserving collision | Implemented; verification below |
 
 ## Open release gates
 
@@ -44,6 +45,13 @@ Final checks on 2026-09-15:
 - Migrations 003/004 applied to the local database; `/ready` reports database ready. The developer game runs at http://127.0.0.1:5173 with the authoritative server on 2567. Test ports 5174/2568 are separate.
 
 The Windows Chrome runner uses CDP touch events because reported touch capability is incomplete. Physical-device FPS and full-match capacity remain unverified.
+
+### Original World visual polish — 2026-09-20
+
+- Preserved the existing topology, spawn logic and all baked collision triangles, including the existing working-tree river/coast fixes. Added a byte-for-byte collision regression and retained manifold, winding, raycast, spawn and water checks.
+- One bounded player-centered moon shadow map, five shadowless local lights, blended biome colors, procedural material/water detail, warm inset cover/bridge/windmill accents and fewer than 800 GPU-animated particles. Reduced effects disables shadows/particles/animation; touch halves particles and uses a 1024 shadow map. No new dependency, imported asset, transmission pass or bloom compositor.
+- Full unit/integration run: 108 passed; five database tests could not connect to PostgreSQL at local port 55432. No database assertions were changed.
+- No browser automation, screenshots or visual review were performed, per the user's instruction. Shader appearance, player-level readability and device/GPU performance remain unverified; full-match/device release gates remain open.
 
 ### Staged load smoke evidence — 2026-09-14
 

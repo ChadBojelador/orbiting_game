@@ -35,7 +35,7 @@ describe('Original World presentation safeguards', () => {
         const indices = object.geometry.index;
         const top =
           object.name === 'WATER_NETWORK' || object.name === 'RIVERBED_NETWORK'
-            ? object.geometry.groups.find((g) => g.materialIndex === 0)
+            ? object.geometry.groups.find((g: { materialIndex?: number }) => g.materialIndex === 0)
             : undefined;
         for (
           let i = top?.start ?? 0;

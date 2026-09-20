@@ -51,17 +51,17 @@ The diagram is approximate and not to scale.
 
 Terrain regions are elliptical. The listed radii are half-widths, and the elevation is the nominal height of the region's core.
 
-| Region | Center `(X,Z)` | Radii `(X,Z)` | Nominal height | Character |
-|---|---:|---:|---:|---|
-| Village | `(0, 0)` | `(37, 38)` | `12` | Central combat hub |
-| Forest | `(-60, -15)` | `(43, 40)` | `21` | Elevated western landmass |
-| Crystal Valley | `(65, -10)` | `(43, 40)` | `20` | Elevated eastern landmass |
-| Ice Peaks | `(10, -85)` | `(42, 42)` | `48` | High northern plateau |
-| Meadow | `(-5, 60)` | `(44, 42)` | `7` | Lower southern approach |
-| Beach | `(10, 104)` | `(46, 23)` | `2.8` | Low coastline |
-| West Island | `(-18, 119)` | `(11, 8)` | `3.2` | Small offshore island |
-| Center Island | `(10, 121)` | `(10, 7)` | `4` | Central offshore island |
-| East Island | `(37, 116)` | `(12, 9)` | `3.4` | Moonstone island |
+| Region         | Center `(X,Z)` | Radii `(X,Z)` | Nominal height | Character                 |
+| -------------- | -------------: | ------------: | -------------: | ------------------------- |
+| Village        |       `(0, 0)` |    `(37, 38)` |           `12` | Central combat hub        |
+| Forest         |   `(-60, -15)` |    `(43, 40)` |           `21` | Elevated western landmass |
+| Crystal Valley |    `(65, -10)` |    `(43, 40)` |           `20` | Elevated eastern landmass |
+| Ice Peaks      |    `(10, -85)` |    `(42, 42)` |           `48` | High northern plateau     |
+| Meadow         |     `(-5, 60)` |    `(44, 42)` |            `7` | Lower southern approach   |
+| Beach          |    `(10, 104)` |    `(46, 23)` |          `2.8` | Low coastline             |
+| West Island    |   `(-18, 119)` |     `(11, 8)` |          `3.2` | Small offshore island     |
+| Center Island  |    `(10, 121)` |     `(10, 7)` |            `4` | Central offshore island   |
+| East Island    |    `(37, 116)` |     `(12, 9)` |          `3.4` | Moonstone island          |
 
 Terrain remains near the nominal height inside each region's core. It smoothly descends toward approximately `Y = 1.85` near the outer coastline.
 
@@ -212,12 +212,12 @@ This branch begins in Crystal Valley and joins the main river at the northern Vi
 
 ## Bridges
 
-| Bridge | Center `(X,Z)` | Size | Purpose |
-|---|---:|---:|---|
-| Village North | `(0,-28)` | `12 × 6 m` | Crosses the main river/branch junction |
-| Crystal Bridge | `(55,-5)` | `6 × 12 m` | Crosses the Crystal Valley branch |
-| Meadow Bridge | `(-5,65)` | `14 × 6 m` | Crosses the southern river |
-| Island Bridge | `(24,118)` | `15 × 6 m` | Connects the beach/island route |
+| Bridge         | Center `(X,Z)` |       Size | Purpose                                |
+| -------------- | -------------: | ---------: | -------------------------------------- |
+| Village North  |      `(0,-28)` | `12 × 6 m` | Crosses the main river/branch junction |
+| Crystal Bridge |      `(55,-5)` | `6 × 12 m` | Crosses the Crystal Valley branch      |
+| Meadow Bridge  |      `(-5,65)` | `14 × 6 m` | Crosses the southern river             |
+| Island Bridge  |     `(24,118)` | `15 × 6 m` | Connects the beach/island route        |
 
 Each bridge has a solid wooden deck and two raised rails.
 
@@ -231,11 +231,11 @@ Each bridge has a solid wooden deck and two raised rails.
 - Cyan point-light range: `16 m`
 - Three shards:
 
-| Shard | Local offset `(X,Z)` | Radius | Height |
-|---|---:|---:|---:|
-| Main | `(0,0)` | `2.8` | `8.96 m` |
-| West | `(-2,0.8)` | `1.5` | `4.8 m` |
-| East | `(2,1.1)` | `1.7` | `5.44 m` |
+| Shard | Local offset `(X,Z)` | Radius |   Height |
+| ----- | -------------------: | -----: | -------: |
+| Main  |              `(0,0)` |  `2.8` | `8.96 m` |
+| West  |           `(-2,0.8)` |  `1.5` |  `4.8 m` |
+| East  |            `(2,1.1)` |  `1.7` | `5.44 m` |
 
 ### Ancient forest tree
 
@@ -253,20 +253,20 @@ Each bridge has a solid wooden deck and two raised rails.
 - Cyan point-light range: `23 m`
 - Four shards:
 
-| Shard | Local offset `(X,Z)` | Radius | Height |
-|---|---:|---:|---:|
-| Center | `(0,0)` | `3.7` | `17 m` |
-| Northwest | `(-4,2)` | `2.2` | `10 m` |
-| East | `(4,1)` | `2.5` | `12 m` |
-| South | `(1,-4)` | `1.8` | `8 m` |
+| Shard     | Local offset `(X,Z)` | Radius | Height |
+| --------- | -------------------: | -----: | -----: |
+| Center    |              `(0,0)` |  `3.7` | `17 m` |
+| Northwest |             `(-4,2)` |  `2.2` | `10 m` |
+| East      |              `(4,1)` |  `2.5` | `12 m` |
+| South     |             `(1,-4)` |  `1.8` |  `8 m` |
 
 ### Ice summit
 
 | Position `(X,Z)` | Radius | Peak geometry height |
-|---:|---:|---:|
-| `(10,-91)` | `9` | `23 m` |
-| `(-2,-88)` | `7` | `17 m` |
-| `(21,-96)` | `6` | `15 m` |
+| ---------------: | -----: | -------------------: |
+|       `(10,-91)` |    `9` |               `23 m` |
+|       `(-2,-88)` |    `7` |               `17 m` |
+|       `(21,-96)` |    `6` |               `15 m` |
 
 The peaks sit on the already elevated northern terrain.
 
@@ -315,14 +315,14 @@ The peaks sit on the already elevated northern terrain.
 
 ## Village combat cover
 
-| Cover | Center `(X,Z)` | Size `(W × D × H)` |
-|---|---:|---:|
-| Northwest block | `(-8,-8)` | `4 × 4 × 1.8 m` |
-| Northeast block | `(8,-8)` | `4 × 4 × 1.8 m` |
-| Southwest block | `(-8,8)` | `4 × 4 × 1.8 m` |
-| Southeast block | `(8,8)` | `4 × 4 × 1.8 m` |
-| North barrier | `(0,-17)` | `8 × 2 × 1.2 m` |
-| South barrier | `(0,17)` | `8 × 2 × 1.2 m` |
+| Cover           | Center `(X,Z)` | Size `(W × D × H)` |
+| --------------- | -------------: | -----------------: |
+| Northwest block |      `(-8,-8)` |    `4 × 4 × 1.8 m` |
+| Northeast block |       `(8,-8)` |    `4 × 4 × 1.8 m` |
+| Southwest block |       `(-8,8)` |    `4 × 4 × 1.8 m` |
+| Southeast block |        `(8,8)` |    `4 × 4 × 1.8 m` |
+| North barrier   |      `(0,-17)` |    `8 × 2 × 1.2 m` |
+| South barrier   |       `(0,17)` |    `8 × 2 × 1.2 m` |
 
 This creates a roughly symmetrical central combat space around the glowing Village crystal.
 
@@ -388,11 +388,11 @@ Original World uses:
 - Strong emissive cyan main crystals with violet secondary spire shards
 - Three compact shadowless crystal point lights and two small amber lights at Village and Windmill
 
-| Light source | Range | Role |
-|---|---:|---|
-| Village crystal | `16 m` | Central crystal accent and navigation light |
-| Crystal Valley spire | `23 m` | Strongest compact magical accent |
-| Island moonstone | `13 m` | Southern island navigation light |
+| Light source         |  Range | Role                                        |
+| -------------------- | -----: | ------------------------------------------- |
+| Village crystal      | `16 m` | Central crystal accent and navigation light |
+| Crystal Valley spire | `23 m` | Strongest compact magical accent            |
+| Island moonstone     | `13 m` | Southern island navigation light            |
 
 Only the moon renders shadows, in a player-centered 96-metre volume: 2048 desktop, 1024 touch, disabled with reduced effects. The five local lights remain shadowless. Village and Windmill amber lights reach 9 m and 8 m. Bridge lamps are emissive only.
 
@@ -415,4 +415,3 @@ Only the moon renders shadows, in a player-centered 96-metre volume: 2048 deskto
 - Renderer and landmark geometry: `apps/client/src/world/original-world-map.ts`
 - Generated collision data: `packages/shared/src/simulation/original-data.ts`
 - High-level map specification: `MAP_SPEC.md`
-

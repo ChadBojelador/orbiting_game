@@ -56,6 +56,11 @@ export class OriginalWorldMaterials {
         float streak = pow(0.5 + 0.5 * sin(vOriginalWorld.x * 8.0
           + sin(vOriginalWorld.y * 0.9 + originalTime * 3.5)), 4.0);
         diffuseColor.rgb *= 0.75 + streak * 0.5;
+        float mountainBase = 1.0 - smoothstep(0.0, 1.6, distance(vOriginalWorld, vec3(20.0, 23.0, -55.0)));
+        float crystalBase = 1.0 - smoothstep(0.0, 1.4, distance(vOriginalWorld, vec3(60.0, 17.0, -5.0)));
+        diffuseColor.rgb += max(mountainBase, crystalBase) * streak * 0.35;
+        float crystalReflection = 1.0 - smoothstep(4.0, 15.0, distance(vOriginalWorld.xz, vec2(69.0, -14.0)));
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(0.91, 0.94, 1.12), crystalReflection * 0.5);
         diffuseColor.a *= 0.75 + streak * 0.25;`
             : '';
       const surfaceColor = isWater

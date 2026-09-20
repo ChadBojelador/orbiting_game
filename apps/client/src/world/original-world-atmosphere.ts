@@ -259,6 +259,7 @@ export class OriginalWorldAtmosphere {
       62 + Math.cos(angle) * 2.28,
     );
     window.rotation.y = angle;
+    window.rotateX(-Math.atan(0.1 * Math.cos(angle)));
     window.scale.set(0.55, 0.85, 0.04);
     this.group.add(window);
     for (const [name, x, y, z, power, range] of [
