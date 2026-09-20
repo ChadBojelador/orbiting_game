@@ -4,7 +4,9 @@ import {
   Float32BufferAttribute,
   FrontSide,
   Mesh,
+  MeshStandardMaterial,
   Object3D,
+  PointLight,
   Raycaster,
   Scene,
   Vector3,
@@ -23,6 +25,7 @@ import {
   type MovementState,
 } from '@ice-water/shared';
 import { OriginalWorldMap } from './original-world-map.js';
+import { isOriginalPresentation } from './original-world-atmosphere.js';
 
 function geometryTopology(geometry: BufferGeometry): {
   boundaryEdges: number;
@@ -177,6 +180,31 @@ describe('restored Original World', () => {
       }
       for (const bridge of originalTopology.BRIDGES)
         expect(world.group.getObjectByName(bridge.id)).toBeDefined();
+
+      const crystalLights: PointLight[] = [];
+      world.group.traverse((object) => {
+        if (object instanceof PointLight && object.name.startsWith('CRYSTAL_LIGHT_'))
+          crystalLights.push(object);
+      });
+      expect(crystalLights.map((light) => light.name).sort()).toEqual([
+        'CRYSTAL_LIGHT_MOONSTONE',
+        'CRYSTAL_LIGHT_SPIRE',
+        'CRYSTAL_LIGHT_VILLAGE',
+      ]);
+      for (const light of crystalLights) {
+        expect(light.castShadow).toBe(false);
+        expect(light.distance).toBeGreaterThan(0);
+        expect(light.intensity).toBeGreaterThan(0);
+        expect(light.distance).toBeLessThanOrEqual(23);
+      }
+      const shard = world.group.getObjectByName('crystal-shard') as Mesh;
+      const shardMaterial = Array.isArray(shard.material) ? shard.material[0] : shard.material;
+      expect(shardMaterial).toBeInstanceOf(MeshStandardMaterial);
+      expect((shardMaterial as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(2);
+      expect((shardMaterial as MeshStandardMaterial).vertexColors).toBe(true);
+      expect(shard.geometry.getAttribute('color')).toBeDefined();
+      expect(shard.geometry.getAttribute('position').count).toBeGreaterThan(24);
+      expect(shard.getObjectByName('crystal-facet-lines')).toBeDefined();
     } finally {
       world.destroy();
     }
@@ -189,6 +217,7 @@ describe('restored Original World', () => {
       world.group.traverse((object) => {
         if (
           !(object instanceof Mesh) ||
+          isOriginalPresentation(object) ||
           object.name.startsWith('OCEAN') ||
           object.name === 'frost-wall' ||
           object.name.startsWith('PATH_') ||
@@ -319,6 +348,78 @@ describe('restored Original World', () => {
           new Vector3().subVectors(b, a).cross(new Vector3().subVectors(c, a)).y,
         ).toBeGreaterThan(0);
       }
+
+      const rivers: Mesh<BufferGeometry>[] = [];
+      const riverbeds: Mesh<BufferGeometry>[] = [];
+      world.group.traverse((object) => {
+        if (object instanceof Mesh && object.name === 'WATER_NETWORK')
+          rivers.push(object as Mesh<BufferGeometry>);
+        if (object instanceof Mesh && object.name === 'RIVERBED_NETWORK')
+          riverbeds.push(object as Mesh<BufferGeometry>);
+      });
+      expect(rivers).toHaveLength(originalTopology.RIVER_BRANCHES.length);
+      expect(riverbeds).toHaveLength(originalTopology.RIVER_BRANCHES.length);
+      for (const river of rivers) {
+        expect(Array.isArray(river.material)).toBe(true);
+        const [water, bank] = Array.isArray(river.material) ? river.material : [];
+        expect(water?.side).toBe(FrontSide);
+        expect(water?.transparent).toBe(true);
+        expect(bank?.side).toBe(FrontSide);
+        expect(bank?.transparent).toBe(false);
+        expect(river.geometry.groups).toHaveLength(2);
+        const positions = river.geometry.getAttribute('position');
+        expect(positions.getY(2)).toBeLessThan(positions.getY(0));
+      }
+      for (let index = 0; index < riverbeds.length; index += 1) {
+        const bed = riverbeds[index]!;
+        const material = Array.isArray(bed.material) ? bed.material[0] : bed.material;
+        if (!material) throw new Error('Riverbed material is missing');
+        expect(material.side).toBe(FrontSide);
+        expect(material.transparent).toBe(false);
+        const bedPositions = bed.geometry.getAttribute('position');
+        const riverPositions = rivers[index]!.geometry.getAttribute('position');
+        expect(bedPositions.count).toBe(riverPositions.count + 40);
+        for (let sample = 0; sample < riverPositions.count / 4; sample += 1) {
+          const riverVertex = sample * 4;
+          const bedVertex = (sample + 5) * 4;
+          const bedCenterX = (bedPositions.getX(bedVertex) + bedPositions.getX(bedVertex + 1)) / 2;
+          const bedCenterZ = (bedPositions.getZ(bedVertex) + bedPositions.getZ(bedVertex + 1)) / 2;
+          const riverCenterX =
+            (riverPositions.getX(riverVertex) + riverPositions.getX(riverVertex + 1)) / 2;
+          const riverCenterZ =
+            (riverPositions.getZ(riverVertex) + riverPositions.getZ(riverVertex + 1)) / 2;
+          expect(bedCenterX).toBeCloseTo(riverCenterX);
+          expect(bedCenterZ).toBeCloseTo(riverCenterZ);
+          expect(bedPositions.getY(bedVertex)).toBeCloseTo(riverPositions.getY(riverVertex) - 0.32);
+          expect(
+            Math.hypot(
+              bedPositions.getX(bedVertex) - bedPositions.getX(bedVertex + 1),
+              bedPositions.getZ(bedVertex) - bedPositions.getZ(bedVertex + 1),
+            ),
+          ).toBeGreaterThan(
+            Math.hypot(
+              riverPositions.getX(riverVertex) - riverPositions.getX(riverVertex + 1),
+              riverPositions.getZ(riverVertex) - riverPositions.getZ(riverVertex + 1),
+            ) + 5,
+          );
+        }
+      }
+      const firstPoint = originalTopology.RIVER_BRANCHES[0]![0]!;
+      const firstRiverPositions = rivers[0]!.geometry.getAttribute('position');
+      const neighboringLand = [
+        { x: firstPoint.x + 3.4, z: firstPoint.z },
+        { x: firstPoint.x - 3.4, z: firstPoint.z },
+        { x: firstPoint.x, z: firstPoint.z + 3.4 },
+        { x: firstPoint.x, z: firstPoint.z - 3.4 },
+      ]
+        .map((point) => originalTopology.terrainHeightAt(point))
+        .filter((height) => height > originalTopology.SEA_LEVEL);
+      expect(firstRiverPositions.getY(0)).toBeCloseTo(
+        (neighboringLand.length === 0
+          ? originalTopology.SEA_LEVEL + 0.05
+          : Math.max(originalTopology.SEA_LEVEL + 0.05, Math.max(...neighboringLand) - 1.05)) +
+          0.08,
+      );
     } finally {
       world.destroy();
     }
@@ -335,6 +436,7 @@ describe('restored Original World', () => {
     const audits = [{ name: arch.name, geometry: combinedGeometry(arch) }];
     world.group.traverse((object) => {
       if (!(object instanceof Mesh)) return;
+      if (isOriginalPresentation(object)) return;
       if (
         object.name === 'OCEAN_UNDERSIDE' ||
         object.name.startsWith('PATH_') ||
@@ -395,9 +497,38 @@ describe('restored Original World', () => {
           1,
           'original',
         );
-      expect(Math.hypot(p.x - spawn.x, p.z - spawn.z)).toBeGreaterThan(2.5);
+      expect(
+        Math.hypot(p.x - spawn.x, p.z - spawn.z),
+        `Blocked Original spawn exit at ${JSON.stringify(spawn)}`,
+      ).toBeGreaterThan(2.5);
       expect(p.y).toBeGreaterThan(1.5);
     }
+  });
+
+  it('keeps the full river-bank corridor supported above the ocean floor', () => {
+    const gaps: Array<{ x: number; z: number; y: number }> = [];
+    for (const branch of originalTopology.RIVER_BRANCHES) {
+      for (let segment = 1; segment < branch.length; segment += 1) {
+        const start = branch[segment - 1]!;
+        const end = branch[segment]!;
+        const dx = end.x - start.x;
+        const dz = end.z - start.z;
+        const length = Math.hypot(dx, dz);
+        const sideX = -dz / length;
+        const sideZ = dx / length;
+        for (let along = -0.1; along <= 1.1; along += 0.1) {
+          for (let lateral = -5; lateral <= 5; lateral += 0.5) {
+            const point = {
+              x: start.x + dx * along + sideX * lateral,
+              z: start.z + dz * along + sideZ * lateral,
+            };
+            const y = terrainHeightAt(point, 'original');
+            if (y < originalTopology.SEA_LEVEL - 0.5) gaps.push({ ...point, y });
+          }
+        }
+      }
+    }
+    expect(gaps).toEqual([]);
   });
 
   it('uses the original sea level for buoyancy and prevents tunneling through village cover', () => {

@@ -1,6 +1,9 @@
 // Original renderer restored from GitHub commit 87a8893f6b84acc39f9b2df709153abe26079cdd; current FPS adapter.
 import * as THREE from 'three';
 import { originalTopology } from '@ice-water/shared';
+import { OriginalWorldAtmosphere } from './original-world-atmosphere.js';
+import { OriginalWorldMaterials } from './original-world-materials.js';
+import type { OriginalWorldQuality } from './original-world-lighting.js';
 const {
   ARENA,
   BRIDGES,
@@ -16,30 +19,34 @@ const {
 import type { Position } from '@ice-water/shared';
 
 const PALETTE = {
-  ocean: 0x35cddd,
-  seabed: 0x398f89,
-  river: 0x64e7ef,
-  grass: 0x79d49a,
-  meadow: 0xa8df7e,
-  forest: 0x4fa879,
-  crystal: 0x75cbc1,
+  ocean: 0xbedbe8,
+  seabed: 0x526f6c,
+  river: 0x719fae,
+  grass: 0x688e6d,
+  meadow: 0x94af70,
+  forest: 0x284e3b,
+  crystal: 0x666785,
   snow: 0xdff7ff,
   sand: 0xffdc9f,
-  cliff: 0xfff1d1,
-  path: 0xf5c995,
+  cliff: 0x87928f,
+  path: 0xad9977,
   wood: 0xa96d46,
   woodDark: 0x70442f,
-  ice: 0x7eebff,
+  ice: 0x8ca8c8,
   crystalBlue: 0x5ea8ff,
   crystalDeep: 0x4056d8,
-  leaf: 0x4a9e68,
-  leafLight: 0x86d475,
+  leaf: 0x234638,
+  leafLight: 0x47684b,
   trunk: 0x8e6244,
   flower: 0xff8d7a,
 } as const;
 
 const TERRAIN_STEP = 3.125;
 const CLIFF_BOTTOM = WATER_BOTTOM;
+// River cells are removed by their center point, so a removed square can reach
+// more than half its diagonal beyond the authored channel. This overlap closes
+// that grid-sized bank gap and leaves room for the player's collision radius.
+const RIVER_SUPPORT_WIDTH = 10.4;
 
 function addTriangle(
   positions: number[],
@@ -50,11 +57,13 @@ function addTriangle(
   b: THREE.Vector3,
   c: THREE.Vector3,
   color: THREE.Color,
+  isTop = false,
 ): void {
-  const colorKey = color.getHex();
   for (const vertex of [a, b, c]) {
+    const vertexColor = isTop ? surfaceColor(vertex.x, vertex.z, vertex.y) : color;
+    const colorKey = vertexColor.getHex();
     // Position and face color define a render vertex. This welds the many
-    // duplicate grid vertices while retaining the original hard biome colors.
+    // duplicate grid vertices while retaining separate cliff/top normals.
     const key = `${Math.round(vertex.x * 1000)},${Math.round(vertex.y * 1000)},${Math.round(
       vertex.z * 1000,
     )},${colorKey}`;
@@ -63,19 +72,28 @@ function addTriangle(
       index = positions.length / 3;
       vertices.set(key, index);
       positions.push(vertex.x, vertex.y, vertex.z);
-      colors.push(color.r, color.g, color.b);
+      colors.push(vertexColor.r, vertexColor.g, vertexColor.b);
     }
     indices.push(index);
   }
 }
 
-function surfaceColor(x: number, z: number, elevation: number): THREE.Color {
-  if (z > 88 || elevation < 4) return new THREE.Color(PALETTE.sand);
-  if (z < -55 || elevation > 35) return new THREE.Color(PALETTE.snow);
-  if (x < -28 && z < 24) return new THREE.Color(PALETTE.forest);
-  if (x > 30 && z < 26) return new THREE.Color(PALETTE.crystal);
-  if (z > 30) return new THREE.Color(PALETTE.meadow);
-  return new THREE.Color(PALETTE.grass);
+export function surfaceColor(x: number, z: number, elevation: number): THREE.Color {
+  const smooth = THREE.MathUtils.smoothstep;
+  const color = new THREE.Color(PALETTE.grass);
+  color.lerp(new THREE.Color(PALETTE.meadow), smooth(z, 22, 48));
+  color.lerp(new THREE.Color(PALETTE.forest), (1 - smooth(x, -45, -22)) * (1 - smooth(z, 12, 43)));
+  color.lerp(new THREE.Color(PALETTE.crystal), smooth(x, 24, 52) * (1 - smooth(z, 15, 42)));
+  const frost = Math.max(1 - smooth(z, -75, -46), smooth(elevation, 28, 52));
+  color.lerp(new THREE.Color(0x768696), frost);
+  // Broken snow patches preserve dark rock and the moon-facing mountain facets.
+  const patch = 0.5 + 0.5 * Math.sin(x * 0.18 + Math.sin(z * 0.24)) * Math.cos(z * 0.16);
+  color.lerp(new THREE.Color(PALETTE.snow), frost * smooth(patch, 0.3, 0.85) * 0.8);
+  color.lerp(
+    new THREE.Color(PALETTE.sand),
+    Math.max(smooth(z, 78, 103), 1 - smooth(elevation, 2.4, 5)),
+  );
+  return color.multiplyScalar(0.96 + Math.sin(x * 0.65) * Math.cos(z * 0.57) * 0.04);
 }
 
 function hasTerrainCell(position: Position): boolean {
@@ -117,8 +135,8 @@ export function createTerrainGeometry(): THREE.BufferGeometry {
         z + TERRAIN_STEP,
       );
       const color = surfaceColor(center.x, center.z, terrainHeightAt(center));
-      addTriangle(positions, colors, indices, vertices, nw, sw, ne, color);
-      addTriangle(positions, colors, indices, vertices, ne, sw, se, color);
+      addTriangle(positions, colors, indices, vertices, nw, sw, ne, color, true);
+      addTriangle(positions, colors, indices, vertices, ne, sw, se, color, true);
 
       // A closed bottom cap makes every land section a solid volume instead of
       // a top sheet. It is shared by adjacent cells and sits below the sea.
@@ -178,6 +196,27 @@ function ribbonPoints(points: readonly Position[], samplesPerSegment = 5): Posit
   return sampled;
 }
 
+function extendRibbonEnds(points: readonly Position[], distance: number): Position[] {
+  if (points.length < 2) return [...points];
+  const first = points[0]!;
+  const second = points[1]!;
+  const previous = points[points.length - 2]!;
+  const last = points[points.length - 1]!;
+  const firstLength = Math.max(0.001, Math.hypot(second.x - first.x, second.z - first.z));
+  const lastLength = Math.max(0.001, Math.hypot(last.x - previous.x, last.z - previous.z));
+  return [
+    {
+      x: first.x - ((second.x - first.x) / firstLength) * distance,
+      z: first.z - ((second.z - first.z) / firstLength) * distance,
+    },
+    ...points,
+    {
+      x: last.x + ((last.x - previous.x) / lastLength) * distance,
+      z: last.z + ((last.z - previous.z) / lastLength) * distance,
+    },
+  ];
+}
+
 function createRibbonGeometry(
   points: readonly Position[],
   width: number,
@@ -229,7 +268,7 @@ function createRibbonVolumeGeometry(
   points: readonly Position[],
   width: number,
   elevation: (point: Position) => number,
-  depth = 0.35,
+  bottomElevation: (point: Position, top: number) => number,
 ): THREE.BufferGeometry {
   const samples = ribbonPoints(points);
   const positions: number[] = [];
@@ -245,37 +284,36 @@ function createRibbonVolumeGeometry(
     const sideX = (-dz / length) * (width / 2);
     const sideZ = (dx / length) * (width / 2);
     const top = elevation(current);
-    const bottom = top - depth;
+    const left = { x: current.x + sideX, z: current.z + sideZ };
+    const right = { x: current.x - sideX, z: current.z - sideZ };
+    const bottomLeft = bottomElevation(left, top);
+    const bottomRight = bottomElevation(right, top);
     positions.push(
-      current.x + sideX,
+      left.x,
       top,
-      current.z + sideZ,
-      current.x - sideX,
+      left.z,
+      right.x,
       top,
-      current.z - sideZ,
-      current.x + sideX,
-      bottom,
-      current.z + sideZ,
-      current.x - sideX,
-      bottom,
-      current.z - sideZ,
+      right.z,
+      left.x,
+      bottomLeft,
+      left.z,
+      right.x,
+      bottomRight,
+      right.z,
     );
     const v = index / Math.max(1, samples.length - 1);
     uvs.push(0, v, 1, v, 0, v, 1, v);
   }
 
-  const indices: number[] = [];
+  const topIndices: number[] = [];
+  const shellIndices: number[] = [];
   for (let index = 0; index < samples.length - 1; index += 1) {
     const offset = index * 4;
     const next = offset + 4;
-    // Top, bottom, left and right faces. Every winding points out of the volume.
-    indices.push(
-      offset,
-      next,
-      offset + 1,
-      next,
-      next + 1,
-      offset + 1,
+    topIndices.push(offset, next, offset + 1, next, next + 1, offset + 1);
+    // Bottom, left and right faces. Every winding points out of the volume.
+    shellIndices.push(
       offset + 2,
       offset + 3,
       next + 2,
@@ -297,12 +335,14 @@ function createRibbonVolumeGeometry(
     );
   }
   const end = (samples.length - 1) * 4;
-  indices.push(0, 1, 2, 1, 3, 2, end, end + 2, end + 1, end + 1, end + 2, end + 3);
+  shellIndices.push(0, 1, 2, 1, 3, 2, end, end + 2, end + 1, end + 1, end + 2, end + 3);
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
+  geometry.setIndex([...topIndices, ...shellIndices]);
+  geometry.addGroup(0, topIndices.length, 0);
+  geometry.addGroup(topIndices.length, shellIndices.length, 1);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
@@ -316,13 +356,16 @@ function riverElevation(point: Position): number {
     terrainHeightAt({ x: point.x, z: point.z + 3.4 }),
     terrainHeightAt({ x: point.x, z: point.z - 3.4 }),
   ].filter((height) => height > SEA_LEVEL);
-  if (samples.length === 0) return SEA_LEVEL + 0.05;
-  return Math.max(SEA_LEVEL + 0.05, Math.max(...samples) - 1.05);
+  const authoredHeight =
+    samples.length === 0
+      ? SEA_LEVEL + 0.05
+      : Math.max(SEA_LEVEL + 0.05, Math.max(...samples) - 1.05);
+  return authoredHeight + 0.08;
 }
 
 function mesh(
   geometry: THREE.BufferGeometry,
-  material: THREE.Material,
+  material: THREE.Material | THREE.Material[],
   name: string,
   position?: THREE.Vector3,
 ): THREE.Mesh {
@@ -334,10 +377,91 @@ function mesh(
   return result;
 }
 
-function createCrystal(material: THREE.Material, radius: number, height: number): THREE.Mesh {
-  const crystal = mesh(new THREE.OctahedronGeometry(radius, 0), material, 'crystal-shard');
-  crystal.scale.y = height / (radius * 2);
+function createCrystalGeometry(radius: number, height: number): THREE.BufferGeometry {
+  const sideCount = 6;
+  const rings = [
+    { y: height / 2, radius: 0, rotation: 0.12 },
+    { y: height * 0.18, radius: radius * 0.72, rotation: 0.12 },
+    { y: -height * 0.06, radius, rotation: 0 },
+    { y: -height * 0.34, radius: radius * 0.54, rotation: 0.28 },
+    { y: -height / 2, radius: 0, rotation: 0.28 },
+  ] as const;
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const facetTints = [0x9ee8ff, 0x67c4ff, 0x4a8ff2, 0x79d8f5, 0x5477dc, 0x8adfff];
+
+  const vertexAt = (ringIndex: number, sideIndex: number): THREE.Vector3 => {
+    const ring = rings[ringIndex]!;
+    const angle = (sideIndex / sideCount) * Math.PI * 2 + ring.rotation;
+    return new THREE.Vector3(Math.cos(angle) * ring.radius, ring.y, Math.sin(angle) * ring.radius);
+  };
+  const addTriangle = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, tint: number) => {
+    const color = new THREE.Color(tint);
+    for (const vertex of [a, b, c]) {
+      positions.push(vertex.x, vertex.y, vertex.z);
+      colors.push(color.r, color.g, color.b);
+    }
+  };
+
+  for (let ringIndex = 0; ringIndex < rings.length - 1; ringIndex += 1) {
+    for (let sideIndex = 0; sideIndex < sideCount; sideIndex += 1) {
+      const nextSide = (sideIndex + 1) % sideCount;
+      const upperLeft = vertexAt(ringIndex, sideIndex);
+      const upperRight = vertexAt(ringIndex, nextSide);
+      const lowerLeft = vertexAt(ringIndex + 1, sideIndex);
+      const lowerRight = vertexAt(ringIndex + 1, nextSide);
+      const tint = facetTints[(sideIndex + ringIndex * 2) % facetTints.length]!;
+      const alternateTint = facetTints[(sideIndex + ringIndex * 2 + 1) % facetTints.length]!;
+
+      if (rings[ringIndex]!.radius === 0) {
+        addTriangle(upperLeft, lowerRight, lowerLeft, tint);
+        continue;
+      }
+      if (rings[ringIndex + 1]!.radius === 0) {
+        addTriangle(upperLeft, upperRight, lowerLeft, tint);
+        continue;
+      }
+      if ((sideIndex + ringIndex) % 2 === 0) {
+        addTriangle(upperLeft, lowerRight, lowerLeft, tint);
+        addTriangle(upperLeft, upperRight, lowerRight, alternateTint);
+      } else {
+        addTriangle(upperLeft, upperRight, lowerLeft, tint);
+        addTriangle(upperRight, lowerRight, lowerLeft, alternateTint);
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function createCrystal(
+  material: THREE.Material,
+  edgeMaterial: THREE.Material,
+  radius: number,
+  height: number,
+): THREE.Mesh {
+  const geometry = createCrystalGeometry(radius, height);
+  const crystal = mesh(geometry, material, 'crystal-shard');
+  const facetLines = new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 12), edgeMaterial);
+  facetLines.name = 'crystal-facet-lines';
+  facetLines.renderOrder = 1;
+  crystal.add(facetLines);
   return crystal;
+}
+
+function createCrystalLight(name: string, intensity: number, distance: number): THREE.PointLight {
+  const light = new THREE.PointLight(0x69c8ff, intensity, distance, 2);
+  light.name = name;
+  // Three bounded, shadowless lights keep the crystals useful on mobile
+  // without multiplying shadow-map renders for the entire world.
+  light.castShadow = false;
+  return light;
 }
 
 function createBeachArch(material: THREE.Material): THREE.Group {
@@ -373,16 +497,27 @@ function createLandmarks(): THREE.Group {
   group.name = 'WORLD_LANDMARKS';
   const crystalMaterial = new THREE.MeshStandardMaterial({
     color: PALETTE.crystalBlue,
-    emissive: PALETTE.crystalDeep,
-    emissiveIntensity: 0.22,
-    roughness: 0.28,
-    metalness: 0.05,
+    emissive: 0x19bddd,
+    emissiveIntensity: 2.8,
+    roughness: 0.16,
+    metalness: 0.08,
+    vertexColors: true,
   });
+  const crystalEdgeMaterial = new THREE.LineBasicMaterial({
+    color: 0xc8f4ff,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+  });
+  const violetMaterial = crystalMaterial.clone();
+  violetMaterial.color.setHex(0x9374ca);
+  violetMaterial.emissive.setHex(0x6740c2);
+  violetMaterial.emissiveIntensity = 2.1;
   const iceMaterial = new THREE.MeshStandardMaterial({
     color: PALETTE.ice,
     emissive: 0x299fb9,
-    emissiveIntensity: 0.16,
-    roughness: 0.32,
+    emissiveIntensity: 0.025,
+    roughness: 0.38,
   });
   const woodMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.9 });
   const leafMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.leaf, roughness: 0.92 });
@@ -400,11 +535,14 @@ function createLandmarks(): THREE.Group {
     [-2, 0.8, 1.5, -0.25],
     [2, 1.1, 1.7, 0.2],
   ] as const) {
-    const shard = createCrystal(crystalMaterial, scale, scale * 3.2);
+    const shard = createCrystal(crystalMaterial, crystalEdgeMaterial, scale, scale * 3.2);
     shard.position.set(x, 0, z);
     shard.rotation.z = tilt;
     villageCrystal.add(shard);
   }
+  const villageLight = createCrystalLight('CRYSTAL_LIGHT_VILLAGE', 42, 16);
+  villageLight.position.set(0, 1.5, 0);
+  villageCrystal.add(villageLight);
   group.add(villageCrystal);
 
   const ancientTree = new THREE.Group();
@@ -444,11 +582,19 @@ function createLandmarks(): THREE.Group {
     [4, 1, 2.5, 12, 0.2],
     [1, -4, 1.8, 8, -0.08],
   ] as const) {
-    const shard = createCrystal(crystalMaterial, radius, height);
+    const shard = createCrystal(
+      x === 0 ? crystalMaterial : violetMaterial,
+      crystalEdgeMaterial,
+      radius,
+      height,
+    );
     shard.position.set(x, height / 2, z);
     shard.rotation.z = tilt;
     crystalSpire.add(shard);
   }
+  const spireLight = createCrystalLight('CRYSTAL_LIGHT_SPIRE', 78, 23);
+  spireLight.position.set(0, 5, 0);
+  crystalSpire.add(spireLight);
   group.add(crystalSpire);
 
   const iceSummit = new THREE.Group();
@@ -504,10 +650,12 @@ function createLandmarks(): THREE.Group {
   beachArch.rotation.y = Math.PI / 2;
   group.add(beachArch);
 
-  const moonstone = createCrystal(crystalMaterial, 2.2, 7);
+  const moonstone = createCrystal(crystalMaterial, crystalEdgeMaterial, 2.2, 7);
   moonstone.name = 'LM_ISLAND_MOONSTONE';
   moonstone.position.set(37, terrainHeightAt({ x: 37, z: 116 }) + 3.5, 116);
-  group.add(moonstone);
+  const moonstoneLight = createCrystalLight('CRYSTAL_LIGHT_MOONSTONE', 30, 13);
+  moonstoneLight.position.copy(moonstone.position).add(new THREE.Vector3(0, 1.5, 0));
+  group.add(moonstone, moonstoneLight);
 
   return group;
 }
@@ -558,10 +706,16 @@ function createWaterfall(
   width: number,
   material: THREE.Material,
 ): THREE.Mesh {
-  const height = top.y - bottom.y;
+  const height = top.distanceTo(bottom);
   const waterfall = mesh(new THREE.PlaneGeometry(width, height, 5, 8), material, id);
-  waterfall.position.set((top.x + bottom.x) / 2, bottom.y + height / 2, (top.z + bottom.z) / 2);
-  waterfall.rotation.y = Math.atan2(top.x - bottom.x, top.z - bottom.z);
+  waterfall.position.copy(top).add(bottom).multiplyScalar(0.5);
+  // The old vertical sheet missed both authored endpoints in Z. Align its
+  // local Y axis to the actual flow so it visibly meets the existing river.
+  waterfall.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    top.clone().sub(bottom).normalize(),
+  );
+  waterfall.castShadow = false;
   return waterfall;
 }
 
@@ -624,6 +778,9 @@ function createBlockoutDetails(): THREE.Group {
 
 export class OriginalWorldMap {
   readonly group = new THREE.Group();
+  private readonly style = new OriginalWorldMaterials();
+  private atmosphere?: OriginalWorldAtmosphere;
+  private readonly crystals = new Map<THREE.MeshStandardMaterial, number>();
   private boundary = new THREE.Group();
   private readonly waterMaterial = new THREE.MeshPhysicalMaterial({
     color: PALETTE.river,
@@ -631,7 +788,7 @@ export class OriginalWorldMap {
     opacity: 0.76,
     roughness: 0.18,
     metalness: 0,
-    transmission: 0.08,
+    transmission: 0,
     depthWrite: false,
     side: THREE.FrontSide,
   });
@@ -647,13 +804,24 @@ export class OriginalWorldMap {
     this.build();
   }
 
-  update(elapsedSeconds: number): void {
-    this.waterMaterial.opacity = 0.72 + Math.sin(elapsedSeconds * 1.4) * 0.04;
+  update(
+    elapsedSeconds: number,
+    camera = this.group.position,
+    quality: OriginalWorldQuality = 'high',
+  ): void {
+    this.style.time.value = quality === 'low' ? 0 : elapsedSeconds;
+    this.style.motion.value = quality === 'low' ? 0 : 1;
+    this.atmosphere?.update(elapsedSeconds, camera, quality);
+    for (const [material, intensity] of this.crystals) {
+      material.emissiveIntensity =
+        intensity * (quality === 'low' ? 1 : 1 + Math.sin(elapsedSeconds * 0.65) * 0.045);
+    }
   }
 
   destroy(): void {
     this.scene.remove(this.group);
     this.disposeObject(this.group);
+    this.style.destroy();
   }
 
   private build(): void {
@@ -663,7 +831,7 @@ export class OriginalWorldMap {
       roughness: 0.22,
       transparent: true,
       opacity: 0.86,
-      transmission: 0.04,
+      transmission: 0,
       depthWrite: false,
       side: THREE.FrontSide,
     });
@@ -700,6 +868,9 @@ export class OriginalWorldMap {
     seabed.castShadow = false;
     seabed.receiveShadow = true;
     this.group.add(ocean, underside, seabed);
+    this.style.apply(oceanMaterial, 'ocean');
+    this.style.apply(undersideMaterial, 'water');
+    this.style.apply(this.waterMaterial, 'water');
 
     const terrainMaterial = new THREE.MeshStandardMaterial({
       vertexColors: true,
@@ -708,13 +879,17 @@ export class OriginalWorldMap {
       metalness: 0,
       side: THREE.FrontSide,
     });
+    this.style.apply(terrainMaterial, 'ground');
     this.group.add(mesh(createTerrainGeometry(), terrainMaterial, 'TERRAIN_BLOCKOUT'));
 
     const pathMaterial = new THREE.MeshStandardMaterial({
       color: PALETTE.path,
       roughness: 0.96,
       side: THREE.FrontSide,
+      transparent: true,
+      depthWrite: false,
     });
+    this.style.apply(pathMaterial, 'path');
     for (const route of ROUTE_CORRIDORS) {
       const path = mesh(
         createRibbonGeometry(
@@ -726,17 +901,46 @@ export class OriginalWorldMap {
         route.id,
       );
       path.receiveShadow = true;
+      path.castShadow = false;
       this.group.add(path);
     }
 
+    const riverbankMaterial = new THREE.MeshStandardMaterial({
+      color: 0x596c70,
+      roughness: 0.48,
+      metalness: 0,
+      side: THREE.FrontSide,
+    });
+    this.style.apply(riverbankMaterial, 'rock');
     for (const branch of RIVER_BRANCHES) {
+      // Transparent water needs a real upward-facing bed beneath it. The
+      // volume's exterior bottom correctly faces downward, so it is culled
+      // when viewed through the surface and cannot double as the visible bed.
+      // Keeping this bed close to the authored surface makes steep channel
+      // transitions read as water over solid terrain instead of empty glass.
+      const riverbed = mesh(
+        createRibbonVolumeGeometry(
+          extendRibbonEnds(branch, TERRAIN_STEP + 0.5),
+          RIVER_SUPPORT_WIDTH,
+          (point) => riverElevation(point) - 0.32,
+          (point, top) =>
+            Math.max(WATER_BOTTOM, Math.min(top - 0.18, terrainHeightAt(point) - 0.04)),
+        ),
+        [riverbankMaterial, riverbankMaterial],
+        'RIVERBED_NETWORK',
+      );
+      riverbed.receiveShadow = true;
       const river = mesh(
-        createRibbonVolumeGeometry(branch, 4.6, (point) => riverElevation(point) + 0.08),
-        this.waterMaterial,
+        createRibbonVolumeGeometry(branch, 4.6, riverElevation, (point, top) =>
+          Math.max(WATER_BOTTOM, Math.min(top - 0.18, terrainHeightAt(point) - 0.04)),
+        ),
+        [this.waterMaterial, riverbankMaterial],
         'WATER_NETWORK',
       );
       river.renderOrder = 2;
-      this.group.add(river);
+      river.castShadow = false;
+      riverbed.castShadow = false;
+      this.group.add(riverbed, river);
     }
 
     for (const bridge of BRIDGES)
@@ -745,6 +949,7 @@ export class OriginalWorldMap {
     const waterfallMaterial = this.waterMaterial.clone();
     waterfallMaterial.opacity = 0.84;
     waterfallMaterial.side = THREE.DoubleSide;
+    this.style.apply(waterfallMaterial, 'waterfall');
     this.group.add(
       createWaterfall(
         'WF_MOUNTAIN_01',
@@ -765,13 +970,26 @@ export class OriginalWorldMap {
     );
 
     this.group.add(createLandmarks(), createBlockoutDetails());
+    this.group.traverse((object) => {
+      if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
+      if (!(object.material instanceof THREE.MeshStandardMaterial)) return;
+      if (object.name === 'crystal-shard' || object.name === 'LM_ISLAND_MOONSTONE')
+        this.crystals.set(object.material, object.material.emissiveIntensity);
+      if (object.name === 'ice-peak' || object.name.startsWith('beach-arch'))
+        this.style.apply(object.material, 'rock');
+      if (object.name.includes('trunk') || object.name.includes('board'))
+        this.style.apply(object.material, 'wood');
+    });
     // Restore the original authored village cover as visible solid geometry.
     const coverMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.9 });
+    this.style.apply(coverMaterial, 'wood');
+    const coverStone = new THREE.MeshStandardMaterial({ color: 0x7d8684, roughness: 0.85 });
+    this.style.apply(coverStone, 'rock');
     for (const block of ARENA.blocks.filter((block) => block.id.startsWith('COVER_'))) {
       this.group.add(
         mesh(
           new THREE.BoxGeometry(block.width, block.height, block.depth),
-          coverMaterial,
+          block.width > 4 || (block.x > 0 && block.z < 0) ? coverStone : coverMaterial,
           block.id,
           new THREE.Vector3(block.x, terrainHeightAt(block) + block.height / 2, block.z),
         ),
@@ -779,6 +997,8 @@ export class OriginalWorldMap {
     }
     this.boundary = this.createBoundary(this.currentHalfExtent);
     this.group.add(this.boundary);
+    this.atmosphere = new OriginalWorldAtmosphere();
+    this.group.add(this.atmosphere.group);
   }
 
   private createBoundary(halfExtent: number): THREE.Group {
@@ -803,18 +1023,30 @@ export class OriginalWorldMap {
       const wall = mesh(new THREE.BoxGeometry(width, height, depth), material, 'frost-wall');
       wall.position.set(x, height / 2, z);
       wall.renderOrder = 3;
+      wall.castShadow = false;
+      wall.receiveShadow = false;
       boundary.add(wall);
     }
     return boundary;
   }
 
   private disposeObject(root: THREE.Object3D): void {
+    const geometries = new Set<THREE.BufferGeometry>();
+    const allMaterials = new Set<THREE.Material>();
     root.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      object.geometry.dispose();
+      if (
+        !(object instanceof THREE.Mesh) &&
+        !(object instanceof THREE.LineSegments) &&
+        !(object instanceof THREE.Points)
+      )
+        return;
+      if (object instanceof THREE.InstancedMesh) object.dispose();
+      geometries.add(object.geometry);
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) material.dispose();
+      for (const material of materials) allMaterials.add(material);
     });
+    geometries.forEach((geometry) => geometry.dispose());
+    allMaterials.forEach((material) => material.dispose());
   }
 }
 

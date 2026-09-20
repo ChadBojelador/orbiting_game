@@ -15,10 +15,10 @@ const DEFAULT_ENVIRONMENT: WaterEnvironment = {
 };
 
 const ORIGINAL_ENVIRONMENT: WaterEnvironment = {
-  background: 0xa4e8ee,
-  fogColor: 0xa4e8ee,
-  fogNear: 190,
-  fogFar: 440,
+  background: 0x050b18,
+  fogColor: 0x0a1830,
+  fogNear: 120,
+  fogFar: 380,
 };
 
 const UNDERWATER_ENVIRONMENT: WaterEnvironment = {

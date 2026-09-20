@@ -13,7 +13,7 @@ export interface WeaponStats {
   recoilVertical: number; // degrees per shot
   recoilHorizontalMax: number; // degrees per shot
   recoilRecoveryRate: number; // degrees per second
-  range: number; // max effective range in metres
+  range: number; // maximum hitscan travel in metres; falloff controls long-range damage
   falloffStart: number; // range at which damage begins to fall off
   falloffEnd: number; // range at which damage reaches minimum
   falloffMinDamage: number; // minimum damage at max range (fraction 0-1)
@@ -22,6 +22,10 @@ export interface WeaponStats {
   fireMode: 'auto' | 'semi' | 'burst' | 'pump';
   pelletsPerShot: number; // > 1 for shotguns
 }
+
+// Long enough to cross Original World's widest playable sightline. Static map
+// geometry still clips every shot before this distance.
+const FIREARM_HITSCAN_RANGE = 400;
 
 export type WeaponId = 'assault-rifle' | 'smg' | 'shotgun' | 'sniper' | 'pistol' | 'ice-pick';
 
@@ -36,11 +40,11 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
     reserveAmmo: 120,
     reloadMs: 2000,
     spread: 0.025,
-    adsSpread: 0.008,
+    adsSpread: 0,
     recoilVertical: 1.2,
     recoilHorizontalMax: 0.4,
     recoilRecoveryRate: 8,
-    range: 80,
+    range: FIREARM_HITSCAN_RANGE,
     falloffStart: 30,
     falloffEnd: 70,
     falloffMinDamage: 0.5,
@@ -59,11 +63,11 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
     reserveAmmo: 140,
     reloadMs: 1600,
     spread: 0.04,
-    adsSpread: 0.018,
+    adsSpread: 0,
     recoilVertical: 0.8,
     recoilHorizontalMax: 0.6,
     recoilRecoveryRate: 12,
-    range: 40,
+    range: FIREARM_HITSCAN_RANGE,
     falloffStart: 15,
     falloffEnd: 35,
     falloffMinDamage: 0.4,
@@ -86,7 +90,7 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
     recoilVertical: 4.0,
     recoilHorizontalMax: 1.5,
     recoilRecoveryRate: 5,
-    range: 15,
+    range: FIREARM_HITSCAN_RANGE,
     falloffStart: 5,
     falloffEnd: 14,
     falloffMinDamage: 0.2,
@@ -105,11 +109,11 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
     reserveAmmo: 20,
     reloadMs: 3000,
     spread: 0.06,
-    adsSpread: 0.001,
+    adsSpread: 0,
     recoilVertical: 6.0,
     recoilHorizontalMax: 1.0,
     recoilRecoveryRate: 3,
-    range: 120,
+    range: FIREARM_HITSCAN_RANGE,
     falloffStart: 80,
     falloffEnd: 120,
     falloffMinDamage: 0.8,
@@ -128,11 +132,11 @@ export const WEAPONS: Record<WeaponId, WeaponStats> = {
     reserveAmmo: 48,
     reloadMs: 1400,
     spread: 0.02,
-    adsSpread: 0.006,
+    adsSpread: 0,
     recoilVertical: 2.0,
     recoilHorizontalMax: 0.5,
     recoilRecoveryRate: 10,
-    range: 50,
+    range: FIREARM_HITSCAN_RANGE,
     falloffStart: 20,
     falloffEnd: 45,
     falloffMinDamage: 0.5,

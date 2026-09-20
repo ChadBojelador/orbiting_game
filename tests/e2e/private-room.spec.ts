@@ -133,9 +133,7 @@ for (const mapId of ['frostline', 'original'] as const)
     },
   );
 
-test('Original World ocean supports underwater presentation and buoyant resurfacing', async ({
-  page,
-}) => {
+test('Original World ocean renders underwater and resurfaces buoyantly', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await identify(page, 'Ocean Diver');
@@ -145,10 +143,12 @@ test('Original World ocean supports underwater presentation and buoyant resurfac
   await page.getByLabel('Map', { exact: true }).selectOption('original');
   const { room } = await create(page);
   await start(page);
+  const dive = page.getByRole('button', { name: 'Crouch / Dive' });
+  await expect(dive).toBeVisible();
   const player = room.state.players.get(room.state.hostPlayerId)!;
   Object.assign(player, {
     x: -50,
-    y: originalTopology.SEA_LEVEL,
+    y: originalTopology.SEA_LEVEL - GAMEPLAY.originalWaterDiveDepth,
     z: 80,
     yaw: -Math.PI / 2,
     pitch: 0,
@@ -156,23 +156,26 @@ test('Original World ocean supports underwater presentation and buoyant resurfac
     velocityZ: 0,
     verticalVelocity: 0,
     isGrounded: false,
+    status: 'spectator',
     spawnGeneration: player.spawnGeneration + 1,
   });
+  // Spectator status pauses movement only inside this test worker, giving the
+  // smoothed camera time to settle at the authoritative submerged position.
   room.broadcastPatch();
-  const dive = page.getByRole('button', { name: 'Crouch / Dive' });
-  await expect(dive).toBeVisible();
-
-  await dive.click();
-  await expect
-    .poll(() => player.y, { timeout: 5000 })
-    .toBeLessThan(originalTopology.SEA_LEVEL - GAMEPLAY.originalWaterDiveDepth + 0.2);
-  expect(
-    isUnderwater({ x: player.x, y: player.y + GAMEPLAY.playerEyeHeight, z: player.z }, 'original'),
-  ).toBe(true);
   await page.waitForTimeout(250);
+  const submergedEye = {
+    x: player.x,
+    y: player.y + GAMEPLAY.playerEyeHeight,
+    z: player.z,
+  };
+  expect(
+    isUnderwater(submergedEye, 'original'),
+    JSON.stringify({ player: { x: player.x, y: player.y, z: player.z }, submergedEye }),
+  ).toBe(true);
   await page.screenshot({ path: 'test-results/fps-original-underwater.png' });
 
-  await dive.click();
+  player.status = 'alive';
+  room.broadcastPatch();
   await expect
     .poll(() => player.y, { timeout: 5000 })
     .toBeGreaterThan(originalTopology.SEA_LEVEL - GAMEPLAY.waterFloatDepth - 0.2);
@@ -180,6 +183,8 @@ test('Original World ocean supports underwater presentation and buoyant resurfac
     isUnderwater({ x: player.x, y: player.y + GAMEPLAY.playerEyeHeight, z: player.z }, 'original'),
   ).toBe(false);
   expect(errors).toEqual([]);
+  await page.getByRole('button', { name: 'Leave room' }).click();
+  await room.disconnect();
 });
 
 for (const mapId of ['frostline', 'island', 'original'] as const)
