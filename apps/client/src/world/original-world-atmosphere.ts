@@ -98,6 +98,7 @@ export class OriginalWorldAtmosphere {
   private readonly time = { value: 0 };
   private readonly fields: ParticleField[] = [];
   private readonly detail: THREE.InstancedMesh[] = [];
+  private readonly fireflyLights: { light: THREE.PointLight; power: number }[] = [];
 
   constructor() {
     this.group.name = 'ORIGINAL_PRESENTATION';
@@ -105,7 +106,20 @@ export class OriginalWorldAtmosphere {
     this.addGroundDetails();
     this.addWarmAccents();
     // Local fog is sparse soft points below eye height, never a full-screen layer.
-    this.addParticles('forest-fireflies', -65, 23, -18, 25, 3, 80, 0xffd080, 0.085, 0.7, 0.12);
+    this.addParticles(
+      'forest-fireflies',
+      -65,
+      23,
+      -18,
+      25,
+      3.4,
+      120,
+      0xffe58f,
+      0.14,
+      0.96,
+      0.12,
+      1,
+    );
     this.addParticles('forest-low-mist', -65, 21.3, -18, 22, 0.45, 20, 0x738b9b, 2.5, 0.045, 0.05);
     this.addParticles('crystal-dust', 69, 24, -14, 15, 8, 90, 0x99a1ff, 0.075, 0.6, 0.18);
     this.addParticles('crystal-low-mist', 69, 20.4, -14, 13, 0.55, 16, 0x877eca, 2.3, 0.045, 0.04);
@@ -140,6 +154,11 @@ export class OriginalWorldAtmosphere {
         quality === 'low'
           ? Math.ceil(detail.instanceMatrix.count * 0.35)
           : detail.instanceMatrix.count;
+    }
+    for (const [index, { light, power }] of this.fireflyLights.entries()) {
+      light.visible = light.position.distanceToSquared(camera) < 130 * 130;
+      const pulse = quality === 'low' ? 0.82 : 0.9 + Math.sin(seconds * 0.72 + index * 2.1) * 0.1;
+      light.intensity = power * pulse;
     }
   }
 
@@ -250,26 +269,23 @@ export class OriginalWorldAtmosphere {
         this.group.add(lamp);
       }
     }
-    const window = new THREE.Mesh(box, amber);
-    window.name = 'windmill-window';
-    const angle = Math.PI / 8;
-    window.position.set(
-      -21 + Math.sin(angle) * 2.28,
-      terrainHeightAt({ x: -21, z: 62 }) + 6.3,
-      62 + Math.cos(angle) * 2.28,
-    );
-    window.rotation.y = angle;
-    window.rotateX(-Math.atan(0.1 * Math.cos(angle)));
-    window.scale.set(0.55, 0.85, 0.04);
-    this.group.add(window);
-    for (const [name, x, y, z, power, range] of [
-      ['village-amber', -8, 14, -7, 18, 9],
-      ['windmill-amber', -20, 13, 65, 12, 8],
-    ] as const) {
+    for (const [name, x, y, z, power, range] of [['village-amber', -8, 14, -7, 18, 9]] as const) {
       const light = new THREE.PointLight(0xffb65c, power, range, 2);
       light.name = name;
       light.position.set(x, y, z);
       this.group.add(light);
+    }
+    for (const [index, x, z, power, range] of [
+      [1, -76, -31, 150, 32],
+      [2, -61, -17, 175, 34],
+      [3, -47, -7, 145, 30],
+    ] as const) {
+      const light = new THREE.PointLight(0xf6c85f, power, range, 1.8);
+      light.name = `forest-firefly-light-${index}`;
+      light.position.set(x, terrainHeightAt({ x, z }) + 3.2, z);
+      light.castShadow = false;
+      this.group.add(light);
+      this.fireflyLights.push({ light, power });
     }
   }
 
@@ -285,6 +301,7 @@ export class OriginalWorldAtmosphere {
     size: number,
     opacity: number,
     speed: number,
+    glow = 0,
   ): void {
     const positions = new Float32Array(count * 3);
     const seeds = new Float32Array(count);
@@ -308,6 +325,7 @@ export class OriginalWorldAtmosphere {
       transparent: true,
       depthWrite: false,
       fog: true,
+      blending: glow > 0 ? THREE.AdditiveBlending : THREE.NormalBlending,
       uniforms: {
         ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog!),
         time: this.time,
@@ -316,6 +334,7 @@ export class OriginalWorldAtmosphere {
         opacity: { value: opacity },
         height: { value: height },
         speed: { value: speed },
+        glow: { value: glow },
       },
       vertexShader: `
         #include <common>
@@ -338,13 +357,16 @@ export class OriginalWorldAtmosphere {
         #include <common>
         #include <fog_pars_fragment>
         uniform vec3 tint;
-        uniform float opacity;
+        uniform float opacity, glow;
         varying float shimmer;
         void main() {
           float radius = length(gl_PointCoord - vec2(0.5)) * 2.0;
-          float alpha = (1.0 - smoothstep(0.0, 1.0, radius)) * opacity * shimmer;
+          float halo = 1.0 - smoothstep(0.0, 1.0, radius);
+          float core = 1.0 - smoothstep(0.0, 0.24, radius);
+          float alpha = (halo + core * glow * 0.35) * opacity * shimmer;
           if (alpha < 0.003) discard;
-          gl_FragColor = vec4(tint, alpha);
+          vec3 color = tint * mix(1.0, 1.55 + core * 0.55, glow);
+          gl_FragColor = vec4(color, min(alpha, 1.0));
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
           #include <fog_fragment>

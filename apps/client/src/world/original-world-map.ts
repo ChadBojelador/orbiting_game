@@ -388,7 +388,10 @@ function createCrystalGeometry(radius: number, height: number): THREE.BufferGeom
   ] as const;
   const positions: number[] = [];
   const colors: number[] = [];
+  const glowGradient: number[] = [];
   const facetTints = [0x9ee8ff, 0x67c4ff, 0x4a8ff2, 0x79d8f5, 0x5477dc, 0x8adfff];
+  const shadowColor = new THREE.Color(0x08263f);
+  const tipColor = new THREE.Color(0xd8fbff);
 
   const vertexAt = (ringIndex: number, sideIndex: number): THREE.Vector3 => {
     const ring = rings[ringIndex]!;
@@ -396,10 +399,16 @@ function createCrystalGeometry(radius: number, height: number): THREE.BufferGeom
     return new THREE.Vector3(Math.cos(angle) * ring.radius, ring.y, Math.sin(angle) * ring.radius);
   };
   const addTriangle = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, tint: number) => {
-    const color = new THREE.Color(tint);
+    const facetColor = new THREE.Color(tint);
     for (const vertex of [a, b, c]) {
+      const heightMix = THREE.MathUtils.clamp(vertex.y / height + 0.5, 0, 1);
+      const color = shadowColor
+        .clone()
+        .lerp(facetColor, THREE.MathUtils.smoothstep(heightMix, 0.02, 0.72));
+      color.lerp(tipColor, THREE.MathUtils.smoothstep(heightMix, 0.68, 1) * 0.78);
       positions.push(vertex.x, vertex.y, vertex.z);
       colors.push(color.r, color.g, color.b);
+      glowGradient.push(heightMix);
     }
   };
 
@@ -434,6 +443,7 @@ function createCrystalGeometry(radius: number, height: number): THREE.BufferGeom
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('crystalGlow', new THREE.Float32BufferAttribute(glowGradient, 1));
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
@@ -455,13 +465,39 @@ function createCrystal(
   return crystal;
 }
 
-function createCrystalLight(name: string, intensity: number, distance: number): THREE.PointLight {
-  const light = new THREE.PointLight(0x69c8ff, intensity, distance, 2);
+function createCrystalLight(
+  name: string,
+  intensity: number,
+  distance: number,
+  decay: number,
+): THREE.PointLight {
+  const light = new THREE.PointLight(0x69c8ff, intensity, distance, decay);
   light.name = name;
-  // Three bounded, shadowless lights keep the crystals useful on mobile
-  // without multiplying shadow-map renders for the entire world.
+  // Three broad, shadowless lights turn the landmarks into regional map
+  // lighting without multiplying shadow-map renders for the entire world.
   light.castShadow = false;
   return light;
+}
+
+function applyCrystalGlowGradient(material: THREE.MeshStandardMaterial, cacheKey: string): void {
+  material.userData.hasCrystalGlowGradient = true;
+  material.customProgramCacheKey = () => `original-crystal-glow-${cacheKey}-v1`;
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute float crystalGlow;\nvarying float vCrystalGlow;',
+      )
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCrystalGlow = crystalGlow;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vCrystalGlow;')
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        float crystalGlowStrength = mix(0.18, 1.0, smoothstep(0.0, 1.0, vCrystalGlow));
+        totalEmissiveRadiance *= crystalGlowStrength;`,
+      );
+  };
 }
 
 function createBeachArch(material: THREE.Material): THREE.Group {
@@ -497,22 +533,24 @@ function createLandmarks(): THREE.Group {
   group.name = 'WORLD_LANDMARKS';
   const crystalMaterial = new THREE.MeshStandardMaterial({
     color: PALETTE.crystalBlue,
-    emissive: 0x19bddd,
-    emissiveIntensity: 2.8,
-    roughness: 0.16,
-    metalness: 0.08,
+    emissive: 0x16b9d4,
+    emissiveIntensity: 2.4,
+    roughness: 0.28,
+    metalness: 0.04,
     vertexColors: true,
   });
+  applyCrystalGlowGradient(crystalMaterial, 'cyan');
   const crystalEdgeMaterial = new THREE.LineBasicMaterial({
     color: 0xc8f4ff,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.3,
     depthWrite: false,
   });
   const violetMaterial = crystalMaterial.clone();
   violetMaterial.color.setHex(0x9374ca);
   violetMaterial.emissive.setHex(0x6740c2);
-  violetMaterial.emissiveIntensity = 2.1;
+  violetMaterial.emissiveIntensity = 2;
+  applyCrystalGlowGradient(violetMaterial, 'violet');
   const iceMaterial = new THREE.MeshStandardMaterial({
     color: PALETTE.ice,
     emissive: 0x299fb9,
@@ -520,6 +558,10 @@ function createLandmarks(): THREE.Group {
     roughness: 0.38,
   });
   const woodMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.9 });
+  const darkWoodMaterial = new THREE.MeshStandardMaterial({
+    color: PALETTE.woodDark,
+    roughness: 0.88,
+  });
   const leafMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.leaf, roughness: 0.92 });
   const leafLightMaterial = new THREE.MeshStandardMaterial({
     color: PALETTE.leafLight,
@@ -540,7 +582,7 @@ function createLandmarks(): THREE.Group {
     shard.rotation.z = tilt;
     villageCrystal.add(shard);
   }
-  const villageLight = createCrystalLight('CRYSTAL_LIGHT_VILLAGE', 42, 16);
+  const villageLight = createCrystalLight('CRYSTAL_LIGHT_VILLAGE', 240, 85, 1.65);
   villageLight.position.set(0, 1.5, 0);
   villageCrystal.add(villageLight);
   group.add(villageCrystal);
@@ -592,7 +634,7 @@ function createLandmarks(): THREE.Group {
     shard.rotation.z = tilt;
     crystalSpire.add(shard);
   }
-  const spireLight = createCrystalLight('CRYSTAL_LIGHT_SPIRE', 78, 23);
+  const spireLight = createCrystalLight('CRYSTAL_LIGHT_SPIRE', 420, 110, 1.6);
   spireLight.position.set(0, 5, 0);
   crystalSpire.add(spireLight);
   group.add(crystalSpire);
@@ -619,30 +661,57 @@ function createLandmarks(): THREE.Group {
   const windmill = new THREE.Group();
   windmill.name = 'LM_MEADOW_WINDMILL';
   windmill.position.set(-21, terrainHeightAt({ x: -21, z: 62 }), 62);
-  windmill.add(
-    mesh(
-      new THREE.CylinderGeometry(2.1, 3.1, 10, 8),
-      creamMaterial,
-      'windmill-tower',
-      new THREE.Vector3(0, 5, 0),
-    ),
+  const tower = mesh(
+    new THREE.CylinderGeometry(2.2, 3.2, 12, 8),
+    creamMaterial,
+    'windmill-tower',
+    new THREE.Vector3(0, 6, 0),
   );
+  windmill.add(tower);
+  const beaconMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffc66f,
+    emissive: 0xff9c3d,
+    emissiveIntensity: 2.35,
+    roughness: 0.32,
+    metalness: 0.04,
+  });
+  const beaconSection = mesh(
+    new THREE.CylinderGeometry(2.28, 2.28, 1.6, 8),
+    beaconMaterial,
+    'windmill-beacon-section',
+    new THREE.Vector3(0, 12.2, 0),
+  );
+  windmill.add(beaconSection);
+  const beaconLight = new THREE.PointLight(0xffb45c, 360, 90, 2);
+  beaconLight.name = 'windmill-beacon-light';
+  beaconLight.position.set(0, 12.2, 0);
+  beaconLight.castShadow = false;
+  windmill.add(beaconLight);
   const roof = mesh(
-    new THREE.ConeGeometry(3.5, 3, 8),
+    new THREE.ConeGeometry(3.5, 2.8, 8),
     new THREE.MeshStandardMaterial({ color: 0xd88465, roughness: 0.85 }),
     'windmill-roof',
-    new THREE.Vector3(0, 11, 0),
+    new THREE.Vector3(0, 14.4, 0),
   );
   windmill.add(roof);
-  const hub = new THREE.Group();
-  hub.position.set(0, 8.5, 3.1);
+  const fan = new THREE.Group();
+  fan.name = 'windmill-fan';
+  fan.userData.originalPresentation = true;
+  fan.position.set(0, 10.7, 2.55);
+  const fanHub = mesh(
+    new THREE.CylinderGeometry(0.62, 0.72, 0.72, 8),
+    darkWoodMaterial,
+    'windmill-fan-hub',
+  );
+  fanHub.rotation.x = Math.PI / 2;
+  fan.add(fanHub);
   for (let index = 0; index < 4; index += 1) {
-    const blade = mesh(new THREE.BoxGeometry(0.7, 7, 0.32), woodMaterial, 'windmill-blade');
-    blade.position.y = 3.2;
+    const blade = mesh(new THREE.BoxGeometry(0.78, 6.8, 0.3), woodMaterial, 'windmill-blade');
+    blade.position.y = 3.1;
     blade.rotation.z = (index * Math.PI) / 2;
-    hub.add(blade);
+    fan.add(blade);
   }
-  windmill.add(hub);
+  windmill.add(fan);
   group.add(windmill);
 
   const beachArch = createBeachArch(creamMaterial);
@@ -653,7 +722,7 @@ function createLandmarks(): THREE.Group {
   const moonstone = createCrystal(crystalMaterial, crystalEdgeMaterial, 2.2, 7);
   moonstone.name = 'LM_ISLAND_MOONSTONE';
   moonstone.position.set(37, terrainHeightAt({ x: 37, z: 116 }) + 3.5, 116);
-  const moonstoneLight = createCrystalLight('CRYSTAL_LIGHT_MOONSTONE', 30, 13);
+  const moonstoneLight = createCrystalLight('CRYSTAL_LIGHT_MOONSTONE', 190, 75, 1.65);
   moonstoneLight.position.copy(moonstone.position).add(new THREE.Vector3(0, 1.5, 0));
   group.add(moonstone, moonstoneLight);
 
@@ -780,6 +849,7 @@ export class OriginalWorldMap {
   readonly group = new THREE.Group();
   private readonly style = new OriginalWorldMaterials();
   private atmosphere?: OriginalWorldAtmosphere;
+  private windmillFan?: THREE.Object3D;
   private readonly crystals = new Map<THREE.MeshStandardMaterial, number>();
   private boundary = new THREE.Group();
   private readonly waterMaterial = new THREE.MeshPhysicalMaterial({
@@ -812,6 +882,7 @@ export class OriginalWorldMap {
     this.style.time.value = quality === 'low' ? 0 : elapsedSeconds;
     this.style.motion.value = quality === 'low' ? 0 : 1;
     this.atmosphere?.update(elapsedSeconds, camera, quality);
+    if (this.windmillFan) this.windmillFan.rotation.z = elapsedSeconds * 0.45;
     for (const [material, intensity] of this.crystals) {
       material.emissiveIntensity =
         intensity * (quality === 'low' ? 1 : 1 + Math.sin(elapsedSeconds * 0.65) * 0.045);
@@ -969,7 +1040,9 @@ export class OriginalWorldMap {
       ),
     );
 
-    this.group.add(createLandmarks(), createBlockoutDetails());
+    const landmarks = createLandmarks();
+    this.group.add(landmarks, createBlockoutDetails());
+    this.windmillFan = landmarks.getObjectByName('windmill-fan');
     this.group.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
       if (!(object.material instanceof THREE.MeshStandardMaterial)) return;

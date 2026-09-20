@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AdditiveBlending,
   InstancedMesh,
   Matrix4,
   Mesh,
+  MeshStandardMaterial,
   PointLight,
   Points,
   Scene,
@@ -106,8 +108,26 @@ describe('Original World presentation safeguards', () => {
       if (object instanceof Points) particles.push(object);
       if (object instanceof InstancedMesh) instanced.push(object);
     });
-    expect(lights).toHaveLength(5);
-    expect(lights.every((light) => !light.castShadow && light.distance <= 23)).toBe(true);
+    expect(lights).toHaveLength(8);
+    expect(lights.every((light) => !light.castShadow && light.distance <= 110)).toBe(true);
+    expect(lights.find((light) => light.name === 'windmill-beacon-light')?.distance).toBe(90);
+    const crystalLights = lights.filter((light) => light.name.startsWith('CRYSTAL_LIGHT_'));
+    expect(crystalLights).toHaveLength(3);
+    expect(crystalLights.every((light) => light.distance >= 75 && light.decay <= 1.65)).toBe(true);
+    const fireflyLights = lights.filter((light) => light.name.startsWith('forest-firefly-light-'));
+    expect(fireflyLights).toHaveLength(3);
+    expect(
+      fireflyLights.every(
+        (light) =>
+          light.distance >= 30 &&
+          light.intensity >= 140 &&
+          light.color.getHex() === 0xf6c85f &&
+          !light.castShadow,
+      ),
+    ).toBe(true);
+    const fireflies = particles.find((field) => field.name === 'forest-fireflies')!;
+    expect(fireflies.geometry.getAttribute('position').count).toBe(120);
+    expect((fireflies.material as import('three').ShaderMaterial).blending).toBe(AdditiveBlending);
     expect(
       particles.reduce((count, field) => count + field.geometry.getAttribute('position').count, 0),
     ).toBeLessThan(800);
@@ -122,6 +142,7 @@ describe('Original World presentation safeguards', () => {
     expect(particles.every((field) => !field.visible)).toBe(true);
     world.update(4, new Vector3(1000, 1000, 1000), 'high');
     expect(particles.every((field) => !field.visible)).toBe(true);
+    expect(fireflyLights.every((light) => !light.visible)).toBe(true);
     expect(instanced.every((mesh) => !mesh.visible)).toBe(true);
     const geometryDispose = vi.spyOn(instanced[0]!.geometry, 'dispose');
     const materialDispose = vi.spyOn(field.material as import('three').ShaderMaterial, 'dispose');
@@ -130,6 +151,88 @@ describe('Original World presentation safeguards', () => {
     expect(geometryDispose).toHaveBeenCalledTimes(1);
     expect(materialDispose).toHaveBeenCalledTimes(1);
     expect(instanceDispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('integrates the broad meadow beacon and aligns an animated non-colliding fan', () => {
+    const world = new OriginalWorldMap(new Scene());
+    try {
+      const landmark = world.group.getObjectByName('LM_MEADOW_WINDMILL')!;
+      const tower = landmark.getObjectByName('windmill-tower') as Mesh;
+      const beacon = landmark.getObjectByName('windmill-beacon-section') as Mesh;
+      const light = landmark.getObjectByName('windmill-beacon-light') as PointLight;
+      const fan = landmark.getObjectByName('windmill-fan')!;
+
+      tower.geometry.computeBoundingBox();
+      const towerTop = tower.position.y + tower.geometry.boundingBox!.max.y;
+      expect(beacon.parent).toBe(landmark);
+      expect(beacon.position.y).toBeGreaterThanOrEqual(towerTop);
+      expect((beacon.material as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(2);
+      expect(light.parent).toBe(landmark);
+      expect(light.position.y).toBe(beacon.position.y);
+      expect(light.distance).toBeGreaterThanOrEqual(80);
+      expect(light.castShadow).toBe(false);
+
+      expect(fan.position.y).toBeGreaterThan(towerTop * 0.8);
+      expect(fan.position.z).toBeGreaterThan(2.2);
+      expect(isOriginalPresentation(fan)).toBe(true);
+      world.update(2, new Vector3(), 'high');
+      expect(fan.rotation.z).toBeCloseTo(0.9);
+    } finally {
+      world.destroy();
+    }
+  });
+
+  it('grades cyan crystals from shadowed bases to bright tips while retaining real shadows', () => {
+    const world = new OriginalWorldMap(new Scene());
+    try {
+      const cyanCrystals: Mesh[] = [];
+      world.group.traverse((object) => {
+        if (!(object instanceof Mesh) || object.name !== 'crystal-shard') return;
+        const material = object.material;
+        if (
+          !Array.isArray(material) &&
+          material instanceof MeshStandardMaterial &&
+          material.color.getHex() === 0x5ea8ff
+        )
+          cyanCrystals.push(object);
+      });
+
+      expect(cyanCrystals.length).toBeGreaterThan(0);
+      for (const crystal of cyanCrystals) {
+        const position = crystal.geometry.getAttribute('position');
+        const color = crystal.geometry.getAttribute('color');
+        const glow = crystal.geometry.getAttribute('crystalGlow');
+        expect(glow.count).toBe(position.count);
+        crystal.geometry.computeBoundingBox();
+        const bounds = crystal.geometry.boundingBox!;
+        const cutoff = (bounds.max.y - bounds.min.y) * 0.2;
+        let lowerLight = 0;
+        let lowerCount = 0;
+        let upperLight = 0;
+        let upperCount = 0;
+        for (let index = 0; index < position.count; index += 1) {
+          const light = color.getX(index) + color.getY(index) + color.getZ(index);
+          const y = position.getY(index);
+          if (y <= bounds.min.y + cutoff) {
+            lowerLight += light;
+            lowerCount++;
+          }
+          if (y >= bounds.max.y - cutoff) {
+            upperLight += light;
+            upperCount++;
+          }
+        }
+        expect(upperLight / upperCount).toBeGreaterThan((lowerLight / lowerCount) * 1.5);
+        expect(crystal.castShadow).toBe(true);
+        expect(crystal.receiveShadow).toBe(true);
+        const material = crystal.material as import('three').MeshStandardMaterial;
+        expect(material.emissiveIntensity).toBeGreaterThan(2);
+        expect(material.userData.hasCrystalGlowGradient).toBe(true);
+        expect(material.roughness).toBeGreaterThanOrEqual(0.25);
+      }
+    } finally {
+      world.destroy();
+    }
   });
 
   it('uses one local moon shadow volume with stable light direction and quality resizing', () => {
@@ -143,6 +246,17 @@ describe('Original World presentation safeguards', () => {
       expect(lighting.moon.position.clone().sub(lighting.moon.target.position).toArray()).toEqual([
         -70, 100, -50,
       ]);
+      expect(lighting.moonDisc.name).toBe('ORIGINAL_SKY_MOON');
+      expect(lighting.moonDisc.position.distanceTo(camera)).toBeCloseTo(240);
+      expect(
+        lighting.moonDisc.position
+          .clone()
+          .sub(camera)
+          .normalize()
+          .dot(lighting.moon.position.clone().sub(lighting.moon.target.position).normalize()),
+      ).toBeCloseTo(1);
+      expect(lighting.moonDisc.material.depthWrite).toBe(false);
+      expect(lighting.moonDisc.material.fog).toBe(false);
       expect(lighting.moon.shadow.camera.right - lighting.moon.shadow.camera.left).toBe(96);
       const map = new WebGLRenderTarget(1, 1);
       const dispose = vi.spyOn(map, 'dispose');
@@ -153,7 +267,11 @@ describe('Original World presentation safeguards', () => {
       lighting.update(camera, 'low');
       expect(lighting.moon.castShadow).toBe(false);
     } finally {
+      const geometryDispose = vi.spyOn(lighting.moonDisc.geometry, 'dispose');
+      const materialDispose = vi.spyOn(lighting.moonDisc.material, 'dispose');
       lighting.destroy();
+      expect(geometryDispose).toHaveBeenCalledTimes(1);
+      expect(materialDispose).toHaveBeenCalledTimes(1);
     }
   });
 

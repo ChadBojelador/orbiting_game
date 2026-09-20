@@ -199,7 +199,7 @@ export const ARENA = {
     { id: 'COVER_VILLAGE_S', x: 0, z: 17, width: 8, depth: 2, height: 1.2 },
     { id: 'LM_FOREST_TREE', x: -65, z: -18, width: 7, depth: 7, height: 17 },
     { id: 'LM_CRYSTAL_SPIRE', x: 69, z: -14, width: 8, depth: 8, height: 16 },
-    { id: 'LM_MEADOW_WINDMILL', x: -21, z: 62, width: 6, depth: 6, height: 12 },
+    { id: 'LM_MEADOW_WINDMILL', x: -21, z: 62, width: 7, depth: 7, height: 16 },
   ] as readonly ArenaBlock[],
 } as const;
 
