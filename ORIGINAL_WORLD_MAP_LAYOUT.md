@@ -228,7 +228,7 @@ Each bridge has a solid wooden deck and two raised rails.
 - Center: `(0,1)`
 - Ground elevation: approximately `Y = 12`
 - Primary central navigation light
-- Cyan point-light range: `34 m`
+- Cyan point-light range: `16 m`
 - Three shards:
 
 | Shard | Local offset `(X,Z)` | Radius | Height |
@@ -250,7 +250,7 @@ Each bridge has a solid wooden deck and two raised rails.
 - Position: `(69,-14)`
 - Ground elevation: approximately `Y = 20`
 - Strongest crystal light source
-- Cyan point-light range: `48 m`
+- Cyan point-light range: `23 m`
 - Four shards:
 
 | Shard | Local offset `(X,Z)` | Radius | Height |
@@ -292,7 +292,7 @@ The peaks sit on the already elevated northern terrain.
 - Position: `(37,116)`
 - Island elevation: approximately `Y = 3.4`
 - Crystal height: `7 m`
-- Cyan point-light range: `30 m`
+- Cyan point-light range: `13 m`
 - Marks the eastern offshore island
 
 ## Waterfalls
@@ -384,17 +384,17 @@ Original World uses:
 
 - A permanent deep-navy night sky
 - Dark blue distance fog
-- Restrained cool moon fill
-- Strong emissive cyan-blue crystal materials
-- Three bounded, shadowless crystal point lights
+- Lavender-blue moon directional lighting with restrained hemisphere fill
+- Strong emissive cyan main crystals with violet secondary spire shards
+- Three compact shadowless crystal point lights and two small amber lights at Village and Windmill
 
 | Light source | Range | Role |
 |---|---:|---|
-| Village crystal | `34 m` | Central combat and navigation light |
-| Crystal Valley spire | `48 m` | Strong eastern regional light |
-| Island moonstone | `30 m` | Southern island navigation light |
+| Village crystal | `16 m` | Central crystal accent and navigation light |
+| Crystal Valley spire | `23 m` | Strongest compact magical accent |
+| Island moonstone | `13 m` | Southern island navigation light |
 
-The lights do not render dynamic shadow maps, limiting their browser GPU cost.
+Only the moon renders shadows, in a player-centered 96-metre volume: 2048 desktop, 1024 touch, disabled with reduced effects. The five local lights remain shadowless. Village and Windmill amber lights reach 9 m and 8 m. Bridge lamps are emissive only.
 
 ## Tactical interpretation
 

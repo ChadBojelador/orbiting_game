@@ -12,6 +12,9 @@ import {
   WebGLRenderer,
   Color,
   Fog,
+  FogExp2,
+  PCFSoftShadowMap,
+  ACESFilmicToneMapping,
   HemisphereLight,
   DirectionalLight,
   Group,
@@ -26,6 +29,7 @@ import type { LobbyRoom } from '../network/lobby-client.js';
 import { LocalPresentation } from '../network/player-motion.js';
 import { FrostlineMap } from '../world/frostline-map.js';
 import { OriginalWorldMap } from '../world/original-world-map.js';
+import { OriginalWorldLighting } from '../world/original-world-lighting.js';
 import { IslandMap } from '../world/island-map.js';
 import { FirstPersonCamera } from './first-person-camera.js';
 import { WeaponRenderer } from './weapon-renderer.js';
@@ -63,6 +67,7 @@ export class GameScene {
   private readonly camera = new PerspectiveCamera(96, 1, 0.05, 320);
   private renderer: WebGLRenderer;
   private world?: FrostlineMap | OriginalWorldMap;
+  private originalLighting?: OriginalWorldLighting;
   private island?: IslandMap;
   private cameraMotion = new FirstPersonCamera();
   private presentation = new LocalPresentation();
@@ -101,20 +106,19 @@ export class GameScene {
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.applyWaterEnvironment(false);
     const isOriginalNight = this.session.view.mapId === 'original';
-    this.scene.add(
-      new HemisphereLight(
-        isOriginalNight ? 0x8fb9ff : 0xedfaff,
-        isOriginalNight ? 0x07111f : 0x41617b,
-        isOriginalNight ? 0.52 : 2.5,
-      ),
-    );
-    const keyLight = new DirectionalLight(
-      isOriginalNight ? 0xc9dcff : 0xfff0d0,
-      isOriginalNight ? 0.72 : 2,
-    );
-    keyLight.name = isOriginalNight ? 'moonlight' : 'sunlight';
-    keyLight.position.set(isOriginalNight ? 45 : -30, isOriginalNight ? 85 : 60, -35);
-    this.scene.add(keyLight);
+    if (isOriginalNight) {
+      this.originalLighting = new OriginalWorldLighting();
+      this.scene.add(this.originalLighting.group);
+      this.renderer.shadowMap.type = PCFSoftShadowMap;
+      this.renderer.toneMapping = ACESFilmicToneMapping;
+      this.renderer.toneMappingExposure = 1.05;
+    } else {
+      this.scene.add(new HemisphereLight(0xedfaff, 0x41617b, 2.5));
+      const keyLight = new DirectionalLight(0xfff0d0, 2);
+      keyLight.name = 'sunlight';
+      keyLight.position.set(-30, 60, -35);
+      this.scene.add(keyLight);
+    }
     if (this.session.view.mapId === 'island') {
       this.island = new IslandMap(this.scene);
       void this.island.ready.then(() => {
@@ -165,6 +169,7 @@ export class GameScene {
     this.weapon.destroy();
     this.effects.destroy();
     this.world?.destroy();
+    this.originalLighting?.destroy();
     this.island?.destroy();
     this.audio.destroy();
     this.body.dispose();
@@ -242,6 +247,10 @@ export class GameScene {
     torso.position.y = 0.9;
     const head = new Mesh(this.head, this.material('head', 0xedf6fa));
     head.position.y = 1.575;
+    torso.castShadow = true;
+    head.castShadow = true;
+    torso.receiveShadow = true;
+    head.receiveShadow = true;
     model.add(torso, head);
     this.scene.add(model);
     this.players.set(player.playerId, model);
@@ -261,7 +270,10 @@ export class GameScene {
   private applyWaterEnvironment(isCameraUnderwater: boolean): void {
     const environment = waterEnvironmentFor(this.session.view.mapId, isCameraUnderwater);
     this.scene.background = new Color(environment.background);
-    this.scene.fog = new Fog(environment.fogColor, environment.fogNear, environment.fogFar);
+    this.scene.fog =
+      this.session.view.mapId === 'original' && !isCameraUnderwater
+        ? new FogExp2(environment.fogColor, 0.0032)
+        : new Fog(environment.fogColor, environment.fogNear, environment.fogFar);
   }
   private loop(now: number): void {
     if (this.destroyed) return;
@@ -402,7 +414,12 @@ export class GameScene {
       if (event.type === 'player/killed' && event.payload.killerId === local)
         this.audio.play('kill');
     }
-    if (this.world instanceof OriginalWorldMap) this.world.update(now / 1000);
+    if (this.world instanceof OriginalWorldMap) {
+      const quality = this.settings.reducedEffects ? 'low' : this.isTouch ? 'medium' : 'high';
+      this.renderer.shadowMap.enabled = quality !== 'low';
+      this.originalLighting?.update(this.camera.position, quality);
+      this.world.update(now / 1000, this.camera.position, quality);
+    }
     this.effects.update(now);
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame((t) => this.loop(t));

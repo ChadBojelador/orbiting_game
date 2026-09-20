@@ -89,7 +89,10 @@ export function surfaceColor(x: number, z: number, elevation: number): THREE.Col
   // Broken snow patches preserve dark rock and the moon-facing mountain facets.
   const patch = 0.5 + 0.5 * Math.sin(x * 0.18 + Math.sin(z * 0.24)) * Math.cos(z * 0.16);
   color.lerp(new THREE.Color(PALETTE.snow), frost * smooth(patch, 0.3, 0.85) * 0.8);
-  color.lerp(new THREE.Color(PALETTE.sand), Math.max(smooth(z, 78, 103), 1 - smooth(elevation, 2.4, 5)));
+  color.lerp(
+    new THREE.Color(PALETTE.sand),
+    Math.max(smooth(z, 78, 103), 1 - smooth(elevation, 2.4, 5)),
+  );
   return color.multiplyScalar(0.96 + Math.sin(x * 0.65) * Math.cos(z * 0.57) * 0.04);
 }
 
@@ -579,7 +582,12 @@ function createLandmarks(): THREE.Group {
     [4, 1, 2.5, 12, 0.2],
     [1, -4, 1.8, 8, -0.08],
   ] as const) {
-    const shard = createCrystal(x === 0 ? crystalMaterial : violetMaterial, crystalEdgeMaterial, radius, height);
+    const shard = createCrystal(
+      x === 0 ? crystalMaterial : violetMaterial,
+      crystalEdgeMaterial,
+      radius,
+      height,
+    );
     shard.position.set(x, height / 2, z);
     shard.rotation.z = tilt;
     crystalSpire.add(shard);
@@ -703,7 +711,10 @@ function createWaterfall(
   waterfall.position.copy(top).add(bottom).multiplyScalar(0.5);
   // The old vertical sheet missed both authored endpoints in Z. Align its
   // local Y axis to the actual flow so it visibly meets the existing river.
-  waterfall.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(bottom).normalize());
+  waterfall.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    top.clone().sub(bottom).normalize(),
+  );
   waterfall.castShadow = false;
   return waterfall;
 }
@@ -769,6 +780,7 @@ export class OriginalWorldMap {
   readonly group = new THREE.Group();
   private readonly style = new OriginalWorldMaterials();
   private atmosphere?: OriginalWorldAtmosphere;
+  private readonly crystals = new Map<THREE.MeshStandardMaterial, number>();
   private boundary = new THREE.Group();
   private readonly waterMaterial = new THREE.MeshPhysicalMaterial({
     color: PALETTE.river,
@@ -792,10 +804,18 @@ export class OriginalWorldMap {
     this.build();
   }
 
-  update(elapsedSeconds: number, camera = this.group.position, quality: OriginalWorldQuality = 'high'): void {
+  update(
+    elapsedSeconds: number,
+    camera = this.group.position,
+    quality: OriginalWorldQuality = 'high',
+  ): void {
     this.style.time.value = quality === 'low' ? 0 : elapsedSeconds;
     this.style.motion.value = quality === 'low' ? 0 : 1;
     this.atmosphere?.update(elapsedSeconds, camera, quality);
+    for (const [material, intensity] of this.crystals) {
+      material.emissiveIntensity =
+        intensity * (quality === 'low' ? 1 : 1 + Math.sin(elapsedSeconds * 0.65) * 0.045);
+    }
   }
 
   destroy(): void {
@@ -866,7 +886,10 @@ export class OriginalWorldMap {
       color: PALETTE.path,
       roughness: 0.96,
       side: THREE.FrontSide,
+      transparent: true,
+      depthWrite: false,
     });
+    this.style.apply(pathMaterial, 'path');
     for (const route of ROUTE_CORRIDORS) {
       const path = mesh(
         createRibbonGeometry(
@@ -950,8 +973,12 @@ export class OriginalWorldMap {
     this.group.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
       if (!(object.material instanceof THREE.MeshStandardMaterial)) return;
-      if (object.name === 'ice-peak' || object.name.startsWith('beach-arch')) this.style.apply(object.material, 'rock');
-      if (object.name.includes('trunk') || object.name.includes('board')) this.style.apply(object.material, 'wood');
+      if (object.name === 'crystal-shard' || object.name === 'LM_ISLAND_MOONSTONE')
+        this.crystals.set(object.material, object.material.emissiveIntensity);
+      if (object.name === 'ice-peak' || object.name.startsWith('beach-arch'))
+        this.style.apply(object.material, 'rock');
+      if (object.name.includes('trunk') || object.name.includes('board'))
+        this.style.apply(object.material, 'wood');
     });
     // Restore the original authored village cover as visible solid geometry.
     const coverMaterial = new THREE.MeshStandardMaterial({ color: PALETTE.wood, roughness: 0.9 });
@@ -962,7 +989,7 @@ export class OriginalWorldMap {
       this.group.add(
         mesh(
           new THREE.BoxGeometry(block.width, block.height, block.depth),
-          block.width > 4 || block.x > 0 && block.z < 0 ? coverStone : coverMaterial,
+          block.width > 4 || (block.x > 0 && block.z < 0) ? coverStone : coverMaterial,
           block.id,
           new THREE.Vector3(block.x, terrainHeightAt(block) + block.height / 2, block.z),
         ),
@@ -1007,14 +1034,19 @@ export class OriginalWorldMap {
     const geometries = new Set<THREE.BufferGeometry>();
     const allMaterials = new Set<THREE.Material>();
     root.traverse((object) => {
-      if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.LineSegments) && !(object instanceof THREE.Points)) return;
+      if (
+        !(object instanceof THREE.Mesh) &&
+        !(object instanceof THREE.LineSegments) &&
+        !(object instanceof THREE.Points)
+      )
+        return;
       if (object instanceof THREE.InstancedMesh) object.dispose();
       geometries.add(object.geometry);
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const material of materials) allMaterials.add(material);
     });
-    geometries.forEach(geometry => geometry.dispose());
-    allMaterials.forEach(material => material.dispose());
+    geometries.forEach((geometry) => geometry.dispose());
+    allMaterials.forEach((material) => material.dispose());
   }
 }
 

@@ -2,7 +2,16 @@ import * as THREE from 'three';
 import { originalTopology } from '@ice-water/shared';
 import type { OriginalWorldQuality } from './original-world-lighting.js';
 
-const { WORLD_MIN, SEA_LEVEL, terrainHeightAt, isPermanentLand, ROUTE_CORRIDORS, RIVER_BRANCHES, BRIDGES, ARENA } = originalTopology;
+const {
+  WORLD_MIN,
+  SEA_LEVEL,
+  terrainHeightAt,
+  isPermanentLand,
+  ROUTE_CORRIDORS,
+  RIVER_BRANCHES,
+  BRIDGES,
+  ARENA,
+} = originalTopology;
 
 /** Explicitly separate non-cover accents from the immutable collision bake. */
 export function isOriginalPresentation(object: THREE.Object3D): boolean {
@@ -17,8 +26,14 @@ function random(seed: number): number {
   return value - Math.floor(value);
 }
 
-function distanceToSegment(x: number, z: number, a: { x: number; z: number }, b: { x: number; z: number }): number {
-  const dx = b.x - a.x, dz = b.z - a.z;
+function distanceToSegment(
+  x: number,
+  z: number,
+  a: { x: number; z: number },
+  b: { x: number; z: number },
+): number {
+  const dx = b.x - a.x,
+    dz = b.z - a.z;
   const t = THREE.MathUtils.clamp(((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz), 0, 1);
   return Math.hypot(x - a.x - dx * t, z - a.z - dz * t);
 }
@@ -26,11 +41,17 @@ function distanceToSegment(x: number, z: number, a: { x: number; z: number }, b:
 export function canDressOriginalGround(x: number, z: number): boolean {
   const cellX = WORLD_MIN + Math.floor((x - WORLD_MIN) / 3.125) * 3.125;
   const cellZ = WORLD_MIN + Math.floor((z - WORLD_MIN) / 3.125) * 3.125;
-  if (!isPermanentLand({ x: cellX + 1.5625, z: cellZ + 1.5625 }) || Math.abs(x) > 123 || Math.abs(z) > 123) return false;
+  if (
+    !isPermanentLand({ x: cellX + 1.5625, z: cellZ + 1.5625 }) ||
+    Math.abs(x) > 123 ||
+    Math.abs(z) > 123
+  )
+    return false;
   if (Math.hypot(x, z) < 31 || terrainHeightAt({ x, z }) < SEA_LEVEL + 0.3) return false;
   for (const route of ROUTE_CORRIDORS) {
     for (let i = 1; i < route.points.length; i++) {
-      if (distanceToSegment(x, z, route.points[i - 1]!, route.points[i]!) < route.width / 2 + 1.5) return false;
+      if (distanceToSegment(x, z, route.points[i - 1]!, route.points[i]!) < route.width / 2 + 1.5)
+        return false;
     }
   }
   for (const river of RIVER_BRANCHES) {
@@ -38,8 +59,16 @@ export function canDressOriginalGround(x: number, z: number): boolean {
       if (distanceToSegment(x, z, river[i - 1]!, river[i]!) < 6.5) return false;
     }
   }
-  if (BRIDGES.some(b => Math.abs(x - b.x) < b.width / 2 + 2 && Math.abs(z - b.z) < b.depth / 2 + 2)) return false;
-  const heights = [terrainHeightAt({x: x - 0.5, z}), terrainHeightAt({x: x + 0.5, z}), terrainHeightAt({x, z: z - 0.5}), terrainHeightAt({x, z: z + 0.5})];
+  if (
+    BRIDGES.some((b) => Math.abs(x - b.x) < b.width / 2 + 2 && Math.abs(z - b.z) < b.depth / 2 + 2)
+  )
+    return false;
+  const heights = [
+    terrainHeightAt({ x: x - 0.5, z }),
+    terrainHeightAt({ x: x + 0.5, z }),
+    terrainHeightAt({ x, z: z - 0.5 }),
+    terrainHeightAt({ x, z: z + 0.5 }),
+  ];
   return Math.max(...heights) - Math.min(...heights) < 0.3;
 }
 
@@ -48,12 +77,15 @@ function groundHeight(x: number, z: number): number {
   const step = 3.125;
   const left = WORLD_MIN + Math.floor((x - WORLD_MIN) / step) * step;
   const top = WORLD_MIN + Math.floor((z - WORLD_MIN) / step) * step;
-  const u = (x - left) / step, v = (z - top) / step;
+  const u = (x - left) / step,
+    v = (z - top) / step;
   const nw = terrainHeightAt({ x: left, z: top });
   const ne = terrainHeightAt({ x: left + step, z: top });
   const sw = terrainHeightAt({ x: left, z: top + step });
   const se = terrainHeightAt({ x: left + step, z: top + step });
-  return u + v <= 1 ? nw + (ne - nw) * u + (sw - nw) * v : se + (sw - se) * (1 - u) + (ne - se) * (1 - v);
+  return u + v <= 1
+    ? nw + (ne - nw) * u + (sw - nw) * v
+    : se + (sw - se) * (1 - u) + (ne - se) * (1 - v);
 }
 
 interface ParticleField {
@@ -88,7 +120,10 @@ export class OriginalWorldAtmosphere {
       this.addParticles(`${name}-spray`, x, y + 0.5, z, width, 1.5, 48, tint, 0.08, 0.45, 0.8);
       this.addParticles(`${name}-mist`, x, y, z, width, 0.8, 20, tint, 1.8, 0.09, 0.25);
     }
-    for (const [name, x, y, z] of [['village', 0, 16, 1], ['moonstone', 37, 7, 116]] as const) {
+    for (const [name, x, y, z] of [
+      ['village', 0, 16, 1],
+      ['moonstone', 37, 7, 116],
+    ] as const) {
       this.addParticles(`${name}-glow`, x, y, z, 3.5, 3, 30, 0x69dfff, 0.085, 0.65, 0.16);
     }
   }
@@ -101,16 +136,28 @@ export class OriginalWorldAtmosphere {
     }
     for (const detail of this.detail) {
       detail.visible = detail.position.distanceToSquared(camera) < 105 * 105;
-      detail.count = quality === 'low' ? Math.ceil(detail.instanceMatrix.count * 0.35) : detail.instanceMatrix.count;
+      detail.count =
+        quality === 'low'
+          ? Math.ceil(detail.instanceMatrix.count * 0.35)
+          : detail.instanceMatrix.count;
     }
   }
 
   private addGroundDetails(): void {
     const stone = new THREE.IcosahedronGeometry(1, 0);
     const sprig = new THREE.ConeGeometry(1, 1, 4);
-    const rock = new THREE.MeshStandardMaterial({ color: 0x82918e, roughness: 0.8, flatShading: true });
+    const rock = new THREE.MeshStandardMaterial({
+      color: 0x82918e,
+      roughness: 0.8,
+      flatShading: true,
+    });
     const green = new THREE.MeshStandardMaterial({ color: 0x6d9564, roughness: 1 });
-    const crystal = new THREE.MeshStandardMaterial({ color: 0x806cba, emissive: 0x594ca8, emissiveIntensity: 0.7, roughness: 0.28 });
+    const crystal = new THREE.MeshStandardMaterial({
+      color: 0x806cba,
+      emissive: 0x594ca8,
+      emissiveIntensity: 0.7,
+      roughness: 0.28,
+    });
     const flower = new THREE.MeshStandardMaterial({ color: 0xe8cf9b, roughness: 0.9 });
     for (const region of originalTopology.LAND_REGIONS) {
       if (region.id === 'BIO_VILLAGE') continue;
@@ -135,14 +182,24 @@ export class OriginalWorldAtmosphere {
           placements.push(transform.matrix.clone());
         }
         if (!placements.length) continue;
-        const material = kind === 0 ? rock : isCrystal ? crystal : isIce ? flower : green;
-        const batch = new THREE.InstancedMesh(kind === 0 ? stone : sprig, material, placements.length);
+        const material =
+          kind === 0 ? rock : isCrystal ? crystal : isIce || isMeadow ? flower : green;
+        const batch = new THREE.InstancedMesh(
+          kind === 0 ? stone : sprig,
+          material,
+          placements.length,
+        );
         batch.name = `DRESS_${region.id}_${kind}`;
         batch.position.set(region.x, 0, region.z);
         batch.userData.ankleHeight = true;
         placements.forEach((matrix, index) => {
           batch.setMatrixAt(index, matrix);
-          batch.setColorAt(index, new THREE.Color(isForest ? 0x668278 : isIce ? 0xc8daed : 0xffffff).multiplyScalar(0.8 + random(index) * 0.2));
+          batch.setColorAt(
+            index,
+            new THREE.Color(isForest ? 0x668278 : isIce ? 0xc8daed : 0xffffff).multiplyScalar(
+              0.8 + random(index) * 0.2,
+            ),
+          );
         });
         batch.receiveShadow = true;
         batch.computeBoundingSphere();
@@ -153,11 +210,16 @@ export class OriginalWorldAtmosphere {
   }
 
   private addWarmAccents(): void {
-    const amber = new THREE.MeshStandardMaterial({ color: 0xf6bc64, emissive: 0xff9b35, emissiveIntensity: 2.3, roughness: 0.7 });
+    const amber = new THREE.MeshStandardMaterial({
+      color: 0xf6bc64,
+      emissive: 0xff9b35,
+      emissiveIntensity: 2.3,
+      roughness: 0.7,
+    });
     const trim = new THREE.MeshStandardMaterial({ color: 0x453a31, roughness: 0.85 });
     const box = new THREE.BoxGeometry(1, 1, 1);
     // Inset crate straps and lamps keep the six existing cover envelopes intact.
-    for (const [index, block] of ARENA.blocks.filter(b => b.id.startsWith('COVER_')).entries()) {
+    for (const [index, block] of ARENA.blocks.filter((b) => b.id.startsWith('COVER_')).entries()) {
       const y = terrainHeightAt(block);
       for (const sign of [-1, 1]) {
         const strap = new THREE.Mesh(box, trim);
@@ -179,7 +241,11 @@ export class OriginalWorldAtmosphere {
         const lamp = new THREE.Mesh(box, amber);
         const horizontal = bridge.width > bridge.depth;
         lamp.name = 'bridge-lantern';
-        lamp.position.set(bridge.x + (horizontal ? sign * bridge.width * 0.35 : bridge.width * 0.46), terrainHeightAt(bridge) + 1.31, bridge.z + (horizontal ? bridge.depth * 0.46 : sign * bridge.depth * 0.35));
+        lamp.position.set(
+          bridge.x + (horizontal ? sign * bridge.width * 0.35 : bridge.width * 0.46),
+          terrainHeightAt(bridge) + 1.31,
+          bridge.z + (horizontal ? bridge.depth * 0.46 : sign * bridge.depth * 0.35),
+        );
         lamp.scale.set(0.12, 0.16, 0.12);
         this.group.add(lamp);
       }
@@ -187,7 +253,11 @@ export class OriginalWorldAtmosphere {
     const window = new THREE.Mesh(box, amber);
     window.name = 'windmill-window';
     const angle = Math.PI / 8;
-    window.position.set(-21 + Math.sin(angle) * 2.28, terrainHeightAt({ x: -21, z: 62 }) + 6.3, 62 + Math.cos(angle) * 2.28);
+    window.position.set(
+      -21 + Math.sin(angle) * 2.28,
+      terrainHeightAt({ x: -21, z: 62 }) + 6.3,
+      62 + Math.cos(angle) * 2.28,
+    );
     window.rotation.y = angle;
     window.scale.set(0.55, 0.85, 0.04);
     this.group.add(window);
@@ -202,22 +272,50 @@ export class OriginalWorldAtmosphere {
     }
   }
 
-  private addParticles(name: string, x: number, y: number, z: number, radius: number, height: number, count: number, color: number, size: number, opacity: number, speed: number): void {
+  private addParticles(
+    name: string,
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    height: number,
+    count: number,
+    color: number,
+    size: number,
+    opacity: number,
+    speed: number,
+  ): void {
     const positions = new Float32Array(count * 3);
     const seeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       const angle = random(i + x) * Math.PI * 2;
       const r = Math.sqrt(random(i + z + 17)) * radius;
-      positions.set([Math.cos(angle) * r, (random(i + y + 31) - 0.5) * height, Math.sin(angle) * r], i * 3);
+      positions.set(
+        [Math.cos(angle) * r, (random(i + y + 31) - 0.5) * height, Math.sin(angle) * r],
+        i * 3,
+      );
       seeds[i] = random(i + 701) * Math.PI * 2;
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('seed', new THREE.BufferAttribute(seeds, 1));
-    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Math.hypot(radius + 1, height + 1));
+    geometry.boundingSphere = new THREE.Sphere(
+      new THREE.Vector3(),
+      Math.hypot(radius + 1, height + 1),
+    );
     const material = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, fog: true,
-      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog!), time: this.time, tint: { value: new THREE.Color(color) }, size: { value: size }, opacity: { value: opacity }, height: { value: height }, speed: { value: speed } },
+      transparent: true,
+      depthWrite: false,
+      fog: true,
+      uniforms: {
+        ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog!),
+        time: this.time,
+        tint: { value: new THREE.Color(color) },
+        size: { value: size },
+        opacity: { value: opacity },
+        height: { value: height },
+        speed: { value: speed },
+      },
       vertexShader: `
         #include <common>
         #include <fog_pars_vertex>

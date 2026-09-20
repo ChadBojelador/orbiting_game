@@ -1,6 +1,12 @@
 # Ice Ice Water! Art Direction
 
-The approved FPS pivot establishes **Frostline: a bright frozen research facility** and **Frost Island: a frozen combat archipelago**. Original World restores the first repository-authored colorful village, forest, crystal, snowy peaks, meadow, and beach palette by user request on 2026-09-15, now presented under a permanent deep-navy night sky. Its cyan-blue crystals glow strongly and cast localized light, while restrained cool moon fill keeps routes readable between them. Previous gameplay art direction and concept images are historical in `docs/archive` and `assets/concepts`.
+The approved FPS pivot establishes **Frostline: a bright frozen research facility** and **Frost Island: a frozen combat archipelago**. Original World restores the first repository-authored village, forest, crystal, snowy peaks, meadow, and beach palette by user request on 2026-09-15, under a permanent deep-navy night sky. The 2026-09-20 polish uses lavender-blue moonlight for shape, restrained hemisphere fill for visibility, amber village/windmill accents, and compact cyan/violet crystal glow. Previous gameplay art direction and concept images are historical in `docs/archive` and `assets/concepts`.
+
+## Original World night hierarchy
+
+The [production brief](assets/original-world-polish-production-prompt.md) preserves topology and collision. Forest is deep green with sparse warm fireflies and ground mist; Crystal Valley mixes cyan main shards, violet secondary shards and faint rock veins. Ice Peaks retain dark rock between broken snow patches. Meadow stays open; pale wet sand and turquoise shallows lead into a navy ocean. Existing cover gets wood grain, stone variation, inset straps and amber lamps rather than new sightline-blocking structures. Bridge lamps and the windmill window supply small warm navigation cues.
+
+Only the moon casts shadows, in a player-centered 96-metre volume. Desktop uses 2048 pixels; touch uses 1024 and half the particles. Reduced effects disables shadows, particles and material animation. Local lights are shadowless; emissive facets and sparse dust carry crystal brightness without regional cyan flooding. ACES tone mapping preserves bright facet color. No bloom compositor, volumetrics, downloaded textures or additional runtime dependency is introduced. The existing windmill blades remain fixed to preserve their collision pose.
 
 ## Visual language
 - Crisp, readable low-poly painted metal, polar-white walls, navy structural blocks, cyan ice, amber route paint, and coral opponents.

@@ -8,6 +8,11 @@ export class OriginalWorldLighting {
   readonly moon = new DirectionalLight(0xb8c9ff, 2.05);
   private quality?: OriginalWorldQuality;
   private readonly offset = new Vector3(-70, 100, -50);
+  private readonly direction = this.offset.clone().normalize();
+  private readonly right = new Vector3()
+    .crossVectors(new Vector3(0, 1, 0), this.direction)
+    .normalize();
+  private readonly up = new Vector3().crossVectors(this.direction, this.right);
 
   constructor() {
     this.group.name = 'ORIGINAL_NIGHT_LIGHTING';
@@ -36,14 +41,17 @@ export class OriginalWorldLighting {
       this.moon.shadow.needsUpdate = true;
     }
     // Snap in light-space to keep shadow texels stable while walking.
-    const direction = this.offset.clone().normalize();
-    const right = new Vector3().crossVectors(new Vector3(0, 1, 0), direction).normalize();
-    const up = new Vector3().crossVectors(direction, right);
     const texel = 96 / this.moon.shadow.mapSize.x;
     const target = this.moon.target.position;
     target.copy(position);
-    target.addScaledVector(right, Math.round(position.dot(right) / texel) * texel - position.dot(right));
-    target.addScaledVector(up, Math.round(position.dot(up) / texel) * texel - position.dot(up));
+    target.addScaledVector(
+      this.right,
+      Math.round(position.dot(this.right) / texel) * texel - position.dot(this.right),
+    );
+    target.addScaledVector(
+      this.up,
+      Math.round(position.dot(this.up) / texel) * texel - position.dot(this.up),
+    );
     this.moon.position.copy(target).add(this.offset);
     this.moon.target.updateMatrixWorld();
   }

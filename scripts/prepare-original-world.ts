@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { Mesh, Scene, Vector3 } from 'three';
 import { OriginalWorldMap } from '../apps/client/src/world/original-world-map.js';
+import { isOriginalPresentation } from '../apps/client/src/world/original-world-atmosphere.js';
 
 // Bake the same procedural meshes the browser renders. River tops remain the
 // authored walkable channel floors. The riverbank beds overlap the grid cells
@@ -14,6 +15,7 @@ const coordinates: number[] = [];
 const vertex = new Vector3();
 world.group.traverse((object) => {
   if (!(object instanceof Mesh)) return;
+  if (isOriginalPresentation(object)) return;
   if (
     object.name.startsWith('OCEAN') ||
     object.name === 'frost-wall' ||

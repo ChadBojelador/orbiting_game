@@ -25,6 +25,7 @@ import {
   type MovementState,
 } from '@ice-water/shared';
 import { OriginalWorldMap } from './original-world-map.js';
+import { isOriginalPresentation } from './original-world-atmosphere.js';
 
 function geometryTopology(geometry: BufferGeometry): {
   boundaryEdges: number;
@@ -193,7 +194,8 @@ describe('restored Original World', () => {
       for (const light of crystalLights) {
         expect(light.castShadow).toBe(false);
         expect(light.distance).toBeGreaterThan(0);
-        expect(light.intensity).toBeGreaterThan(100);
+        expect(light.intensity).toBeGreaterThan(0);
+        expect(light.distance).toBeLessThanOrEqual(23);
       }
       const shard = world.group.getObjectByName('crystal-shard') as Mesh;
       const shardMaterial = Array.isArray(shard.material) ? shard.material[0] : shard.material;
@@ -215,6 +217,7 @@ describe('restored Original World', () => {
       world.group.traverse((object) => {
         if (
           !(object instanceof Mesh) ||
+          isOriginalPresentation(object) ||
           object.name.startsWith('OCEAN') ||
           object.name === 'frost-wall' ||
           object.name.startsWith('PATH_') ||
@@ -433,6 +436,7 @@ describe('restored Original World', () => {
     const audits = [{ name: arch.name, geometry: combinedGeometry(arch) }];
     world.group.traverse((object) => {
       if (!(object instanceof Mesh)) return;
+      if (isOriginalPresentation(object)) return;
       if (
         object.name === 'OCEAN_UNDERSIDE' ||
         object.name.startsWith('PATH_') ||
