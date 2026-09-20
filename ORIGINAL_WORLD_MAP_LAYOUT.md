@@ -274,9 +274,10 @@ The peaks sit on the already elevated northern terrain.
 
 - Position: `(-21,62)`
 - Ground elevation: approximately `Y = 7`
-- Tower height: `10 m`
-- Roof centered approximately `11 m` above its base
-- Four fixed blades
+- Tower body height: `12 m`
+- Integrated amber beacon centered `12.2 m` above its base with a `90 m` light range
+- Roof centered approximately `14.4 m` above its base
+- Four rotating presentation-only blades centered on the upper tower face
 - Primary southern mid-map landmark
 
 ### Beach arch
@@ -386,15 +387,15 @@ Original World uses:
 - Dark blue distance fog
 - Lavender-blue moon directional lighting with restrained hemisphere fill
 - Strong emissive cyan main crystals with violet secondary spire shards
-- Three compact shadowless crystal point lights and two small amber lights at Village and Windmill
+- Three broad shadowless crystal point lights, one small Village light, and one broad Windmill beacon
 
-| Light source         |  Range | Role                                        |
-| -------------------- | -----: | ------------------------------------------- |
-| Village crystal      | `16 m` | Central crystal accent and navigation light |
-| Crystal Valley spire | `23 m` | Strongest compact magical accent            |
-| Island moonstone     | `13 m` | Southern island navigation light            |
+| Light source         |   Range | Role                                          |
+| -------------------- | ------: | --------------------------------------------- |
+| Village crystal      |  `85 m` | Broad central cyan map light                  |
+| Crystal Valley spire | `110 m` | Strongest eastern regional magical light      |
+| Island moonstone     |  `75 m` | Broad southern-island and coastline map light |
 
-Only the moon renders shadows, in a player-centered 96-metre volume: 2048 desktop, 1024 touch, disabled with reduced effects. The five local lights remain shadowless. Village and Windmill amber lights reach 9 m and 8 m. Bridge lamps are emissive only.
+Only the moon renders shadows, in a player-centered 96-metre volume: 2048 desktop, 1024 touch, disabled with reduced effects. The five local lights remain shadowless. The Village amber light reaches 9 m; the integrated Windmill beacon reaches 90 m across the southern meadow. Bridge lamps are emissive only.
 
 ## Tactical interpretation
 

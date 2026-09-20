@@ -193,16 +193,18 @@ describe('restored Original World', () => {
       ]);
       for (const light of crystalLights) {
         expect(light.castShadow).toBe(false);
-        expect(light.distance).toBeGreaterThan(0);
-        expect(light.intensity).toBeGreaterThan(0);
-        expect(light.distance).toBeLessThanOrEqual(23);
+        expect(light.distance).toBeGreaterThanOrEqual(75);
+        expect(light.intensity).toBeGreaterThanOrEqual(190);
+        expect(light.distance).toBeLessThanOrEqual(110);
       }
       const shard = world.group.getObjectByName('crystal-shard') as Mesh;
       const shardMaterial = Array.isArray(shard.material) ? shard.material[0] : shard.material;
       expect(shardMaterial).toBeInstanceOf(MeshStandardMaterial);
       expect((shardMaterial as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(2);
+      expect((shardMaterial as MeshStandardMaterial).userData.hasCrystalGlowGradient).toBe(true);
       expect((shardMaterial as MeshStandardMaterial).vertexColors).toBe(true);
       expect(shard.geometry.getAttribute('color')).toBeDefined();
+      expect(shard.geometry.getAttribute('crystalGlow')).toBeDefined();
       expect(shard.geometry.getAttribute('position').count).toBeGreaterThan(24);
       expect(shard.getObjectByName('crystal-facet-lines')).toBeDefined();
     } finally {
