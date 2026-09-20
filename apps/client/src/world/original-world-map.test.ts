@@ -199,6 +199,10 @@ describe('restored Original World', () => {
       const shardMaterial = Array.isArray(shard.material) ? shard.material[0] : shard.material;
       expect(shardMaterial).toBeInstanceOf(MeshStandardMaterial);
       expect((shardMaterial as MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(2);
+      expect((shardMaterial as MeshStandardMaterial).vertexColors).toBe(true);
+      expect(shard.geometry.getAttribute('color')).toBeDefined();
+      expect(shard.geometry.getAttribute('position').count).toBeGreaterThan(24);
+      expect(shard.getObjectByName('crystal-facet-lines')).toBeDefined();
     } finally {
       world.destroy();
     }

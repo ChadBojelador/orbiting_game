@@ -363,9 +363,81 @@ function mesh(
   return result;
 }
 
-function createCrystal(material: THREE.Material, radius: number, height: number): THREE.Mesh {
-  const crystal = mesh(new THREE.OctahedronGeometry(radius, 0), material, 'crystal-shard');
-  crystal.scale.y = height / (radius * 2);
+function createCrystalGeometry(radius: number, height: number): THREE.BufferGeometry {
+  const sideCount = 6;
+  const rings = [
+    { y: height / 2, radius: 0, rotation: 0.12 },
+    { y: height * 0.18, radius: radius * 0.72, rotation: 0.12 },
+    { y: -height * 0.06, radius, rotation: 0 },
+    { y: -height * 0.34, radius: radius * 0.54, rotation: 0.28 },
+    { y: -height / 2, radius: 0, rotation: 0.28 },
+  ] as const;
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const facetTints = [0x9ee8ff, 0x67c4ff, 0x4a8ff2, 0x79d8f5, 0x5477dc, 0x8adfff];
+
+  const vertexAt = (ringIndex: number, sideIndex: number): THREE.Vector3 => {
+    const ring = rings[ringIndex]!;
+    const angle = (sideIndex / sideCount) * Math.PI * 2 + ring.rotation;
+    return new THREE.Vector3(Math.cos(angle) * ring.radius, ring.y, Math.sin(angle) * ring.radius);
+  };
+  const addTriangle = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, tint: number) => {
+    const color = new THREE.Color(tint);
+    for (const vertex of [a, b, c]) {
+      positions.push(vertex.x, vertex.y, vertex.z);
+      colors.push(color.r, color.g, color.b);
+    }
+  };
+
+  for (let ringIndex = 0; ringIndex < rings.length - 1; ringIndex += 1) {
+    for (let sideIndex = 0; sideIndex < sideCount; sideIndex += 1) {
+      const nextSide = (sideIndex + 1) % sideCount;
+      const upperLeft = vertexAt(ringIndex, sideIndex);
+      const upperRight = vertexAt(ringIndex, nextSide);
+      const lowerLeft = vertexAt(ringIndex + 1, sideIndex);
+      const lowerRight = vertexAt(ringIndex + 1, nextSide);
+      const tint = facetTints[(sideIndex + ringIndex * 2) % facetTints.length]!;
+      const alternateTint = facetTints[(sideIndex + ringIndex * 2 + 1) % facetTints.length]!;
+
+      if (rings[ringIndex]!.radius === 0) {
+        addTriangle(upperLeft, lowerRight, lowerLeft, tint);
+        continue;
+      }
+      if (rings[ringIndex + 1]!.radius === 0) {
+        addTriangle(upperLeft, upperRight, lowerLeft, tint);
+        continue;
+      }
+      if ((sideIndex + ringIndex) % 2 === 0) {
+        addTriangle(upperLeft, lowerRight, lowerLeft, tint);
+        addTriangle(upperLeft, upperRight, lowerRight, alternateTint);
+      } else {
+        addTriangle(upperLeft, upperRight, lowerLeft, tint);
+        addTriangle(upperRight, lowerRight, lowerLeft, alternateTint);
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function createCrystal(
+  material: THREE.Material,
+  edgeMaterial: THREE.Material,
+  radius: number,
+  height: number,
+): THREE.Mesh {
+  const geometry = createCrystalGeometry(radius, height);
+  const crystal = mesh(geometry, material, 'crystal-shard');
+  const facetLines = new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 12), edgeMaterial);
+  facetLines.name = 'crystal-facet-lines';
+  facetLines.renderOrder = 1;
+  crystal.add(facetLines);
   return crystal;
 }
 
@@ -412,9 +484,16 @@ function createLandmarks(): THREE.Group {
   const crystalMaterial = new THREE.MeshStandardMaterial({
     color: PALETTE.crystalBlue,
     emissive: 0x3b8dff,
-    emissiveIntensity: 2.4,
-    roughness: 0.2,
-    metalness: 0.05,
+    emissiveIntensity: 2.25,
+    roughness: 0.16,
+    metalness: 0.08,
+    vertexColors: true,
+  });
+  const crystalEdgeMaterial = new THREE.LineBasicMaterial({
+    color: 0xc8f4ff,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
   });
   const iceMaterial = new THREE.MeshStandardMaterial({
     color: PALETTE.ice,
@@ -438,7 +517,7 @@ function createLandmarks(): THREE.Group {
     [-2, 0.8, 1.5, -0.25],
     [2, 1.1, 1.7, 0.2],
   ] as const) {
-    const shard = createCrystal(crystalMaterial, scale, scale * 3.2);
+    const shard = createCrystal(crystalMaterial, crystalEdgeMaterial, scale, scale * 3.2);
     shard.position.set(x, 0, z);
     shard.rotation.z = tilt;
     villageCrystal.add(shard);
@@ -485,7 +564,7 @@ function createLandmarks(): THREE.Group {
     [4, 1, 2.5, 12, 0.2],
     [1, -4, 1.8, 8, -0.08],
   ] as const) {
-    const shard = createCrystal(crystalMaterial, radius, height);
+    const shard = createCrystal(crystalMaterial, crystalEdgeMaterial, radius, height);
     shard.position.set(x, height / 2, z);
     shard.rotation.z = tilt;
     crystalSpire.add(shard);
@@ -548,7 +627,7 @@ function createLandmarks(): THREE.Group {
   beachArch.rotation.y = Math.PI / 2;
   group.add(beachArch);
 
-  const moonstone = createCrystal(crystalMaterial, 2.2, 7);
+  const moonstone = createCrystal(crystalMaterial, crystalEdgeMaterial, 2.2, 7);
   moonstone.name = 'LM_ISLAND_MOONSTONE';
   moonstone.position.set(37, terrainHeightAt({ x: 37, z: 116 }) + 3.5, 116);
   const moonstoneLight = createCrystalLight('CRYSTAL_LIGHT_MOONSTONE', 105, 30);
@@ -881,7 +960,7 @@ export class OriginalWorldMap {
 
   private disposeObject(root: THREE.Object3D): void {
     root.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
+      if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.LineSegments)) return;
       object.geometry.dispose();
       const materials = Array.isArray(object.material) ? object.material : [object.material];
       for (const material of materials) material.dispose();
