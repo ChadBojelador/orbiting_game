@@ -60,4 +60,3 @@ Desktop.ini
 # Generated optimized assets; source asset policy will define committed outputs.
 assets/generated/
 
-*.glb
