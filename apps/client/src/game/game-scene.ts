@@ -44,6 +44,7 @@ import {
   disposePlayerNameplate,
   setNameplateTone,
 } from './player-nameplate.js';
+import { Snowstorm } from './snowstorm.js';
 
 const DAY_SKY_LIGHT = new Color(0xedfaff);
 const NIGHT_SKY_LIGHT = new Color(0x748cc7);
@@ -86,6 +87,7 @@ export class GameScene {
   private presentation = new LocalPresentation();
   private effects: HitEffects;
   private audio = new AudioManager();
+  private snowstorm?: Snowstorm;
   private readonly players = new Map<string, Group>();
   private readonly nameplates = new Map<string, Sprite>();
   private readonly materials = new Map<string, MeshStandardMaterial>();
@@ -168,6 +170,9 @@ export class GameScene {
     this.scene.add(this.camera);
     this.hands = new FirstPersonHands(this.camera);
     this.effects = new HitEffects(this.scene);
+    // Snowstorm: quality follows same tier as clouds
+    const snowQuality = this.isTouch ? 'medium' : 'high';
+    this.snowstorm = new Snowstorm(this.scene, this.session.view.mapId, snowQuality);
     void loadGameplayCharacterFactories().then((factories) => {
       if (this.destroyed) return;
       this.characterFactories = factories;
@@ -212,6 +217,7 @@ export class GameScene {
     this.originalLighting?.destroy();
     this.island?.destroy();
     this.cloudSky.destroy();
+    this.snowstorm?.destroy();
     this.audio.destroy();
     this.body.dispose();
     this.head.dispose();
@@ -594,6 +600,11 @@ export class GameScene {
     this.applyWaterEnvironment(this.wasUnderwater);
     this.applyMatchLighting();
     this.cloudSky.update(now / 1000, this.camera.position, quality, this.nightProgress);
+    // Snowstorm progression keyed to existing timer remaining
+    if (session.view.phase === 'playing' && this.snowstorm) {
+      const remainingMs = session.view.phaseDeadline - serverNow;
+      this.snowstorm.update(now / 1000, remainingMs, this.camera.position);
+    }
     this.effects.update(now);
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame((t) => this.loop(t));
