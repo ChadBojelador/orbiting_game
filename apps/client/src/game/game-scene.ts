@@ -1,10 +1,4 @@
-import {
-  GAMEPLAY,
-  isSwimming,
-  isUnderwater,
-  surfaceAt,
-  type PlayerView,
-} from '@ice-water/shared';
+import { GAMEPLAY, isSwimming, isUnderwater, surfaceAt, type PlayerView } from '@ice-water/shared';
 import {
   Scene,
   PerspectiveCamera,
@@ -30,7 +24,9 @@ import { FrostlineMap } from '../world/frostline-map.js';
 import { OriginalWorldMap } from '../world/original-world-map.js';
 import { OriginalWorldLighting } from '../world/original-world-lighting.js';
 import { IslandMap } from '../world/island-map.js';
+import { CloudSky, type CloudQuality } from '../world/cloud-sky.js';
 import { FirstPersonCamera } from './first-person-camera.js';
+import { FirstPersonHands } from './first-person-hands.js';
 import {
   loadGameplayCharacterFactories,
   type CharacterAnimation,
@@ -39,7 +35,7 @@ import {
   type GameplayCharacterFactories,
 } from './character-model.js';
 import { HitEffects } from './hit-effects.js';
-import { AudioManager } from '../audio/audio-manager.js';
+import { AudioManager, landingIntensity } from '../audio/audio-manager.js';
 import { readSettings, type FpsSettings } from './fps-settings.js';
 import { renderPixelRatio } from './render-performance.js';
 import { waterEnvironmentFor } from './water-presentation.js';
@@ -74,7 +70,9 @@ export class GameScene {
   private world?: FrostlineMap | OriginalWorldMap;
   private originalLighting?: OriginalWorldLighting;
   private island?: IslandMap;
+  private cloudSky: CloudSky;
   private cameraMotion = new FirstPersonCamera();
+  private hands: FirstPersonHands;
   private presentation = new LocalPresentation();
   private effects: HitEffects;
   private audio = new AudioManager();
@@ -94,6 +92,14 @@ export class GameScene {
   private previous = performance.now();
   private lastStep = 0;
   private remoteSteps = new Map<string, number>();
+  private remoteLunges = new Map<string, number>();
+  private remoteGrounded = new Map<string, boolean>();
+  private remoteFallVelocity = new Map<string, number>();
+  private readonly handledGameplayEvents = new Set<string>();
+  private readonly handledGameplayEventOrder: string[] = [];
+  private previousLocalLungeUntil = 0;
+  private previousLocalVerticalVelocity = 0;
+  private localFallVelocity = 0;
   private wasGrounded = true;
   private wasSwimming = false;
   private wasSliding = false;
@@ -116,15 +122,19 @@ export class GameScene {
     if (isOriginalNight) {
       this.originalLighting = new OriginalWorldLighting();
       this.scene.add(this.originalLighting.group);
+      this.cloudSky = new CloudSky(this.scene, this.session.view.mapId, [
+        this.originalLighting.moon,
+      ]);
       this.renderer.shadowMap.type = PCFSoftShadowMap;
       this.renderer.toneMapping = ACESFilmicToneMapping;
       this.renderer.toneMappingExposure = 1.05;
     } else {
-      this.scene.add(new HemisphereLight(0xedfaff, 0x41617b, 2.5));
+      const skyLight = new HemisphereLight(0xedfaff, 0x41617b, 2.5);
       const keyLight = new DirectionalLight(0xfff0d0, 2);
       keyLight.name = 'sunlight';
       keyLight.position.set(-30, 60, -35);
-      this.scene.add(keyLight);
+      this.scene.add(skyLight, keyLight);
+      this.cloudSky = new CloudSky(this.scene, this.session.view.mapId, [skyLight, keyLight]);
     }
     if (this.session.view.mapId === 'island') {
       this.island = new IslandMap(this.scene);
@@ -137,6 +147,7 @@ export class GameScene {
       this.camera.updateProjectionMatrix();
     } else this.world = new FrostlineMap(this.scene);
     this.scene.add(this.camera);
+    this.hands = new FirstPersonHands(this.camera);
     this.effects = new HitEffects(this.scene);
     void loadGameplayCharacterFactories().then((factories) => {
       if (this.destroyed) return;
@@ -176,10 +187,12 @@ export class GameScene {
     this.cleanups.forEach((c) => c());
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
     this.session.destroy();
+    this.hands.destroy();
     this.effects.destroy();
     this.world?.destroy();
     this.originalLighting?.destroy();
     this.island?.destroy();
+    this.cloudSky.destroy();
     this.audio.destroy();
     this.body.dispose();
     this.head.dispose();
@@ -243,8 +256,13 @@ export class GameScene {
     let model = this.players.get(player.playerId);
     const factory = this.characterFactories[player.team === 'water' ? 'water' : 'ice'];
     if (model) {
-      if (factory && !this.characters.has(player.playerId)) this.attachCharacter(model, player, factory);
-      if (player.team === 'water' && this.characterFactories.frozenIce && !this.frozenIce.has(player.playerId))
+      if (factory && !this.characters.has(player.playerId))
+        this.attachCharacter(model, player, factory);
+      if (
+        player.team === 'water' &&
+        this.characterFactories.frozenIce &&
+        !this.frozenIce.has(player.playerId)
+      )
         this.attachFrozenIce(model, player);
       return model;
     }
@@ -259,7 +277,8 @@ export class GameScene {
     head.receiveShadow = true;
     model.add(torso, head);
     if (factory) this.attachCharacter(model, player, factory);
-    if (player.team === 'water' && this.characterFactories.frozenIce) this.attachFrozenIce(model, player);
+    if (player.team === 'water' && this.characterFactories.frozenIce)
+      this.attachFrozenIce(model, player);
     this.scene.add(model);
     this.players.set(player.playerId, model);
     const nameplate = createPlayerNameplate(player.displayName);
@@ -275,7 +294,11 @@ export class GameScene {
     this.frozenIce.set(player.playerId, effect);
     if (player.status === 'frozen') effect.playFreeze();
   }
-  private attachCharacter(model: Group, player: PlayerView, factory: GameplayCharacterFactories['ice']): void {
+  private attachCharacter(
+    model: Group,
+    player: PlayerView,
+    factory: GameplayCharacterFactories['ice'],
+  ): void {
     if (!factory) return;
     const fallback = [...model.children];
     const character = factory.instantiate(player.team === 'water' ? '#43c6d6' : '#bdefff', 'Idle');
@@ -308,6 +331,7 @@ export class GameScene {
       this.session.view.mapId === 'original' && !isCameraUnderwater
         ? new FogExp2(environment.fogColor, 0.0032)
         : new Fog(environment.fogColor, environment.fogNear, environment.fogFar);
+    this.cloudSky?.setUnderwater(isCameraUnderwater);
   }
   private loop(now: number): void {
     if (this.destroyed) return;
@@ -334,6 +358,9 @@ export class GameScene {
       this.camera.position.set(eye.x, eye.y, eye.z);
       this.camera.rotation.order = 'YXZ';
       this.camera.rotation.set(input.cameraPitch, input.cameraYaw, 0);
+      this.hands.setVisible(p.status === 'alive' || p.status === 'frozen');
+      this.hands.setTeam(p.team);
+      this.hands.update(predicted, seconds, this.settings.reducedEffects);
       const cameraIsUnderwater = isUnderwater(eye, session.view.mapId);
       if (cameraIsUnderwater !== this.wasUnderwater) {
         this.wasUnderwater = cameraIsUnderwater;
@@ -345,6 +372,9 @@ export class GameScene {
       this.camera.updateProjectionMatrix();
       this.audio.listener(eye, input.cameraYaw);
       if (p.status === 'alive') {
+        const isLunging = p.lungeUntil > serverNow;
+        if (isLunging && p.lungeUntil !== this.previousLocalLungeUntil)
+          this.audio.play('lunge');
         if (
           Math.hypot(predicted.velocityX, predicted.velocityZ) > 1 &&
           (predicted.isGrounded || swimming) &&
@@ -354,14 +384,25 @@ export class GameScene {
           this.lastStep = now;
         }
         if (!this.wasSwimming && swimming) this.audio.play('water');
-        if (this.wasGrounded && !predicted.isGrounded && !swimming) this.audio.play('jump');
-        if (!this.wasGrounded && predicted.isGrounded && !this.wasSwimming) this.audio.play('land');
+        const hasTakenOff =
+          !predicted.isGrounded &&
+          predicted.verticalVelocity > 0.5 &&
+          (this.wasGrounded || this.previousLocalVerticalVelocity <= 0.5);
+        if (hasTakenOff && !swimming && !isLunging) this.audio.play('jump');
+        if (!predicted.isGrounded && !swimming)
+          this.localFallVelocity = Math.min(this.localFallVelocity, predicted.verticalVelocity);
+        if (!this.wasGrounded && predicted.isGrounded && !this.wasSwimming) {
+          this.audio.play('land', undefined, landingIntensity(this.localFallVelocity));
+          this.localFallVelocity = 0;
+        }
         if (!this.wasSliding && predicted.isSliding) this.audio.play('slide');
       }
+      this.previousLocalLungeUntil = p.lungeUntil;
+      this.previousLocalVerticalVelocity = predicted.verticalVelocity;
       this.wasGrounded = predicted.isGrounded;
       this.wasSwimming = swimming;
       this.wasSliding = predicted.isSliding;
-    }
+    } else this.hands.setVisible(false);
     for (const remote of session.view.players) {
       if (remote.playerId === session.playerId) continue;
       const model = this.model(remote);
@@ -383,11 +424,7 @@ export class GameScene {
         this.setCharacterAnimation(remote, animation);
         character.update(seconds);
         character.material.color.setHex(
-          remote.status === 'frozen'
-            ? 0xbdefff
-            : remote.team === 'water'
-              ? 0x43c6d6
-              : 0x74d9ec,
+          remote.status === 'frozen' ? 0xbdefff : remote.team === 'water' ? 0x43c6d6 : 0x74d9ec,
         );
       }
       this.previousStatuses.set(remote.playerId, remote.status);
@@ -409,9 +446,16 @@ export class GameScene {
       if (!character)
         (model.children[0] as Mesh).material = this.material(
           key,
-          key === 'frozen' ? 0xbdefff : key === 'protected' ? 0xf3b747 : friend ? 0x308cad : 0xe96958,
+          key === 'frozen'
+            ? 0xbdefff
+            : key === 'protected'
+              ? 0xf3b747
+              : friend
+                ? 0x308cad
+                : 0xe96958,
         );
-      model.scale.y = remote.status === 'frozen' ? 1.1 : remote.isCrouching || remote.isSliding ? 0.61 : 1;
+      model.scale.y =
+        remote.status === 'frozen' ? 1.1 : remote.isCrouching || remote.isSliding ? 0.61 : 1;
       const nameplate = this.nameplates.get(remote.playerId);
       if (nameplate) {
         nameplate.visible = model.visible;
@@ -422,12 +466,42 @@ export class GameScene {
         );
         setNameplateTone(nameplate, key);
       }
+      const distanceFromLocal = p ? Math.hypot(remote.x - p.x, remote.z - p.z) : Infinity;
+      const isNearby = model.visible && distanceFromLocal < 35;
+      const previousLungeUntil = this.remoteLunges.get(remote.playerId);
+      const previousGrounded = this.remoteGrounded.get(remote.playerId);
+      const isRemoteLunging = remote.lungeUntil > serverNow;
       if (
-        model.visible &&
-        Math.hypot(remote.velocityX, remote.velocityZ) > 1 &&
-        p &&
-        Math.hypot(remote.x - p.x, remote.z - p.z) < 35
-      ) {
+        isNearby &&
+        previousLungeUntil !== undefined &&
+        isRemoteLunging &&
+        remote.lungeUntil !== previousLungeUntil
+      )
+        this.audio.play('lunge', position);
+      if (
+        isNearby &&
+        previousGrounded === true &&
+        !remote.isGrounded &&
+        remote.verticalVelocity > 0.5 &&
+        !isRemoteLunging
+      )
+        this.audio.play('jump', position);
+      if (!remote.isGrounded)
+        this.remoteFallVelocity.set(
+          remote.playerId,
+          Math.min(this.remoteFallVelocity.get(remote.playerId) ?? 0, remote.verticalVelocity),
+        );
+      if (isNearby && previousGrounded === false && remote.isGrounded) {
+        this.audio.play(
+          'land',
+          position,
+          landingIntensity(this.remoteFallVelocity.get(remote.playerId) ?? 0),
+        );
+        this.remoteFallVelocity.set(remote.playerId, 0);
+      }
+      this.remoteLunges.set(remote.playerId, remote.lungeUntil);
+      this.remoteGrounded.set(remote.playerId, remote.isGrounded);
+      if (isNearby && Math.hypot(remote.velocityX, remote.velocityZ) > 1) {
         const remoteIsSwimming = isSwimming(position, session.view.mapId);
         if (
           (remote.isGrounded || remoteIsSwimming) &&
@@ -443,17 +517,44 @@ export class GameScene {
     }
     for (const event of session.events.splice(0)) {
       const local = session.playerId;
-      if (event.type === 'player/frozen' && event.payload.attackerId === local)
-        this.audio.play('ice');
-      if (event.type === 'player/rescued' && event.payload.rescuerIds.includes(local))
-        this.audio.play('ice');
+      const eventKey =
+        event.type === 'player/frozen'
+          ? `${event.type}:${event.payload.serverTime}:${event.payload.playerId}:${event.payload.attackerId}`
+          : `${event.type}:${event.payload.serverTime}:${event.payload.playerId}:${event.payload.rescuerIds.join(',')}`;
+      if (this.handledGameplayEvents.has(eventKey)) continue;
+      this.handledGameplayEvents.add(eventKey);
+      this.handledGameplayEventOrder.push(eventKey);
+      if (this.handledGameplayEventOrder.length > 64) {
+        const oldest = this.handledGameplayEventOrder.shift();
+        if (oldest) this.handledGameplayEvents.delete(oldest);
+      }
+      const target = session.view.players.find(
+        (candidate) => candidate.playerId === event.payload.playerId,
+      );
+      const isNearby =
+        !!p && !!target && Math.hypot(target.x - p.x, target.z - p.z) < 35;
+      if (event.type === 'player/frozen') {
+        if (event.payload.attackerId === local || event.payload.playerId === local)
+          this.audio.play('tag');
+        else if (target && isNearby) this.audio.play('tag', target);
+      } else if (
+        event.payload.playerId === local ||
+        event.payload.rescuerIds.includes(local)
+      )
+        this.audio.play('untag');
+      else if (target && isNearby) this.audio.play('untag', target);
     }
+    const quality: CloudQuality = this.settings.reducedEffects
+      ? 'low'
+      : this.isTouch
+        ? 'medium'
+        : 'high';
     if (this.world instanceof OriginalWorldMap) {
-      const quality = this.settings.reducedEffects ? 'low' : this.isTouch ? 'medium' : 'high';
       this.renderer.shadowMap.enabled = quality !== 'low';
       this.originalLighting?.update(this.camera.position, quality);
       this.world.update(now / 1000, this.camera.position, quality);
     }
+    this.cloudSky.update(now / 1000, this.camera.position, quality);
     this.effects.update(now);
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame((t) => this.loop(t));

@@ -42,17 +42,7 @@ export function arenaHalfExtentForMap(mapId: MapId): number {
   if (mapId === 'original') return ORIGINAL_HALF_EXTENT;
   return mapId === 'island' ? ISLAND_ARENA.halfExtent : ARENA.halfExtent;
 }
-export const HOUSE_LANDMARK: ArenaBlock = {
-  id: 'wooden-house',
-  x: -30,
-  y: 0,
-  z: -30,
-  width: 8,
-  depth: 6.55957,
-  height: 5.62012,
-};
 export const ARENA_BLOCKS: readonly ArenaBlock[] = [
-  HOUSE_LANDMARK,
   { id: 'north', x: 0, y: 0, z: -40 * MAP_SCALE, width: 80 * MAP_SCALE, depth: 1, height: 7 },
   { id: 'south', x: 0, y: 0, z: 40 * MAP_SCALE, width: 80 * MAP_SCALE, depth: 1, height: 7 },
   { id: 'west', x: -40 * MAP_SCALE, y: 0, z: 0, width: 1, depth: 80 * MAP_SCALE, height: 7 },

@@ -33,6 +33,11 @@ describe('Frostline movement and collision', () => {
     expect(new Set(SPAWN_POINTS.map((p) => JSON.stringify(p))).size).toBe(16);
     expect(SPAWN_POINTS.every((p) => isWalkable(p))).toBe(true);
   });
+  it('keeps the former wooden-house site clear', () => {
+    expect(terrainHeightAt({ x: -30, z: -30 })).toBe(0);
+    expect(isWalkable({ x: -30, z: -30 })).toBe(true);
+    expect(worldRayDistance({ x: -36, y: 1, z: -30 }, { x: 1, y: 0, z: 0 }, 12)).toBe(12);
+  });
   it('normalizes diagonals and prevents tunneling at high speed', () => {
     const cardinal = moveKinematic({ x: 0, z: -34 }, { x: 1, z: 0 }, 0.05);
     const diagonal = moveKinematic({ x: 0, z: -34 }, { x: 1, z: 1 }, 0.05);
@@ -69,7 +74,7 @@ describe('Frostline movement and collision', () => {
     );
   });
   it('wall-runs beside a wall while airborne and kicks away on jump', () => {
-    const airborne = motion(-34.52, -30);
+    const airborne = motion(-22.22, 0);
     airborne.y = 1;
     airborne.isGrounded = false;
     const running = simulateMovement(airborne, { x: 1, z: 0, sequence: 1 }, 50);

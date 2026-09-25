@@ -15,31 +15,22 @@ export function createPlayerNameplate(displayName: string): Sprite {
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   const fontFamily = 'Bahnschrift, "Segoe UI", sans-serif';
-  let fontSize = 27;
-  context.font = `600 ${fontSize}px ${fontFamily}`;
-  const maxTextWidth = NAMEPLATE_WIDTH - 28;
+  let fontSize = 21;
+  context.font = `500 ${fontSize}px ${fontFamily}`;
+  const maxTextWidth = NAMEPLATE_WIDTH - 36;
   const initialTextWidth = context.measureText(displayName).width;
   if (initialTextWidth > maxTextWidth) {
     fontSize *= maxTextWidth / initialTextWidth;
-    context.font = `600 ${fontSize}px ${fontFamily}`;
+    context.font = `500 ${fontSize}px ${fontFamily}`;
   }
-  const measuredWidth = Math.min(NAMEPLATE_WIDTH, context.measureText(displayName).width + 28);
-  const left = (NAMEPLATE_WIDTH - measuredWidth) / 2;
 
-  context.fillStyle = 'rgba(12, 31, 48, 0.82)';
-  context.beginPath();
-  context.roundRect(left, 6, measuredWidth, 48, 8);
-  context.fill();
-  context.strokeStyle = 'rgba(237, 246, 250, 0.72)';
-  context.lineWidth = 2;
-  context.stroke();
-
+  // A compact dark keyline keeps the floating text legible over snow, water, and terrain.
   context.lineJoin = 'round';
   context.strokeStyle = '#10283b';
-  context.lineWidth = 6;
-  context.strokeText(displayName, NAMEPLATE_WIDTH / 2, 29);
+  context.lineWidth = 4;
+  context.strokeText(displayName, NAMEPLATE_WIDTH / 2, NAMEPLATE_HEIGHT / 2);
   context.fillStyle = '#ffffff';
-  context.fillText(displayName, NAMEPLATE_WIDTH / 2, 29);
+  context.fillText(displayName, NAMEPLATE_WIDTH / 2, NAMEPLATE_HEIGHT / 2);
 
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
@@ -64,7 +55,13 @@ export function createPlayerNameplate(displayName: string): Sprite {
 
 export function setNameplateTone(nameplate: Sprite, tone: NameplateTone): void {
   const color =
-    tone === 'frozen' ? 0xbdefff : tone === 'protected' ? 0xf3b747 : tone === 'friend' ? 0x74d9ec : 0xffffff;
+    tone === 'frozen'
+      ? 0xbdefff
+      : tone === 'protected'
+        ? 0xf3b747
+        : tone === 'friend'
+          ? 0x74d9ec
+          : 0xffffff;
   (nameplate.material as SpriteMaterial).color.setHex(color);
 }
 
