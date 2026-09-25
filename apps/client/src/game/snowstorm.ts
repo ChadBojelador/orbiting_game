@@ -7,7 +7,6 @@ import {
   AdditiveBlending,
   Mesh,
   PlaneGeometry,
-  Color,
   DoubleSide,
   type Scene,
   type Vector3,
@@ -20,39 +19,54 @@ import type { MapId } from '@ice-water/shared';
  * Snowstorm timing constants (all in milliseconds of remaining match time).
  * These detect when the existing timer reaches certain points — the round
  * duration itself is never modified.
+ * The snowstorm mechanic is active only on Frostline.
  */
-const STORM_START_MS = 240_000; // 4:00 remaining
-const STORM_MID_MS = 120_000; // 2:00 remaining
-const STORM_HEAVY_MS = 60_000; // 1:00 remaining
-const STORM_MAX_MS = 10_000; // 0:10 remaining
+export const STORM_WARNING_START_MS = 240_000; // 4:00 remaining: "SNOWSTORM INCOMING!"
+export const STORM_WARNING_DURATION_MS = 3_000; // Visible for 3 seconds
+export const SNOWFALL_START_MS = 236_500; // ~3:56.5: Snowflakes begin falling + "The snowstorm has begun!"
+export const STORM_BEGUN_DURATION_MS = 3_000; // Visible for 3 seconds
+export const STORM_MID_MS = 120_000; // 2:00 remaining: Noticeable snow accumulation
+export const STORM_HEAVY_MS = 60_000; // 1:00 remaining: Heavy snowstorm / thick snow
+export const STORM_MAX_MS = 10_000; // 0:10 remaining: Maximum snow coverage & intensity
 
-/** Map-specific snowstorm radii and ground plane sizes. */
-function mapExtent(mapId: MapId): { radius: number; ground: number; groundY: number } {
-  switch (mapId) {
-    case 'frostline':
-      return { radius: 70, ground: 130, groundY: 0.02 };
-    case 'island':
-      return { radius: 90, ground: 170, groundY: 0.04 };
-    case 'original':
-      return { radius: 130, ground: 260, groundY: 0.03 };
-  }
+/** Frostline snowstorm radius and ground plane size. */
+const FROSTLINE_EXTENT = { radius: 70, ground: 130, groundY: 0.02 } as const;
+
+/** Checks if the "SNOWSTORM INCOMING!" warning should be displayed (Frostline only). */
+export function isSnowstormWarningVisible(remainingMs: number, mapId: MapId = 'frostline'): boolean {
+  if (mapId !== 'frostline') return false;
+  return (
+    remainingMs <= STORM_WARNING_START_MS &&
+    remainingMs > STORM_WARNING_START_MS - STORM_WARNING_DURATION_MS
+  );
+}
+
+/** Checks if the "The snowstorm has begun!" message should be displayed (Frostline only). */
+export function isSnowstormBegunVisible(remainingMs: number, mapId: MapId = 'frostline'): boolean {
+  if (mapId !== 'frostline') return false;
+  return (
+    remainingMs <= SNOWFALL_START_MS &&
+    remainingMs > SNOWFALL_START_MS - STORM_BEGUN_DURATION_MS
+  );
 }
 
 /**
  * Returns a 0–1 snowstorm intensity based on remaining match milliseconds.
+ * Only active on Frostline.
  * 0 = no snow, 1 = maximum blizzard.
  */
-export function snowstormIntensity(remainingMs: number): number {
-  if (remainingMs >= STORM_START_MS) return 0;
+export function snowstormIntensity(remainingMs: number, mapId: MapId = 'frostline'): number {
+  if (mapId !== 'frostline') return 0;
+  if (remainingMs >= SNOWFALL_START_MS) return 0;
   if (remainingMs <= STORM_MAX_MS) return 1;
-  // Piecewise ramp for a natural-feeling progression
+
   if (remainingMs > STORM_MID_MS) {
-    // 4:00 → 2:00: light snow, 0 → 0.3
-    const t = (STORM_START_MS - remainingMs) / (STORM_START_MS - STORM_MID_MS);
+    // 3:56.5 → 2:00: light snow, 0 → 0.3
+    const t = (SNOWFALL_START_MS - remainingMs) / (SNOWFALL_START_MS - STORM_MID_MS);
     return t * 0.3;
   }
   if (remainingMs > STORM_HEAVY_MS) {
-    // 2:00 → 1:00: moderate, 0.3 → 0.65
+    // 2:00 → 1:00: moderate to heavy, 0.3 → 0.65
     const t = (STORM_MID_MS - remainingMs) / (STORM_MID_MS - STORM_HEAVY_MS);
     return 0.3 + t * 0.35;
   }
@@ -62,20 +76,25 @@ export function snowstormIntensity(remainingMs: number): number {
 }
 
 /**
- * Returns a 0–1 snow ground accumulation factor. Slightly lags behind
- * snowfall intensity so accumulation feels like it builds up over time.
+ * Returns a 0–1 snow ground accumulation factor.
+ * Only active on Frostline.
  */
-export function snowAccumulation(remainingMs: number): number {
-  if (remainingMs >= STORM_START_MS) return 0;
+export function snowAccumulation(remainingMs: number, mapId: MapId = 'frostline'): number {
+  if (mapId !== 'frostline') return 0;
+  if (remainingMs >= SNOWFALL_START_MS) return 0;
   if (remainingMs <= STORM_MAX_MS) return 1;
+
   if (remainingMs > STORM_MID_MS) {
-    const t = (STORM_START_MS - remainingMs) / (STORM_START_MS - STORM_MID_MS);
+    // 3:56.5 → 2:00: gradual accumulation, 0 → 0.15 (noticeable snow)
+    const t = (SNOWFALL_START_MS - remainingMs) / (SNOWFALL_START_MS - STORM_MID_MS);
     return t * 0.15;
   }
   if (remainingMs > STORM_HEAVY_MS) {
+    // 2:00 → 1:00: noticeably thicker, 0.15 → 0.55
     const t = (STORM_MID_MS - remainingMs) / (STORM_MID_MS - STORM_HEAVY_MS);
     return 0.15 + t * 0.4;
   }
+  // 1:00 → 0:10: thick snow to maximum coverage, 0.55 → 1.0
   const t = (STORM_HEAVY_MS - remainingMs) / (STORM_HEAVY_MS - STORM_MAX_MS);
   return 0.55 + t * 0.45;
 }
@@ -87,10 +106,11 @@ type Quality = keyof typeof PARTICLE_COUNTS;
 /**
  * Performance-friendly snowstorm rendered with a single GPU particle system
  * (THREE.Points with a custom shader) and a translucent ground snow plane.
+ * Exclusively active on Frostline.
  *
  * All snowflake positions are computed on the GPU via modular arithmetic so
  * the JS render loop does zero per-particle work. The ground snow plane uses
- * opacity to simulate accumulation — no permanent objects are spawned.
+ * procedural multi-octave noise to simulate accumulation — no permanent objects are spawned.
  */
 export class Snowstorm {
   readonly group = new Group();
@@ -98,24 +118,23 @@ export class Snowstorm {
   private readonly groundSnow: Mesh;
   private readonly groundMaterial: ShaderMaterial;
   private readonly particleMaterial: ShaderMaterial;
-  private readonly extent: ReturnType<typeof mapExtent>;
   private readonly maxParticles: number;
   private currentIntensity = 0;
   private currentAccumulation = 0;
 
   constructor(
     scene: Scene,
-    private readonly mapId: MapId,
+    private readonly mapId: MapId = 'frostline',
     quality: Quality = 'high',
   ) {
-    this.extent = mapExtent(mapId);
+    const extent = FROSTLINE_EXTENT;
     this.maxParticles = PARTICLE_COUNTS[quality];
 
     // ── GPU snow particles ──
     const positions = new Float32Array(this.maxParticles * 3);
     const seeds = new Float32Array(this.maxParticles * 2);
     for (let i = 0; i < this.maxParticles; i++) {
-      const radius = this.extent.radius;
+      const radius = extent.radius;
       positions[i * 3] = (Math.random() * 2 - 1) * radius;
       positions[i * 3 + 1] = Math.random() * 50;
       positions[i * 3 + 2] = (Math.random() * 2 - 1) * radius;
@@ -126,6 +145,7 @@ export class Snowstorm {
     geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
     geometry.setAttribute('seed', new Float32BufferAttribute(seeds, 2));
     geometry.boundingSphere = null; // disable frustum culling on these
+
     this.particleMaterial = new ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -136,7 +156,7 @@ export class Snowstorm {
         uTime: { value: 0 },
         uIntensity: { value: 0 },
         uFallHeight: { value: 50 },
-        uRadius: { value: this.extent.radius },
+        uRadius: { value: extent.radius },
         uCameraPos: { value: { x: 0, y: 0, z: 0 } },
       },
       vertexShader: /* glsl */ `
@@ -203,7 +223,7 @@ export class Snowstorm {
     this.group.add(this.snowParticles);
 
     // ── Ground snow accumulation plane ──
-    const groundSize = this.extent.ground;
+    const groundSize = extent.ground;
     const groundGeo = new PlaneGeometry(groundSize, groundSize, 1, 1);
     groundGeo.rotateX(-Math.PI / 2);
     this.groundMaterial = new ShaderMaterial({
@@ -256,8 +276,8 @@ export class Snowstorm {
           float pattern = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
 
           // Snow coverage expands with accumulation
-          float coverage = smoothstep(1.0 - uAccumulation, 1.0, pattern);
-          float alpha = coverage * uAccumulation * 0.72;
+          float coverage = smoothstep(1.0 - uAccumulation * 1.15, 1.0 - uAccumulation * 0.25, pattern);
+          float alpha = mix(coverage * uAccumulation * 0.7, 0.94, uAccumulation * uAccumulation);
 
           // Slight warm-white tint variation
           vec3 snowColor = mix(
@@ -277,7 +297,7 @@ export class Snowstorm {
 
     this.groundSnow = new Mesh(groundGeo, this.groundMaterial);
     this.groundSnow.name = 'snowstorm-ground';
-    this.groundSnow.position.y = this.extent.groundY;
+    this.groundSnow.position.y = extent.groundY;
     this.groundSnow.renderOrder = 1;
     this.group.add(this.groundSnow);
 
@@ -293,8 +313,12 @@ export class Snowstorm {
    * @param cameraPosition  - current camera world position
    */
   update(elapsedSeconds: number, remainingMs: number, cameraPosition: Vector3): void {
-    this.currentIntensity = snowstormIntensity(remainingMs);
-    this.currentAccumulation = snowAccumulation(remainingMs);
+    if (this.mapId !== 'frostline') {
+      this.group.visible = false;
+      return;
+    }
+    this.currentIntensity = snowstormIntensity(remainingMs, this.mapId);
+    this.currentAccumulation = snowAccumulation(remainingMs, this.mapId);
     const isActive = this.currentIntensity > 0;
     this.group.visible = isActive;
     if (!isActive) return;
