@@ -170,9 +170,11 @@ export class GameScene {
     this.scene.add(this.camera);
     this.hands = new FirstPersonHands(this.camera);
     this.effects = new HitEffects(this.scene);
-    // Snowstorm: quality follows same tier as clouds
-    const snowQuality = this.isTouch ? 'medium' : 'high';
-    this.snowstorm = new Snowstorm(this.scene, this.session.view.mapId, snowQuality);
+    // Snowstorm: active only on Frostline, quality follows same tier as clouds
+    if (this.session.view.mapId === 'frostline') {
+      const snowQuality = this.isTouch ? 'medium' : 'high';
+      this.snowstorm = new Snowstorm(this.scene, 'frostline', snowQuality);
+    }
     void loadGameplayCharacterFactories().then((factories) => {
       if (this.destroyed) return;
       this.characterFactories = factories;

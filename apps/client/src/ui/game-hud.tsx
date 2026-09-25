@@ -1,27 +1,10 @@
 import type { LobbyView } from '@ice-water/shared';
 import { isTwoMinuteWarningVisible } from '../game/match-night.js';
+import {
+  isSnowstormWarningVisible,
+  isSnowstormBegunVisible,
+} from '../game/snowstorm.js';
 export type KillEntry = never;
-
-/** Snowstorm begins at 4:00 remaining (240 000 ms). */
-const SNOWSTORM_START_MS = 240_000;
-/** "SNOWSTORM INCOMING!" is visible for this many ms. */
-const SNOWSTORM_WARNING_DURATION_MS = 3_000;
-/** "The snowstorm has begun!" appears this many ms after the first warning. */
-const SNOWSTORM_BEGUN_DELAY_MS = 3_500;
-/** "The snowstorm has begun!" stays visible for this many ms. */
-const SNOWSTORM_BEGUN_DURATION_MS = 3_000;
-
-function isSnowstormWarningVisible(remainingMs: number): boolean {
-  return (
-    remainingMs <= SNOWSTORM_START_MS &&
-    remainingMs > SNOWSTORM_START_MS - SNOWSTORM_WARNING_DURATION_MS
-  );
-}
-
-function isSnowstormBegunVisible(remainingMs: number): boolean {
-  const elapsed = SNOWSTORM_START_MS - remainingMs;
-  return elapsed >= SNOWSTORM_BEGUN_DELAY_MS && elapsed < SNOWSTORM_BEGUN_DELAY_MS + SNOWSTORM_BEGUN_DURATION_MS;
-}
 
 export function GameHud({
   view,
@@ -40,8 +23,8 @@ export function GameHud({
   const time = Math.max(0, Math.ceil(remainingMs / 1000));
   const isTwoMinuteWarning = view.phase === 'playing' && isTwoMinuteWarningVisible(remainingMs);
   const isPlaying = view.phase === 'playing';
-  const showSnowstormWarning = isPlaying && isSnowstormWarningVisible(remainingMs);
-  const showSnowstormBegun = isPlaying && isSnowstormBegunVisible(remainingMs);
+  const showSnowstormWarning = isPlaying && isSnowstormWarningVisible(remainingMs, view.mapId);
+  const showSnowstormBegun = isPlaying && isSnowstormBegunVisible(remainingMs, view.mapId);
   return (
     <div className="game-hud">
       <div className="match-clock">
