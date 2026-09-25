@@ -9,7 +9,7 @@ Current product: private-room arena FPS with desktop/mobile support and Frostlin
 | FPS-01 | Authoritative movement, camera, prediction, and touch input | Complete |
 | FPS-02 | Movement interactions, proximity freeze/rescue, and death | Complete |
 | FPS-03 | FFA/TDM/duel, solo practice, respawn, reconnect, results, and summaries | Complete |
-| FPS-04 | Frostline geometry and wooden-house scale/collision | Complete |
+| FPS-04 | Frostline geometry; wooden-house render/collision removed 2026-09-25 | Complete |
 | FPS-05 | Fort optimization and shared triangle collision | Complete |
 | FPS-06 | HUD, scoreboard, feedback, desktop/mobile controls, and settings | Complete |
 | FPS-07 | Lobby loadout, preview, audio, and map selection | Complete |

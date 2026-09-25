@@ -1,13 +1,5 @@
+import { ARENA_BLOCKS, ARENA_RAMPS, ICE_PATCHES, WATER_PATCHES } from '@ice-water/shared';
 import {
-  HOUSE_LANDMARK,
-  ARENA_BLOCKS,
-  ARENA_RAMPS,
-  ICE_PATCHES,
-  WATER_PATCHES,
-} from '@ice-water/shared';
-import houseModelUrl from '../../../../assets/low_poly_wooden_house_rusty_3d_model_free.glb?url';
-import {
-  Box3,
   BoxGeometry,
   BufferGeometry,
   Float32BufferAttribute,
@@ -15,16 +7,11 @@ import {
   Mesh,
   MeshStandardMaterial,
   CylinderGeometry,
-  Vector3,
   type Scene,
 } from 'three';
 import { disposeModel } from './model-disposal.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 export class FrostlineMap {
   readonly group = new Group();
-  readonly ready: Promise<void>;
-  hasError = false;
-  private destroyed = false;
   constructor(scene: Scene) {
     const snow = new MeshStandardMaterial({ color: 0xedf6fa, roughness: 0.9 });
     const navy = new MeshStandardMaterial({ color: 0x18334b, roughness: 0.75 });
@@ -35,7 +22,6 @@ export class FrostlineMap {
     floor.position.y = -0.15;
     this.group.add(floor);
     for (const block of ARENA_BLOCKS) {
-      if (block.id === HOUSE_LANDMARK.id) continue;
       const material = block.id.startsWith('cover')
         ? blue
         : block.id === 'reactor'
@@ -95,37 +81,8 @@ export class FrostlineMap {
     ring.position.y = 3.4;
     this.group.add(ring);
     scene.add(this.group);
-    this.ready = this.loadHouse().catch(() => {
-      this.hasError = true;
-    });
-  }
-  private async loadHouse(): Promise<void> {
-    const model = (await new GLTFLoader().loadAsync(houseModelUrl)).scene;
-    if (this.destroyed) {
-      disposeModel(model);
-      return;
-    }
-    model.name = 'wooden-house-landmark';
-    model.traverse((object) => {
-      if (!(object instanceof Mesh)) return;
-      object.castShadow = true;
-      object.receiveShadow = true;
-    });
-    const bounds = new Box3().setFromObject(model),
-      size = bounds.getSize(new Vector3());
-    const largest = Math.max(size.x, size.y, size.z);
-    if (largest > 0) model.scale.setScalar(8 / largest);
-    const normalizedBounds = new Box3().setFromObject(model);
-    const center = normalizedBounds.getCenter(new Vector3());
-    model.position.set(
-      HOUSE_LANDMARK.x - center.x,
-      -normalizedBounds.min.y,
-      HOUSE_LANDMARK.z - center.z,
-    );
-    this.group.add(model);
   }
   destroy(): void {
-    this.destroyed = true;
     disposeModel(this.group);
     this.group.removeFromParent();
   }

@@ -10,7 +10,7 @@ The FPS pivot replaced freeze-tag gameplay, archived under `docs/archive`; the f
 - Reactor: 7.5 × 7.5 m at (0,0), height 3.5 m.
 - Catwalks: X ±43.5, width 9, depth 15, elevation 3. Wedge ramps at Z ±15, depth 15.
 - Staggered cover is defined by `ARENA_BLOCKS`. Ice patches at Z ±31.5 are 18 × 13.5 m; shallow-water strips at X ±30 are 6 × 51 m and reduce speed to 70%.
-- Wooden house at (-30,-30): uniformly normalized to 8 m wide, 6.55957 m deep and 5.62012 m tall, centered and grounded. This is a closed landmark with a conservative outer-box collider including its roof volume. Decorative openings are not traversable.
+- The former wooden-house site at (-30,-30) is open ground with no rendered model or collider.
 - Sixteen authored spawn candidates. Selection scores enemy distance, line of sight and recent death location.
 
 ## Frost Island

@@ -1206,6 +1206,43 @@ form .primary {
 .match-clock span {
   font-size: 12px;
 }
+.two-minute-warning {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(94vw, 980px);
+  transform: translate(-50%, -50%);
+  color: #e8f8ff;
+  font-size: clamp(42px, 7.5vw, 104px);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow:
+    0 2px 0 #3b7092,
+    0 0 22px #6adcf0cc,
+    0 8px 36px #020b18e6;
+  animation: two-minute-warning 5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes two-minute-warning {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -44%) scale(1.08);
+    filter: blur(8px);
+  }
+  12%,
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -56%) scale(0.98);
+    filter: blur(2px);
+  }
+}
 .frozen-status {
   position: absolute;
   top: 28%;
@@ -1844,6 +1881,9 @@ form .primary {
   }
   .game-menu {
     top: 10px;
+  }
+  .two-minute-warning {
+    font-size: clamp(34px, 9vw, 58px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
