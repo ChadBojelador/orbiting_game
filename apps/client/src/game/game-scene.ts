@@ -491,12 +491,13 @@ export class GameScene {
           remote.playerId,
           Math.min(this.remoteFallVelocity.get(remote.playerId) ?? 0, remote.verticalVelocity),
         );
-      if (isNearby && previousGrounded === false && remote.isGrounded) {
-        this.audio.play(
-          'land',
-          position,
-          landingIntensity(this.remoteFallVelocity.get(remote.playerId) ?? 0),
-        );
+      if (previousGrounded === false && remote.isGrounded) {
+        if (isNearby)
+          this.audio.play(
+            'land',
+            position,
+            landingIntensity(this.remoteFallVelocity.get(remote.playerId) ?? 0),
+          );
         this.remoteFallVelocity.set(remote.playerId, 0);
       }
       this.remoteLunges.set(remote.playerId, remote.lungeUntil);
@@ -516,6 +517,7 @@ export class GameScene {
       }
     }
     for (const event of session.events.splice(0)) {
+      if (event.type === 'player/respawned') continue;
       const local = session.playerId;
       const eventKey =
         event.type === 'player/frozen'

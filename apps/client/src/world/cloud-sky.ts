@@ -233,6 +233,10 @@ const CLOUD_PUFFS: readonly (readonly (readonly [number, number, number, number]
   ],
 ];
 
+const CLOUD_BATCH_SPECS = CLOUD_PUFFS.map((_, shape) =>
+  CLOUD_SPECS.filter((spec) => spec.shape === shape),
+);
+
 const DAY_THEME: CloudTheme = {
   colors: [0xf7fbfd, 0xe7f3f7, 0xdcebf1],
   opacity: 0.56,
@@ -277,7 +281,7 @@ export class CloudSky {
     const motionScale = quality === 'low' ? 0.22 : quality === 'medium' ? 0.72 : 1;
     for (let shape = 0; shape < this.batches.length; shape++) {
       const mesh = this.batches[shape]!;
-      const specs = CLOUD_SPECS.filter((spec) => spec.shape === shape);
+      const specs = CLOUD_BATCH_SPECS[shape]!;
       const qualityScale = quality === 'low' ? 0.4 : quality === 'medium' ? 0.7 : 1;
       mesh.count = Math.max(2, Math.ceil(specs.length * qualityScale));
       for (let index = 0; index < mesh.count; index++) {
@@ -294,8 +298,9 @@ export class CloudSky {
           this.theme.radius,
         );
         this.transform.position.set(x, spec.y * this.theme.altitudeScale, z);
-        this.transform.rotation.set(0, spec.rotation, 0);
-        this.transform.scale.set(spec.width, 1, spec.depth);
+        this.transform.scale.set(spec.width, spec.depth, 1);
+        this.transform.lookAt(cameraPosition);
+        this.transform.rotateZ(spec.rotation);
         this.transform.updateMatrix();
         mesh.setMatrixAt(index, this.transform.matrix);
       }
@@ -326,7 +331,6 @@ export class CloudSky {
 
   private createBatch(shape: number): InstancedMesh {
     const geometry = new PlaneGeometry(1, 1);
-    geometry.rotateX(-Math.PI / 2);
     const texture = createCloudTexture(shape);
     const material = new MeshBasicMaterial({
       color: this.theme.colors[shape],
@@ -340,7 +344,7 @@ export class CloudSky {
       fog: false,
       toneMapped: false,
     });
-    const count = CLOUD_SPECS.filter((spec) => spec.shape === shape).length;
+    const count = CLOUD_BATCH_SPECS[shape]!.length;
     const mesh = new InstancedMesh(geometry, material, count);
     mesh.name = `cloud-bank-${shape + 1}`;
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
