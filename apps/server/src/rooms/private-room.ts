@@ -5,9 +5,7 @@ import {
   arenaHalfExtentForMap,
   isEmptyPayload,
   isRecord,
-  isGameMode,
   isMapId,
-  isPrimaryWeapon,
   type GameplayMessages,
   type MatchResult,
 } from '@ice-water/shared';
@@ -80,9 +78,8 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
       this.patchRate = GAMEPLAY.tickMs;
       const gameplayMessages: (keyof GameplayMessages)[] = [
         'input/move',
-        'action/shoot',
-        'action/reload',
-        'action/switch-weapon',
+        'action/interact',
+        'action/lunge',
       ];
       for (const type of gameplayMessages)
         this.onMessage(type, (client: GuestClient, payload: unknown) => {
@@ -118,20 +115,16 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         if (
           !isRecord(payload) ||
           Object.keys(payload).length < 1 ||
-          Object.keys(payload).some((key) => key !== 'gameMode' && key !== 'mapId') ||
-          (payload.gameMode !== undefined && !isGameMode(payload.gameMode)) ||
+          Object.keys(payload).some((key) => key !== 'mapId') ||
           (payload.mapId !== undefined && !isMapId(payload.mapId))
         )
           return this.fail(client, 'invalid-message', 'Invalid room configuration');
-        if (payload.gameMode === 'duel' && this.state.players.size > 2)
-          return this.fail(client, 'cannot-configure', 'Duel supports at most two players');
-        if (payload.gameMode !== undefined) this.state.gameMode = payload.gameMode;
         if (payload.mapId !== undefined) {
           this.state.mapId = payload.mapId;
           this.state.arenaHalfExtent = arenaHalfExtentForMap(payload.mapId);
         }
       });
-      this.onMessage('player/loadout', (client: GuestClient, payload: unknown) => {
+      this.onMessage('player/team', (client: GuestClient, payload: unknown) => {
         if (!client.auth || client.auth.expiresAt <= Date.now())
           return this.fail(client, 'unauthorized', 'Guest session expired');
         if (!this.actions.take(client.sessionId))
@@ -140,11 +133,11 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
           this.state.phase !== 'lobby' ||
           !isRecord(payload) ||
           Object.keys(payload).length !== 1 ||
-          !isPrimaryWeapon(payload.primaryWeapon)
+          !['auto', 'ice', 'water'].includes(String(payload.team))
         )
-          return this.fail(client, 'invalid-message', 'Choose a primary weapon in the lobby');
+          return this.fail(client, 'invalid-message', 'Choose Ice, Water, or Auto before the match');
         const player = this.state.players.get(client.auth.playerId);
-        if (player) player.primaryWeapon = payload.primaryWeapon;
+        if (player) player.teamPreference = payload.team as 'auto' | 'ice' | 'water';
       });
       this.onMessage('session/ping', (client: GuestClient, payload: unknown) => {
         if (
@@ -182,8 +175,6 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
       if (this.state.players.has(identity.playerId))
         throw new ServerError(409, 'This guest is already in the room');
       if (this.state.players.size >= config.maxPlayers) throw new ServerError(409, 'Room is full');
-      if (this.state.gameMode === 'duel' && this.state.players.size >= 2)
-        throw new ServerError(409, 'Duel is full');
       return identity;
     }
 
@@ -194,7 +185,6 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
         this.state.phase !== 'lobby' ||
         this.state.players.has(identity.playerId) ||
         this.state.players.size >= config.maxPlayers ||
-        (this.state.gameMode === 'duel' && this.state.players.size >= 2) ||
         identity.expiresAt <= Date.now()
       )
         throw new ServerError(409, 'Seat is no longer available');

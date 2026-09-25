@@ -98,22 +98,7 @@ try {
             slide: sequence % 30 === 0,
           });
           if (sequence % 4 || local.status !== 'alive') return;
-          if (local.ammo === 0) {
-            if (!local.reloadUntil) room.send('action/reload', {});
-            return;
-          }
-          const target = [...room.state.players.values()]
-            .filter((p) => p.playerId !== local.playerId && p.status === 'alive')
-            .sort(
-              (a, b) =>
-                Math.hypot(a.x - local.x, a.z - local.z) - Math.hypot(b.x - local.x, b.z - local.z),
-            )[0];
-          if (target)
-            room.send('action/shoot', {
-              yaw: Math.atan2(local.x - target.x, local.z - target.z),
-              pitch: 0,
-              isAds: true,
-            });
+          room.send('action/interact', {});
         });
         tickDurations.push(performance.now() - tickStart);
       }, 50);
@@ -130,8 +115,7 @@ try {
             Number.isFinite(p.x) &&
             Number.isFinite(p.y) &&
             Number.isFinite(p.z) &&
-            p.hp >= 0 &&
-            p.hp <= 100,
+            p.status === 'alive' || p.status === 'frozen' || p.status === 'spectator',
         ),
       );
       assert.ok(snapshots.every((p) => p.team === 'none'));

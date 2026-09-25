@@ -1,6 +1,5 @@
 import {
   GAMEPLAY,
-  WEAPONS,
   isSwimming,
   isUnderwater,
   surfaceAt,
@@ -32,7 +31,13 @@ import { OriginalWorldMap } from '../world/original-world-map.js';
 import { OriginalWorldLighting } from '../world/original-world-lighting.js';
 import { IslandMap } from '../world/island-map.js';
 import { FirstPersonCamera } from './first-person-camera.js';
-import { WeaponRenderer } from './weapon-renderer.js';
+import {
+  loadGameplayCharacterFactories,
+  type CharacterAnimation,
+  type CharacterInstance,
+  type FrozenIceInstance,
+  type GameplayCharacterFactories,
+} from './character-model.js';
 import { HitEffects } from './hit-effects.js';
 import { AudioManager } from '../audio/audio-manager.js';
 import { readSettings, type FpsSettings } from './fps-settings.js';
@@ -71,12 +76,16 @@ export class GameScene {
   private island?: IslandMap;
   private cameraMotion = new FirstPersonCamera();
   private presentation = new LocalPresentation();
-  private weapon: WeaponRenderer;
   private effects: HitEffects;
   private audio = new AudioManager();
   private readonly players = new Map<string, Group>();
   private readonly nameplates = new Map<string, Sprite>();
   private readonly materials = new Map<string, MeshStandardMaterial>();
+  private characterFactories: GameplayCharacterFactories = {};
+  private readonly characters = new Map<string, CharacterInstance>();
+  private readonly frozenIce = new Map<string, FrozenIceInstance>();
+  private readonly characterAnimations = new Map<string, CharacterAnimation>();
+  private readonly previousStatuses = new Map<string, PlayerView['status']>();
   private body = new BoxGeometry(0.65, 1.15, 0.42);
   private head = new BoxGeometry(0.5, 0.45, 0.48);
   private cleanups: (() => void)[] = [];
@@ -88,9 +97,7 @@ export class GameScene {
   private wasGrounded = true;
   private wasSwimming = false;
   private wasSliding = false;
-  private wasReloading = false;
   private wasUnderwater = false;
-  private emptyAt = 0;
   constructor(
     private readonly canvas: HTMLCanvasElement,
     room: LobbyRoom,
@@ -130,8 +137,11 @@ export class GameScene {
       this.camera.updateProjectionMatrix();
     } else this.world = new FrostlineMap(this.scene);
     this.scene.add(this.camera);
-    this.weapon = new WeaponRenderer(this.camera);
     this.effects = new HitEffects(this.scene);
+    void loadGameplayCharacterFactories().then((factories) => {
+      if (this.destroyed) return;
+      this.characterFactories = factories;
+    });
     this.session.input.isEnabled = this.isTouch;
     const resize = () => {
       const w = canvas.clientWidth || innerWidth,
@@ -166,7 +176,6 @@ export class GameScene {
     this.cleanups.forEach((c) => c());
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
     this.session.destroy();
-    this.weapon.destroy();
     this.effects.destroy();
     this.world?.destroy();
     this.originalLighting?.destroy();
@@ -177,6 +186,10 @@ export class GameScene {
     this.materials.forEach((m) => m.dispose());
     this.nameplates.forEach(disposePlayerNameplate);
     this.nameplates.clear();
+    this.characters.clear();
+    this.frozenIce.clear();
+    this.characterAnimations.clear();
+    this.previousStatuses.clear();
     this.renderer.dispose();
   }
   private bindControls(): void {
@@ -192,24 +205,13 @@ export class GameScene {
       if (!this.isLocked) {
         this.lock();
       }
-      if (e.button === 0) input.pressFire();
-      if (e.button === 2) input.isAds = true;
+      if (e.button === 0) input.pressInteract();
     };
     const up = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return;
-      if (e.button === 0) input.isFiring = false;
-      if (e.button === 2) input.isAds = false;
     };
     const move = (e: MouseEvent) => {
       if (this.isLocked) input.look(e.movementX, e.movementY);
-    };
-    const wheel = (e: WheelEvent) => {
-      if (this.isLocked) {
-        e.preventDefault();
-        input.switchWeapon(
-          (this.session.local()?.currentWeaponSlot ?? 0) + (e.deltaY > 0 ? 1 : -1),
-        );
-      }
     };
     const context = (e: Event) => e.preventDefault();
     const escape = (event: KeyboardEvent) => {
@@ -224,7 +226,6 @@ export class GameScene {
     window.addEventListener('pointerup', up);
     document.addEventListener('mousemove', move);
     document.addEventListener('pointerlockchange', lock);
-    this.canvas.addEventListener('wheel', wheel, { passive: false });
     this.canvas.addEventListener('contextmenu', context);
     const unlockAudio = () => this.audio.unlock();
     window.addEventListener('pointerdown', unlockAudio, { once: true });
@@ -234,14 +235,19 @@ export class GameScene {
       window.removeEventListener('pointerup', up);
       document.removeEventListener('mousemove', move);
       document.removeEventListener('pointerlockchange', lock);
-      this.canvas.removeEventListener('wheel', wheel);
       this.canvas.removeEventListener('contextmenu', context);
       window.removeEventListener('pointerdown', unlockAudio);
     });
   }
   private model(player: PlayerView): Group {
     let model = this.players.get(player.playerId);
-    if (model) return model;
+    const factory = this.characterFactories[player.team === 'water' ? 'water' : 'ice'];
+    if (model) {
+      if (factory && !this.characters.has(player.playerId)) this.attachCharacter(model, player, factory);
+      if (player.team === 'water' && this.characterFactories.frozenIce && !this.frozenIce.has(player.playerId))
+        this.attachFrozenIce(model, player);
+      return model;
+    }
     model = new Group();
     const torso = new Mesh(this.body, this.material('body', 0x308cad));
     torso.position.y = 0.9;
@@ -252,12 +258,40 @@ export class GameScene {
     torso.receiveShadow = true;
     head.receiveShadow = true;
     model.add(torso, head);
+    if (factory) this.attachCharacter(model, player, factory);
+    if (player.team === 'water' && this.characterFactories.frozenIce) this.attachFrozenIce(model, player);
     this.scene.add(model);
     this.players.set(player.playerId, model);
     const nameplate = createPlayerNameplate(player.displayName);
     this.scene.add(nameplate);
     this.nameplates.set(player.playerId, nameplate);
     return model;
+  }
+  private attachFrozenIce(model: Group, player: PlayerView): void {
+    const factory = this.characterFactories.frozenIce;
+    if (!factory || player.team !== 'water' || this.frozenIce.has(player.playerId)) return;
+    const effect = factory.instantiate();
+    model.add(effect.root);
+    this.frozenIce.set(player.playerId, effect);
+    if (player.status === 'frozen') effect.playFreeze();
+  }
+  private attachCharacter(model: Group, player: PlayerView, factory: GameplayCharacterFactories['ice']): void {
+    if (!factory) return;
+    const fallback = [...model.children];
+    const character = factory.instantiate(player.team === 'water' ? '#43c6d6' : '#bdefff', 'Idle');
+    // Gameplay uses the opposite facing from the lobby's display pose.
+    character.root.rotation.y = Math.PI;
+    fallback.forEach((child) => child.removeFromParent());
+    model.add(character.root);
+    this.characters.set(player.playerId, character);
+    this.characterAnimations.set(player.playerId, 'Idle');
+  }
+  private setCharacterAnimation(player: PlayerView, animation: CharacterAnimation): void {
+    const character = this.characters.get(player.playerId);
+    if (!character) return;
+    if (this.characterAnimations.get(player.playerId) === animation) return;
+    character.play(animation);
+    this.characterAnimations.set(player.playerId, animation);
   }
   private material(key: string, color: number): MeshStandardMaterial {
     let material = this.materials.get(key);
@@ -306,23 +340,11 @@ export class GameScene {
         this.applyWaterEnvironment(cameraIsUnderwater);
         this.audio.setUnderwater(cameraIsUnderwater);
       }
-      const fov = input.isAds ? WEAPONS[p.weaponId].adsZoomFov : this.settings.fov;
+      const fov = this.settings.fov;
       this.camera.fov += (fov - this.camera.fov) * (1 - Math.exp(-18 * seconds));
       this.camera.updateProjectionMatrix();
-      this.weapon.update(
-        p.weaponId,
-        now,
-        seconds,
-        input.isAds,
-        p.reloadUntil > serverNow,
-        this.settings.reducedEffects,
-      );
       this.audio.listener(eye, input.cameraYaw);
       if (p.status === 'alive') {
-        if (input.isFiring && p.ammo === 0 && now - this.emptyAt > 500) {
-          this.audio.play('empty');
-          this.emptyAt = now;
-        }
         if (
           Math.hypot(predicted.velocityX, predicted.velocityZ) > 1 &&
           (predicted.isGrounded || swimming) &&
@@ -335,28 +357,61 @@ export class GameScene {
         if (this.wasGrounded && !predicted.isGrounded && !swimming) this.audio.play('jump');
         if (!this.wasGrounded && predicted.isGrounded && !this.wasSwimming) this.audio.play('land');
         if (!this.wasSliding && predicted.isSliding) this.audio.play('slide');
-        if (!this.wasReloading && p.reloadUntil > serverNow) this.audio.play('reload');
       }
       this.wasGrounded = predicted.isGrounded;
       this.wasSwimming = swimming;
       this.wasSliding = predicted.isSliding;
-      this.wasReloading = p.reloadUntil > serverNow;
     }
     for (const remote of session.view.players) {
       if (remote.playerId === session.playerId) continue;
       const model = this.model(remote);
-      model.visible = remote.status === 'alive';
+      const character = this.characters.get(remote.playerId);
+      const frozenIce = this.frozenIce.get(remote.playerId);
+      if (frozenIce) {
+        const previousStatus = this.previousStatuses.get(remote.playerId);
+        if (previousStatus !== 'frozen' && remote.status === 'frozen') frozenIce.playFreeze();
+        if (previousStatus === 'frozen' && remote.status === 'alive') frozenIce.playUnfreeze();
+        frozenIce.update(seconds);
+      }
+      if (character) {
+        let animation: CharacterAnimation = 'Idle';
+        if (remote.status === 'frozen') animation = 'Frozen';
+        else if (remote.lungeUntil > serverNow) animation = 'Lunge';
+        else if (remote.isWallRunning) animation = 'Run';
+        else if (!remote.isGrounded) animation = remote.verticalVelocity > 0 ? 'Jump' : 'FallIdle';
+        else if (Math.hypot(remote.velocityX, remote.velocityZ) > 1) animation = 'Run';
+        this.setCharacterAnimation(remote, animation);
+        character.update(seconds);
+        character.material.color.setHex(
+          remote.status === 'frozen'
+            ? 0xbdefff
+            : remote.team === 'water'
+              ? 0x43c6d6
+              : 0x74d9ec,
+        );
+      }
+      this.previousStatuses.set(remote.playerId, remote.status);
+      model.visible = remote.status !== 'dead' && remote.status !== 'spectator';
       const position =
         session.remotes.get(remote.playerId)?.at(serverNow - GAMEPLAY.interpolationMs) ?? remote;
       model.position.set(position.x, position.y, position.z);
       model.rotation.y = position.yaw;
       model.scale.y = remote.isCrouching || remote.isSliding ? 0.61 : 1;
       const friend = session.view.gameMode === 'tdm' && remote.team === p?.team;
-      const key = remote.protectedUntil > serverNow ? 'protected' : friend ? 'friend' : 'enemy';
-      (model.children[0] as Mesh).material = this.material(
-        key,
-        key === 'protected' ? 0xf3b747 : friend ? 0x308cad : 0xe96958,
-      );
+      const key =
+        remote.status === 'frozen'
+          ? 'frozen'
+          : remote.protectedUntil > serverNow
+            ? 'protected'
+            : friend
+              ? 'friend'
+              : 'enemy';
+      if (!character)
+        (model.children[0] as Mesh).material = this.material(
+          key,
+          key === 'frozen' ? 0xbdefff : key === 'protected' ? 0xf3b747 : friend ? 0x308cad : 0xe96958,
+        );
+      model.scale.y = remote.status === 'frozen' ? 1.1 : remote.isCrouching || remote.isSliding ? 0.61 : 1;
       const nameplate = this.nameplates.get(remote.playerId);
       if (nameplate) {
         nameplate.visible = model.visible;
@@ -388,31 +443,10 @@ export class GameScene {
     }
     for (const event of session.events.splice(0)) {
       const local = session.playerId;
-      if (event.type === 'weapon/fired') {
-        if (!this.settings.reducedEffects) {
-          const visualOrigin =
-            event.payload.playerId === local
-              ? this.weapon.muzzleWorldPosition()
-              : event.payload.origin;
-          this.effects.shot(visualOrigin, event.payload.end, now);
-        }
-        this.audio.play(
-          'shot',
-          event.payload.playerId === local ? undefined : event.payload.origin,
-        );
-        if (event.payload.playerId === local) {
-          this.weapon.fire(now);
-          if (!this.settings.reducedEffects)
-            input.cameraPitch = Math.min(
-              (Math.PI * 89) / 180,
-              input.cameraPitch + (WEAPONS[event.payload.weaponId].recoilVertical * Math.PI) / 180,
-            );
-        }
-      }
-      if (event.type === 'player/hit' && event.payload.attackerId === local)
-        this.audio.play(event.payload.isHeadshot ? 'headshot' : 'hit');
-      if (event.type === 'player/killed' && event.payload.killerId === local)
-        this.audio.play('kill');
+      if (event.type === 'player/frozen' && event.payload.attackerId === local)
+        this.audio.play('ice');
+      if (event.type === 'player/rescued' && event.payload.rescuerIds.includes(local))
+        this.audio.play('ice');
     }
     if (this.world instanceof OriginalWorldMap) {
       const quality = this.settings.reducedEffects ? 'low' : this.isTouch ? 'medium' : 'high';

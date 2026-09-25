@@ -255,11 +255,8 @@ for (const mapId of ['frostline', 'island', 'original'] as const)
           ],
         });
         await expect.poll(() => Math.hypot(p.x - before.x, p.z - before.z)).toBeGreaterThan(1);
-        await expect.poll(() => p.ammo).toBeLessThan(30);
         expect(p.yaw).not.toBe(before.yaw);
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-        await page.getByRole('button', { name: 'Weapon', exact: true }).tap();
-        await expect(page.locator('.ammo-display')).toContainText('Snowmelt');
         await page.getByRole('button', { name: 'Scores', exact: true }).tap();
         await expect(page.getByRole('region', { name: 'Scoreboard' })).toBeVisible();
         await page.getByRole('button', { name: 'Scores', exact: true }).tap();
@@ -269,7 +266,7 @@ for (const mapId of ['frostline', 'island', 'original'] as const)
         );
         await page.screenshot({ path: 'test-results/fps-mobile-' + mapId + '.png' });
         await page.setViewportSize({ width: 844, height: 390 });
-        await expect(page.getByRole('button', { name: 'Fire', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Tag / Rescue', exact: true })).toBeVisible();
         await page.screenshot({ path: 'test-results/fps-mobile-landscape-' + mapId + '.png' });
         await page.getByRole('button', { name: 'Leave room' }).tap();
         expect(errors).toEqual([]);
@@ -278,12 +275,11 @@ for (const mapId of ['frostline', 'island', 'original'] as const)
       }
     },
   );
-test('loadout, duel mode and local settings survive their intended boundaries', async ({
+test('duel mode and local settings survive their intended boundaries', async ({
   page,
 }) => {
   await identify(page, 'Loadout Guest');
   await page.getByLabel('Game mode', { exact: true }).selectOption('duel');
-  await page.getByLabel('Primary weapon').selectOption('sniper');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Field of view', { exact: false }).press('End');
   for (let i = 0; i < 6; i++)
@@ -295,15 +291,10 @@ test('loadout, duel mode and local settings survive their intended boundaries', 
   await expect(page.getByLabel('Field of view')).toHaveValue('104');
   await page.getByRole('button', { name: 'Done' }).click();
   await page.getByLabel('Game mode', { exact: true }).selectOption('duel');
-  await page.getByLabel('Primary weapon').selectOption('sniper');
   const { room } = await create(page);
   await expect.poll(() => room.state.gameMode).toBe('duel');
-  await expect
-    .poll(() => room.state.players.get(room.state.hostPlayerId)?.primaryWeapon)
-    .toBe('sniper');
   await page.screenshot({ path: 'test-results/fps-lobby-desktop.png', fullPage: true });
   await start(page);
-  await expect(page.locator('.ammo-display')).toContainText('Icicle');
   await page.getByRole('button', { name: 'Leave room' }).click();
 });
 
@@ -331,9 +322,6 @@ test('Frost Island loads its central Fort and uses the selected authoritative ma
     .poll(() => Math.hypot(player.x - before.x, player.z - before.z))
     .toBeGreaterThan(1.5);
   await page.keyboard.up('KeyW');
-  await page.mouse.down();
-  await expect.poll(() => player.ammo).toBeLessThan(30);
-  await page.mouse.up();
   await page.screenshot({ path: 'test-results/fps-island.png' });
   expect(errors).toEqual([]);
   await page.keyboard.press('Escape');

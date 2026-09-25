@@ -11,8 +11,6 @@ export class LobbyController {
     if (this.state.hostPlayerId !== playerId) return 'Only the host can start the match';
     if (this.state.phase !== 'lobby') return 'The match has already started';
     if (this.connectedCount() < MIN_PLAYERS) return 'At least one connected player is needed';
-    if (this.state.gameMode === 'duel' && this.state.players.size > 2)
-      return 'Duel supports at most two players';
     this.state.phase = 'countdown';
     this.state.phaseDeadline = now + this.countdownMs;
     this.state.serverTime = now;
@@ -32,9 +30,22 @@ export class LobbyController {
       const j = this.pick(i + 1);
       [players[i], players[j]] = [players[j]!, players[i]!];
     }
-    players.forEach((p, i) => {
-      p.team = this.state.gameMode === 'tdm' ? (i % 2 === 0 ? 'ice' : 'water') : 'none';
-    });
+    const auto = players.filter((player) => player.teamPreference === 'auto');
+    let iceCount = players.filter((player) => player.teamPreference === 'ice').length;
+    let waterCount = players.filter((player) => player.teamPreference === 'water').length;
+    for (const player of auto) {
+      if (iceCount <= waterCount) {
+        player.team = 'ice';
+        iceCount++;
+      } else {
+        player.team = 'water';
+        waterCount++;
+      }
+    }
+    for (const player of players) {
+      if (player.teamPreference === 'ice') player.team = 'ice';
+      if (player.teamPreference === 'water') player.team = 'water';
+    }
     this.state.phase = 'playing';
     this.state.phaseDeadline = 0;
     return true;

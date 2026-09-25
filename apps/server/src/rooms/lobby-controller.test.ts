@@ -31,13 +31,22 @@ it('cancels a countdown with no connected players and transfers host', () => {
   expect(state.phase).toBe('lobby');
   expect(state.hostPlayerId).toBe('');
 });
-it('balances odd TDM populations and rejects oversized duels', () => {
+it('balances odd Ice Ice Water populations', () => {
   const { state, controller } = fixture(5);
   state.gameMode = 'tdm';
   controller.start('0', 0);
   controller.tick(1000);
   expect([...state.players.values()].filter((p) => p.team === 'ice')).toHaveLength(3);
-  const duel = fixture(3);
-  duel.state.gameMode = 'duel';
-  expect(duel.controller.start('0', 0)).toContain('two');
+});
+it('honors explicit Ice and Water team preferences at countdown', () => {
+  const { state, controller } = fixture(4);
+  state.gameMode = 'tdm';
+  state.players.get('0')!.teamPreference = 'water';
+  state.players.get('1')!.teamPreference = 'ice';
+  controller.start('0', 0);
+  controller.tick(1000);
+  expect(state.players.get('0')!.team).toBe('water');
+  expect(state.players.get('1')!.team).toBe('ice');
+  expect([...state.players.values()].filter((player) => player.team === 'ice')).toHaveLength(2);
+  expect([...state.players.values()].filter((player) => player.team === 'water')).toHaveLength(2);
 });

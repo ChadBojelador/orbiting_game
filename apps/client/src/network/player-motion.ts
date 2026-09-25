@@ -19,6 +19,7 @@ const initial = (): MovementState => ({
   isCrouching: false,
   slideUntil: 0,
   slideReadyAt: 0,
+  isWallRunning: false,
 });
 export class LocalPrediction {
   motion = initial();
@@ -54,6 +55,7 @@ export class LocalPrediction {
       isCrouching: player.isCrouching,
       slideUntil: player.slideUntil,
       slideReadyAt: player.slideReadyAt,
+      isWallRunning: player.isWallRunning,
     };
     this.yaw = player.yaw;
     for (const p of this.pending)

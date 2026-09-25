@@ -21,7 +21,8 @@ interface TestState {
   serverTime: number;
   hostPlayerId: string;
   players: Map<string, PlayerView>;
-  gameMode: 'ffa' | 'tdm' | 'duel';
+  gameMode: 'tdm';
+  iceScore: number;
   matchWinner: string;
 }
 type TestRoom = Room<unknown, TestState>;
@@ -73,9 +74,6 @@ async function enter(
   rooms.push(room);
   room.onMessage('match/phase-changed', () => {});
   for (const type of [
-    'weapon/fired',
-    'player/hit',
-    'player/killed',
     'player/respawned',
     'match/result',
   ])
@@ -295,12 +293,8 @@ describe('HTTP and real WebSocket room flow', () => {
       }),
     ).toMatchObject({ code: 'invalid-action', message: 'Invalid movement input' });
     expect(
-      await sendForError(actor.room, actorErrors, 'action/shoot', {
-        yaw: 0,
-        pitch: 0,
-        status: 'eliminated',
-      }),
-    ).toMatchObject({ code: 'invalid-action', message: 'Invalid shot intent' });
+      await sendForError(actor.room, actorErrors, 'action/interact', { forged: true }),
+    ).toMatchObject({ code: 'invalid-action', message: 'Invalid interaction' });
     expect(
       await sendForError(actor.room, actorErrors, 'match/result', {
         winner: 'water',
@@ -328,8 +322,8 @@ describe('HTTP and real WebSocket room flow', () => {
     ).toBeLessThanOrEqual(GAMEPLAY.moveSpeed * 0.2);
 
     const rateStart = rateErrors.length;
-    for (let index = 0; index < 26; index++) rateActor.room.send('action/reload', {});
-    await waitFor(() => rateErrors.length >= rateStart + 26);
+    for (let index = 0; index < 26; index++) rateActor.room.send('action/interact', {});
+    await waitFor(() => rateErrors.length > rateStart);
     expect(rateErrors.slice(rateStart)).toContainEqual({
       code: 'invalid-action',
       message: 'Too many gameplay requests',
@@ -360,20 +354,17 @@ describe('HTTP and real WebSocket room flow', () => {
       )
       .toBe(404);
   });
-  it('synchronizes hits, death, respawn and dead-player reconnect through real sockets', async () => {
+  it('synchronizes proximity freeze and frozen-player reconnect through real sockets', async () => {
     const { participants } = await startMatch('Combat');
     const actor = participants[0]!,
       target = participants[1]!;
     const serverRoom = authoritativeRoom(actor.room);
     const a = serverRoom.state.players.get(actor.identity.playerId)!,
       b = serverRoom.state.players.get(target.identity.playerId)!;
-    Object.assign(a, { x: -50, z: -30, y: 0, protectedUntil: 0 });
-    Object.assign(b, { x: -50, z: -33, y: 0, hp: 1, protectedUntil: 0 });
-    actor.room.send('action/shoot', { yaw: 0, pitch: 0, isAds: true });
-    await waitFor(() => actor.room.state.players.get(target.identity.playerId)?.status === 'dead');
-    expect(actor.room.state.players.get(actor.identity.playerId)?.kills).toBe(1);
-    expect(actor.room.state.players.get(target.identity.playerId)?.deaths).toBe(1);
-    const deadline = b.respawnAt;
+    Object.assign(a, { team: 'ice', x: -50, z: -30, y: 0, protectedUntil: 0 });
+    Object.assign(b, { team: 'water', x: -50, z: -30.2, y: 0, protectedUntil: 0 });
+    actor.room.send('action/interact', {});
+    await waitFor(() => actor.room.state.players.get(target.identity.playerId)?.status === 'frozen');
     const token = target.room.reconnectionToken;
     target.room.reconnection.enabled = false;
     target.room.connection.close(4010);
@@ -381,21 +372,16 @@ describe('HTTP and real WebSocket room flow', () => {
     const reconnected: TestRoom = await new Client(url).reconnect<TestState>(token);
     rooms.push(reconnected);
     for (const type of [
-      'player/respawned',
-      'weapon/fired',
-      'player/hit',
-      'player/killed',
+      'player/frozen',
+      'player/rescued',
       'match/phase-changed',
       'match/result',
     ])
       reconnected.onMessage(type, () => {});
     await waitFor(
-      () => reconnected.state?.players.get(target.identity.playerId)?.status === 'dead',
+      () => reconnected.state?.players.get(target.identity.playerId)?.status === 'frozen',
     );
-    expect(b.respawnAt).toBe(deadline);
-    await waitFor(() => actor.room.state.players.get(target.identity.playerId)?.status === 'alive');
-    expect(b.hp).toBe(100);
-    expect(b.deaths).toBe(1);
+    expect(b.status).toBe('frozen');
     await Promise.all([
       reconnected.leave(),
       ...participants.filter((p) => p !== target).map((p) => p.room.leave()),
@@ -408,7 +394,7 @@ describe('HTTP and real WebSocket room flow', () => {
     serverRoom.setTimestep(() => {}, 60_000);
     const reconnectToken = observer.room.reconnectionToken;
     const writesBefore = saveMatchSummary.mock.calls.length;
-    serverRoom.state.players.get(observer.identity.playerId)!.kills = GAMEPLAY.ffaScoreLimit;
+    (serverRoom.state as TestState).iceScore = GAMEPLAY.tdmScoreLimit;
     const completedAt = Date.now();
     advanceRoom(serverRoom, completedAt);
     await waitFor(() => ['finished', 'intermission'].includes(observer.room.state.phase));

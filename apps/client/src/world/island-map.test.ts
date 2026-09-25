@@ -125,6 +125,7 @@ describe('Island render and authoritative geometry', () => {
         isCrouching: false,
         slideUntil: 0,
         slideReadyAt: 0,
+        isWallRunning: false,
       };
       for (let tick = 1; tick <= 8; tick++)
         p = simulateMovement(
@@ -219,6 +220,7 @@ describe('Island render and authoritative geometry', () => {
       isCrouching: false,
       slideUntil: 0,
       slideReadyAt: 0,
+      isWallRunning: false,
     };
     for (let tick = 1; tick <= 80; tick++) {
       p = simulateMovement(p, { x: 1, z: 0, sequence: tick }, tick * 50, 0.05, 1, 'island');

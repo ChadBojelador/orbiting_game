@@ -25,6 +25,7 @@ const motion = (x = 0, z = -34): MovementState => ({
   isCrouching: false,
   slideUntil: 0,
   slideReadyAt: 0,
+  isWallRunning: false,
 });
 describe('Frostline movement and collision', () => {
   it('keeps all sixteen spawn points valid and distinct', () => {
@@ -66,6 +67,23 @@ describe('Frostline movement and collision', () => {
     expect(simulateMovement(p, { x: 1, z: 0, sequence: 4, slide: true }, 200).isSliding).toBe(
       false,
     );
+  });
+  it('wall-runs beside a wall while airborne and kicks away on jump', () => {
+    const airborne = motion(-34.52, -30);
+    airborne.y = 1;
+    airborne.isGrounded = false;
+    const running = simulateMovement(airborne, { x: 1, z: 0, sequence: 1 }, 50);
+    expect(running.isWallRunning).toBe(true);
+    expect(running.y).toBeGreaterThan(0.9);
+
+    const kicked = simulateMovement(
+      running,
+      { x: 1, z: 0, sequence: 2, jump: true },
+      100,
+    );
+    expect(kicked.isWallRunning).toBe(false);
+    expect(kicked.velocityX).toBeLessThan(0);
+    expect(kicked.verticalVelocity).toBeGreaterThan(0);
   });
   it('slows water and crouch movement and retains more ice momentum', () => {
     const input = { x: 0, z: 1, sequence: 1 };

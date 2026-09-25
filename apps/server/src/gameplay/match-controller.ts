@@ -22,8 +22,7 @@ export class MatchController {
     this.hasStarted = true;
     this.startedAt = now;
     this.state.phase = 'playing';
-    this.state.phaseDeadline =
-      now + (this.state.gameMode === 'duel' ? GAMEPLAY.duelTimeLimitMs : GAMEPLAY.ffaTimeLimitMs);
+    this.state.phaseDeadline = now + GAMEPLAY.tdmTimeLimitMs;
     this.onStart(now);
     this.changed(now);
   }
@@ -43,21 +42,27 @@ export class MatchController {
       return false;
     }
     if (this.state.phase !== 'playing') return false;
-    const limit =
-      this.state.gameMode === 'tdm'
-        ? GAMEPLAY.tdmScoreLimit
-        : this.state.gameMode === 'duel'
-          ? GAMEPLAY.duelScoreLimit
-          : GAMEPLAY.ffaScoreLimit;
-    const scores =
-      this.state.gameMode === 'tdm'
-        ? [
-            { id: 'ice', score: this.state.iceScore },
-            { id: 'water', score: this.state.waterScore },
-          ]
-        : [...this.state.players.values()]
-            .filter((p) => p.team !== 'unassigned')
-            .map((p) => ({ id: p.playerId, score: p.kills }));
+    const waterPlayers = [...this.state.players.values()].filter((p) => p.team === 'water');
+    if (waterPlayers.length > 0 && waterPlayers.every((p) => p.status === 'frozen')) {
+      const result: MatchResult = {
+        winner: 'ice',
+        reason: 'all-frozen',
+        gameMode: this.state.gameMode,
+      };
+      this.state.phase = 'finished';
+      this.state.matchWinner = result.winner;
+      this.state.resultReason = result.reason;
+      this.state.phaseDeadline = now + GAMEPLAY.intermissionMs;
+      this.emit({ type: 'match/result', payload: result });
+      this.changed(now);
+      this.lifecycle.onResult?.(result, this.startedAt, now);
+      return true;
+    }
+    const limit = GAMEPLAY.tdmScoreLimit;
+    const scores = [
+      { id: 'ice', score: this.state.iceScore },
+      { id: 'water', score: this.state.waterScore },
+    ];
     scores.sort((a, b) => b.score - a.score);
     const leader = scores[0];
     const hasScoreLimit = (leader?.score ?? 0) >= limit;

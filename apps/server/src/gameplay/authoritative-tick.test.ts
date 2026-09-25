@@ -24,5 +24,5 @@ it('applies only pre-deadline steps and locks gameplay before time-limit resolut
   expect(p.inputSequence).toBe(1);
   expect(p.x).toBeGreaterThan(0);
   expect(state.phase).toBe('finished');
-  expect(gameplay.handle('p', 'action/shoot', { yaw: 0, pitch: 0 }, 1100)).toContain('phase');
+  expect(gameplay.handle('p', 'action/interact', {}, 1100)).toContain('phase');
 });

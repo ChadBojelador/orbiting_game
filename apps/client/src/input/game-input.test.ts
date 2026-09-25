@@ -12,15 +12,11 @@ it('clamps mouse look and clears one-shot and held input on reset', () => {
   expect(Math.abs(input.cameraPitch)).toBeLessThan(Math.PI / 2);
   input.pressJump();
   input.pressSlide();
-  input.pressFire();
-  input.pressReload();
-  expect(input.sample()).toMatchObject({ jump: true, slide: true, hasShot: true, hasReload: true });
-  expect(input.sample()).toMatchObject({
-    jump: false,
-    slide: false,
-    hasShot: false,
-    isFiring: true,
-  });
+  input.pressInteract();
+  input.pressLunge();
+  input.pressInteract();
+  expect(input.sample()).toMatchObject({ jump: true, slide: true, hasInteraction: true, hasLunge: true });
+  expect(input.sample()).toMatchObject({ jump: false, slide: false, hasInteraction: false, hasLunge: false });
   input.reset();
-  expect(input.sample().isFiring).toBe(false);
+  expect(input.sample().hasInteraction).toBe(false);
 });

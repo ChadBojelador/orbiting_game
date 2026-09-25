@@ -117,7 +117,6 @@ describe('BotRunner and solo playtest', () => {
         return Math.hypot(player.x - before.x, player.z - before.z) > 0.01;
       }),
     ).toBe(true);
-    expect(gameplay.handle(host.playerId, 'action/shoot', { yaw: 0, pitch: 0 }, 1_051)).toBeNull();
-    expect(host.ammo).toBe(29);
+    expect(gameplay.handle(host.playerId, 'action/interact', {}, 1_051)).toBeNull();
   });
 });

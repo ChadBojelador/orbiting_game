@@ -1,18 +1,15 @@
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
-  WEAPONS,
   sanitizeDisplayName,
   normalizeInviteCode,
   type GameMode,
   type GuestSession,
   type LobbyView,
   type MapId,
-  type WeaponId,
 } from '@ice-water/shared';
 import type { LobbyRoom } from '../network/lobby-client.js';
 import type { FpsSettings } from '../game/fps-settings.js';
 import type { LobbySection } from '../game/lobby-preview.js';
-import { LoadoutScreen } from './loadout-screen.js';
 import { SettingsPanel } from './settings-panel.js';
 import assetCreditsUrl from '../../../../assets/ATTRIBUTION.txt?url&no-inline';
 
@@ -30,8 +27,8 @@ interface LobbyScreenProps {
   settings: FpsSettings;
   onSettings: (settings: FpsSettings) => void;
   onIdentify: (name: string) => void;
-  onCreate: (mode: GameMode, mapId: MapId, primary: WeaponId) => void;
-  onJoin: (code: string, primary: WeaponId) => void;
+  onCreate: (mode: GameMode, mapId: MapId) => void;
+  onJoin: (code: string) => void;
   onLeave: () => void;
   onForgetGuest: () => void;
   onAudioUnlock: () => void;
@@ -39,17 +36,11 @@ interface LobbyScreenProps {
 }
 
 const MODE_DETAILS: Record<GameMode, { name: string; summary: string; limit: string }> = {
-  ffa: {
-    name: 'Free-for-all',
-    summary: 'Every operator for themselves.',
-    limit: '30 eliminations · 5:00',
-  },
   tdm: {
-    name: 'Team deathmatch',
+    name: 'Ice Ice Water',
     summary: 'Ice and Water squads collide.',
     limit: '50 team eliminations · 5:00',
   },
-  duel: { name: 'Duel', summary: 'A focused one-on-one fight.', limit: '10 eliminations · 3:00' },
 };
 
 export function LobbyScreen(props: LobbyScreenProps) {
@@ -57,15 +48,13 @@ export function LobbyScreen(props: LobbyScreenProps) {
   const [section, setSection] = useState<LobbySection>(guest ? 'play' : 'main');
   const [name, setName] = useState(''),
     [code, setCode] = useState(''),
-    [mode, setMode] = useState<GameMode>('ffa'),
+    [mode, setMode] = useState<GameMode>('tdm'),
     [mapId, setMapId] = useState<MapId>('frostline');
-  const [primary, setPrimary] = useState<WeaponId>('assault-rifle'),
-    [copy, setCopy] = useState('Copy invite code'),
+  const [copy, setCopy] = useState('Copy invite code'),
     [isSocialOpen, setSocialOpen] = useState(false);
   const previousGuest = useRef(guest?.playerId),
     previousRoom = useRef(room);
   const local = view?.players.find((player) => player.playerId === guest?.playerId);
-  const selectedWeapon = local?.primaryWeapon ?? primary;
 
   useEffect(() => {
     if (guest && !previousGuest.current) setSection('play');
@@ -99,7 +88,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
   const join = (event: FormEvent) => {
     event.preventDefault();
     const invite = normalizeInviteCode(code);
-    props.onJoin(invite ?? code, primary);
+    props.onJoin(invite ?? code);
   };
   const connected = view?.players.filter((player) => player.isConnected) ?? [];
   const hover = (event: React.PointerEvent<HTMLElement>) => {
@@ -122,7 +111,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
         >
           <LobbyPreview
             section={section}
-            weapon={selectedWeapon}
             reducedEffects={settings.reducedEffects}
             isRoomActive={!!room || isBusy}
           />
@@ -172,7 +160,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
       {guest && (
         <nav className="main-navigation" aria-label="Main navigation">
           <NavButton label="Play" section="play" current={section} onClick={navigate} accent />
-          <NavButton label="Loadout" section="loadout" current={section} onClick={navigate} />
           <NavButton label="Game modes" section="modes" current={section} onClick={navigate} />
           <NavButton label="Customize" section="customize" current={section} onClick={navigate} />
           <NavButton label="Settings" section="settings" current={section} onClick={navigate} />
@@ -201,7 +188,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
             guest={guest}
             room={room}
             view={view}
-            localWeapon={selectedWeapon}
             settings={settings}
             now={now}
             isBusy={isBusy}
@@ -219,8 +205,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
             setMode={setMode}
             mapId={mapId}
             setMapId={setMapId}
-            primary={primary}
-            setPrimary={setPrimary}
             code={code}
             setCode={setCode}
             settings={settings}
@@ -229,7 +213,7 @@ export function LobbyScreen(props: LobbyScreenProps) {
             onSection={navigate}
             onCreate={() => {
               props.onUiCue('deploy');
-              props.onCreate(mode, mapId, primary);
+              props.onCreate(mode, mapId);
             }}
             onJoin={join}
             onForget={props.onForgetGuest}
@@ -369,8 +353,6 @@ interface SoloPanelProps {
   setMode: (mode: GameMode) => void;
   mapId: MapId;
   setMapId: (map: MapId) => void;
-  primary: WeaponId;
-  setPrimary: (weapon: WeaponId) => void;
   code: string;
   setCode: (code: string) => void;
   settings: FpsSettings;
@@ -383,8 +365,6 @@ interface SoloPanelProps {
 }
 function SoloPanel(props: SoloPanelProps) {
   const { section } = props;
-  if (section === 'loadout')
-    return <LoadoutPanel value={props.primary} onChange={props.setPrimary} />;
   if (section === 'modes') return <GameModePanel value={props.mode} onChange={props.setMode} />;
   if (section === 'customize') return <CustomizationPanel />;
   if (section === 'profile') return <ProfilePanel guest={props.guest} />;
@@ -428,7 +408,7 @@ function SoloPanel(props: SoloPanelProps) {
           value={props.mode}
           onChange={(event) => props.setMode(event.target.value as GameMode)}
         >
-          {Object.entries(MODE_DETAILS).map(([id, detail]) => (
+          {Object.entries(MODE_DETAILS).filter(([id]) => id === 'tdm').map(([id, detail]) => (
             <option key={id} value={id}>
               {detail.name}
             </option>
@@ -447,7 +427,6 @@ function SoloPanel(props: SoloPanelProps) {
           <option value="original">Original World</option>
         </select>
       </div>
-      <LoadoutScreen value={props.primary} onChange={props.setPrimary} />
       <button
         className="primary deployment-button"
         onClick={props.onCreate}
@@ -455,7 +434,7 @@ function SoloPanel(props: SoloPanelProps) {
       >
         <span>{props.isBusy ? 'Opening room…' : 'Create private room'}</span>
         <small>
-          {MODE_DETAILS[props.mode].name} · {WEAPONS[props.primary].name}
+          {MODE_DETAILS[props.mode].name} · Proximity tag rules
         </small>
       </button>
       <form className="join-form" onSubmit={props.onJoin}>
@@ -487,7 +466,6 @@ interface RoomAwareProps {
   guest: GuestSession;
   room: LobbyRoom;
   view: LobbyView;
-  localWeapon: WeaponId;
   settings: FpsSettings;
   now: number;
   isBusy: boolean;
@@ -500,15 +478,8 @@ interface RoomAwareProps {
 function RoomAwarePanel(props: RoomAwareProps) {
   const { section, view, guest, room } = props,
     isHost = view.hostPlayerId === guest.playerId,
-    count = view.players.filter((player) => player.isConnected).length;
-  if (section === 'loadout')
-    return (
-      <LoadoutPanel
-        value={props.localWeapon}
-        onChange={(weapon) => room.send('player/loadout', { primaryWeapon: weapon })}
-        disabled={view.phase !== 'lobby'}
-      />
-    );
+    count = view.players.filter((player) => player.isConnected).length,
+    local = view.players.find((player) => player.playerId === guest.playerId);
   if (section === 'modes')
     return (
       <GameModePanel
@@ -561,12 +532,26 @@ function RoomAwarePanel(props: RoomAwareProps) {
           disabled={!isHost || view.phase !== 'lobby'}
           onChange={(event) => room.send('room/configure', { gameMode: event.target.value })}
         >
-          {Object.entries(MODE_DETAILS).map(([id, detail]) => (
+          {Object.entries(MODE_DETAILS).filter(([id]) => id === 'tdm').map(([id, detail]) => (
             <option key={id} value={id}>
               {detail.name}
             </option>
           ))}
         </select>
+      </div>
+      <div className="field-row">
+        <label htmlFor="room-team">Team preference</label>
+        <select
+          id="room-team"
+          value={local?.teamPreference ?? 'auto'}
+          disabled={view.phase !== 'lobby'}
+          onChange={(event) => room.send('player/team', { team: event.target.value as 'auto' | 'ice' | 'water' })}
+        >
+          <option value="auto">Auto balance</option>
+          <option value="ice">Ice</option>
+          <option value="water">Water</option>
+        </select>
+        <small>Choose Water to test rescuing frozen teammates.</small>
       </div>
       <div className="field-row">
         <label htmlFor="room-map">Map</label>
@@ -594,7 +579,13 @@ function RoomAwarePanel(props: RoomAwareProps) {
                 : player.isBot
                   ? 'Practice bot'
                   : player.isConnected
-                    ? 'Ready'
+                    ? view.gameMode === 'tdm'
+                      ? player.teamPreference === 'auto'
+                        ? 'Auto balance'
+                        : player.teamPreference === 'ice'
+                          ? 'Ice selected'
+                          : 'Water selected'
+                      : 'Ready'
                     : 'Away'}
             </small>
           </li>
@@ -636,8 +627,8 @@ function GameModePanel({
   return (
     <>
       <div className="panel-kicker">Match format</div>
-      <h1>Game modes</h1>
-      <p className="panel-lede">Choose the rule set for your next private room.</p>
+      <h1>Ice Ice Water</h1>
+      <p className="panel-lede">The team format for every private room.</p>
       <div className="mode-grid">
         {(Object.entries(MODE_DETAILS) as [GameMode, (typeof MODE_DETAILS)[GameMode]][]).map(
           ([id, detail]) => (
@@ -648,7 +639,7 @@ function GameModePanel({
               disabled={disabled}
               onClick={() => onChange(id)}
             >
-              <span className="mode-mark">{id === 'ffa' ? '◈' : id === 'tdm' ? '◫' : '◇'}</span>
+              <span className="mode-mark">◫</span>
               <span>
                 <strong>{detail.name}</strong>
                 <small>{detail.summary}</small>
@@ -661,59 +652,6 @@ function GameModePanel({
       {disabled && (
         <p className="locked-note">Only the party leader can change the mode before countdown.</p>
       )}
-    </>
-  );
-}
-
-function LoadoutPanel({
-  value,
-  onChange,
-  disabled = false,
-}: {
-  value: WeaponId;
-  onChange: (weapon: WeaponId) => void;
-  disabled?: boolean;
-}) {
-  const weapon = WEAPONS[value];
-  return (
-    <>
-      <div className="panel-kicker">Armory link</div>
-      <h1>Loadout</h1>
-      <p className="panel-lede">Changes update the weapon on your lobby character immediately.</p>
-      <LoadoutScreen value={value} onChange={onChange} disabled={disabled} />
-      <dl className="weapon-stats">
-        <div>
-          <dt>Damage</dt>
-          <dd>
-            {weapon.damage}
-            {weapon.pelletsPerShot > 1 ? ` × ${weapon.pelletsPerShot}` : ''}
-          </dd>
-        </div>
-        <div>
-          <dt>Magazine</dt>
-          <dd>{weapon.magazineSize}</dd>
-        </div>
-        <div>
-          <dt>Range</dt>
-          <dd>{weapon.range} m</dd>
-        </div>
-        <div>
-          <dt>Fire mode</dt>
-          <dd>{weapon.fireMode}</dd>
-        </div>
-      </dl>
-      <div className="kit-slots">
-        <span>
-          <i>1</i>
-          {weapon.name}
-        </span>
-        <span>
-          <i>2</i>Snowmelt
-        </span>
-        <span>
-          <i>3</i>Ice Pick
-        </span>
-      </div>
     </>
   );
 }

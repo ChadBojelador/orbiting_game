@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { WEAPONS, type WeaponId } from '@ice-water/shared';
 import * as THREE from 'three';
-import { loadCharacterModel, type CharacterInstance } from './character-model.js';
+import {
+  loadLobbyCharacterFactories,
+  type CharacterInstance,
+  type FrozenIceInstance,
+} from './character-model.js';
 
 export type LobbySection =
-  'main' | 'play' | 'modes' | 'loadout' | 'customize' | 'party' | 'profile' | 'settings';
+  'main' | 'play' | 'modes' | 'customize' | 'party' | 'profile' | 'settings';
 
 interface LobbyPreviewProps {
   section: LobbySection;
-  weapon: WeaponId;
   reducedEffects: boolean;
   isRoomActive: boolean;
 }
@@ -19,10 +21,6 @@ const CAMERA_POSES: Record<LobbySection, { position: THREE.Vector3; target: THRE
   modes: {
     position: new THREE.Vector3(4.6, 2.95, 6.65),
     target: new THREE.Vector3(0.42, 1.25, -0.15),
-  },
-  loadout: {
-    position: new THREE.Vector3(2.75, 2.1, 3.75),
-    target: new THREE.Vector3(0.3, 1.25, 0.08),
   },
   customize: {
     position: new THREE.Vector3(3.2, 2.4, 4.65),
@@ -39,30 +37,7 @@ const CAMERA_POSES: Record<LobbySection, { position: THREE.Vector3; target: THRE
   },
 };
 
-const RIGHT_UPPER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(-0.9, 1.0, -1.5),
-);
-const RIGHT_LOWER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(-0.6, -0.2, 0.5),
-);
-const LEFT_UPPER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(-0.3, 0.3, -0.9),
-);
-const LEFT_LOWER_ARM_HOLD_OFFSET = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(0.3, 1.2, -1.5),
-);
-const WEAPON_GRIP_POINT = new THREE.Vector3(0, -0.24, -0.16);
-const STAGE_UP = new THREE.Vector3(0, 1, 0);
-const WEAPON_PREVIEW_SCALE: Record<WeaponId, number> = {
-  'assault-rifle': 0.78,
-  smg: 0.88,
-  shotgun: 0.76,
-  sniper: 0.68,
-  pistol: 0.78,
-  'ice-pick': 0.78,
-};
-
-export function LobbyPreview({ section, weapon, reducedEffects, isRoomActive }: LobbyPreviewProps) {
+export function LobbyPreview({ section, reducedEffects, isRoomActive }: LobbyPreviewProps) {
   const ref = useRef<HTMLCanvasElement>(null),
     sceneRef = useRef<LobbyScene | undefined>(undefined);
   const [hasError, setHasError] = useState(false);
@@ -81,8 +56,8 @@ export function LobbyPreview({ section, weapon, reducedEffects, isRoomActive }: 
     };
   }, []);
   useEffect(
-    () => sceneRef.current?.setState(section, weapon, reducedEffects, isRoomActive),
-    [section, weapon, reducedEffects, isRoomActive],
+    () => sceneRef.current?.setState(section, reducedEffects, isRoomActive),
+    [section, reducedEffects, isRoomActive],
   );
   return (
     <>
@@ -115,24 +90,13 @@ class LobbyScene {
     roughness: 0.25,
   });
   private readonly cleanup: Array<() => void> = [];
-  private character?: CharacterInstance;
-  private upperArmR?: THREE.Object3D;
-  private lowerArmR?: THREE.Object3D;
-  private upperArmL?: THREE.Object3D;
-  private lowerArmL?: THREE.Object3D;
-  private rightHand?: THREE.Object3D;
-  private leftHand?: THREE.Object3D;
-  private readonly handPosition = new THREE.Vector3();
-  private readonly supportHandPosition = new THREE.Vector3();
-  private readonly gripOffset = new THREE.Vector3();
-  private readonly weaponRotation = new THREE.Matrix4();
+  private readonly characters: CharacterInstance[] = [];
+  private frozenWater?: FrozenIceInstance;
   private placeholder?: THREE.Group;
-  private weapon = new THREE.Group();
   private snow?: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
   private frame = 0;
   private previous = performance.now();
   private section: LobbySection = 'main';
-  private weaponId: WeaponId = 'assault-rifle';
   private isReduced = false;
   private isRoomActive = false;
   private isDestroyed = false;
@@ -161,8 +125,6 @@ class LobbyScene {
     this.resize();
     this.placeholder = this.buildPlaceholder();
     this.stage.add(this.placeholder);
-    this.weapon = this.buildWeapon(this.weaponId);
-    this.stage.add(this.weapon);
     this.scene.add(this.stage);
     void this.loadCharacter();
     this.frame = requestAnimationFrame((time) => this.render(time));
@@ -170,20 +132,12 @@ class LobbyScene {
 
   setState(
     section: LobbySection,
-    weapon: WeaponId,
     reducedEffects: boolean,
     isRoomActive: boolean,
   ): void {
     this.section = section;
     this.isReduced = reducedEffects;
     this.isRoomActive = isRoomActive;
-    if (this.weaponId !== weapon) {
-      this.weaponId = weapon;
-      this.weapon.removeFromParent();
-      this.disposeObject(this.weapon);
-      this.weapon = this.buildWeapon(weapon);
-      this.stage.add(this.weapon);
-    }
     if (this.snow) this.snow.visible = !reducedEffects;
   }
 
@@ -430,129 +384,31 @@ class LobbyScene {
 
   private async loadCharacter(): Promise<void> {
     try {
-      const factory = await loadCharacterModel();
+      const { water, frozenIce } = await loadLobbyCharacterFactories();
+      if (!water) return;
       if (this.isDestroyed) return;
-      this.character = factory.instantiate('#dbeef2', 'Idle');
-      this.character.root.scale.setScalar(0.26);
-      this.character.root.rotation.y = Math.PI;
-      this.character.root.position.y = 0.02;
-      this.upperArmR = this.character.root.getObjectByName('UpperArmR') ?? undefined;
-      this.lowerArmR = this.character.root.getObjectByName('LowerArmR') ?? undefined;
-      this.upperArmL = this.character.root.getObjectByName('UpperArmL') ?? undefined;
-      this.lowerArmL = this.character.root.getObjectByName('LowerArmL') ?? undefined;
-      this.rightHand =
-        this.character.root.getObjectByName('LowerArmR_end') ?? this.lowerArmR ?? undefined;
-      this.leftHand =
-        this.character.root.getObjectByName('LowerArmL_end') ?? this.lowerArmL ?? undefined;
-      const limbMaterial = new THREE.MeshStandardMaterial({
-        color: 0x1a4960,
-        roughness: 0.48,
-        metalness: 0.24,
-      });
-      this.character.root.traverse((object) => {
-        if (object instanceof THREE.Mesh && object.name !== 'Sphere002')
-          object.material = limbMaterial;
-      });
-      const chest = new THREE.Mesh(
-        new THREE.BoxGeometry(0.58, 0.42, 0.1),
-        new THREE.MeshStandardMaterial({ color: 0x17394b, metalness: 0.42, roughness: 0.32 }),
-      );
-      chest.position.set(0, 1.27, 0.28);
-      const visor = new THREE.Mesh(
-        new THREE.SphereGeometry(0.28, 18, 12),
-        new THREE.MeshStandardMaterial({
-          color: 0x07131d,
-          emissive: 0x36cce3,
-          emissiveIntensity: 0.45,
-          metalness: 0.72,
-          roughness: 0.15,
-        }),
-      );
-      visor.scale.set(1, 0.48, 0.26);
-      visor.position.set(0, 1.78, 0.27);
-      this.stage.add(chest, visor);
+      const frozenWater = water.instantiate('#43c6d6', 'Frozen');
+      const actor = new THREE.Group();
+      actor.position.set(-0.15, 0.02, -0.25);
+      actor.rotation.y = -0.48;
+      frozenWater.root.scale.setScalar(0.26);
+      actor.add(frozenWater.root);
+      if (frozenIce) {
+        this.frozenWater = frozenIce.instantiate();
+        this.frozenWater.root.scale.setScalar(0.26);
+        actor.add(this.frozenWater.root);
+        this.frozenWater.playFreeze();
+      }
+      this.stage.add(actor);
+      this.characters.push(frozenWater);
       if (this.placeholder) {
         this.placeholder.removeFromParent();
         this.disposeObject(this.placeholder);
         this.placeholder = undefined;
       }
-      this.stage.add(this.character.root);
     } catch {
       /* Keep the original procedural field-suit fallback. */
     }
-  }
-
-  private buildWeapon(id: WeaponId): THREE.Group {
-    const group = new THREE.Group(),
-      body = new THREE.MeshStandardMaterial({ color: 0x308cad, metalness: 0.58, roughness: 0.3 }),
-      dark = new THREE.MeshStandardMaterial({ color: 0x10283a, metalness: 0.72, roughness: 0.26 }),
-      ice = new THREE.MeshStandardMaterial({
-        color: 0x74d9ec,
-        emissive: 0x47d7e9,
-        emissiveIntensity: 0.42,
-        metalness: 0.42,
-        roughness: 0.22,
-      }),
-      accent = new THREE.MeshStandardMaterial({
-        color: 0xffbd59,
-        emissive: 0xff8a32,
-        emissiveIntensity: 0.18,
-      });
-    const length = id === 'sniper' ? 1.18 : id === 'smg' ? 0.66 : id === 'shotgun' ? 0.9 : 0.82;
-    const box = (
-      w: number,
-      h: number,
-      d: number,
-      x: number,
-      y: number,
-      z: number,
-      material: THREE.Material,
-    ) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
-      mesh.position.set(x, y, z);
-      mesh.castShadow = true;
-      group.add(mesh);
-      return mesh;
-    };
-    box(0.2, 0.18, 0.25, 0, 0, 0.03, dark);
-    box(0.24, 0.23, length * 0.46, 0, 0, -length * 0.33, body);
-    box(0.17, 0.14, length * 0.34, 0, 0.01, -length * 0.69, ice);
-    box(0.065, 0.065, length * 0.3, 0, 0.02, -length * 0.98, dark);
-    box(0.09, 0.09, 0.15, 0, 0.02, -length - 0.08, ice);
-    box(0.09, 0.34, 0.14, 0, -0.23, -0.17, dark).rotation.x = -0.12;
-    box(0.11, 0.27, 0.15, 0, -0.2, -length * 0.42, body).rotation.x = -0.16;
-    box(0.05, 0.055, length * 0.42, 0, 0.14, -length * 0.42, accent);
-    if (id === 'sniper') {
-      box(0.13, 0.13, 0.4, 0, 0.24, -0.43, dark);
-      box(0.18, 0.18, 0.08, 0, 0.24, -0.22, ice);
-    }
-    if (id === 'shotgun') box(0.11, 0.1, 0.34, 0, -0.12, -0.64, accent);
-    group.name = `${WEAPONS[id].name} lobby preview`;
-    group.position.set(0.43, 1.39, 0.44);
-    group.rotation.set(0.05, 2.1, -0.08);
-    group.scale.setScalar(WEAPON_PREVIEW_SCALE[id]);
-    return group;
-  }
-
-  private snapWeaponToHands(roll: number): void {
-    if (!this.rightHand) return;
-    this.stage.updateWorldMatrix(true, true);
-    this.rightHand.getWorldPosition(this.handPosition);
-    this.stage.worldToLocal(this.handPosition);
-    if (this.leftHand) {
-      this.leftHand.getWorldPosition(this.supportHandPosition);
-      this.stage.worldToLocal(this.supportHandPosition);
-      // Keep the weapon at a low-ready angle while the raised support hand rests on its fore-end.
-      this.supportHandPosition.y = this.handPosition.y;
-      this.weaponRotation.lookAt(this.handPosition, this.supportHandPosition, STAGE_UP);
-      this.weapon.quaternion.setFromRotationMatrix(this.weaponRotation);
-      this.weapon.rotateZ(roll);
-    }
-    this.gripOffset
-      .copy(WEAPON_GRIP_POINT)
-      .multiply(this.weapon.scale)
-      .applyQuaternion(this.weapon.quaternion);
-    this.weapon.position.copy(this.handPosition).sub(this.gripOffset);
   }
 
   private bind(): void {
@@ -626,13 +482,8 @@ class LobbyScene {
   }
 
   private update(now: number, delta: number): void {
-    this.character?.update(delta);
-    if (this.upperArmR && this.lowerArmR && this.upperArmL && this.lowerArmL) {
-      this.upperArmR.quaternion.multiply(RIGHT_UPPER_ARM_HOLD_OFFSET);
-      this.lowerArmR.quaternion.multiply(RIGHT_LOWER_ARM_HOLD_OFFSET);
-      this.upperArmL.quaternion.multiply(LEFT_UPPER_ARM_HOLD_OFFSET);
-      this.lowerArmL.quaternion.multiply(LEFT_LOWER_ARM_HOLD_OFFSET);
-    }
+    this.characters.forEach((character) => character.update(delta));
+    this.frozenWater?.update(delta);
     const pose = CAMERA_POSES[this.section],
       ease = 1 - Math.exp(-4.8 * delta),
       pointerScale = this.isReduced ? 0 : 1;
@@ -648,7 +499,7 @@ class LobbyScene {
     this.cameraTarget.lerp(target, ease);
     this.camera.lookAt(this.cameraTarget);
     const baseRotation =
-      this.section === 'loadout' ? -0.35 : this.section === 'customize' ? -0.18 : -0.12;
+      this.section === 'customize' ? -0.18 : -0.12;
     this.stage.rotation.y = THREE.MathUtils.lerp(
       this.stage.rotation.y,
       baseRotation + (this.section === 'customize' ? this.rotationOffset : 0),
@@ -656,8 +507,6 @@ class LobbyScene {
     );
     const idle = this.isReduced ? 0 : Math.sin(now * 0.0017) * 0.018;
     this.stage.position.y = idle;
-    const weaponRoll = -0.08 + (this.isReduced ? 0 : Math.sin(now * 0.0013) * 0.014);
-    this.snapWeaponToHands(weaponRoll);
     this.fan.rotation.z += delta * 0.38;
     this.holograms.forEach((panel, index) => {
       (panel.material as THREE.MeshBasicMaterial).opacity =

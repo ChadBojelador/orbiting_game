@@ -12,11 +12,7 @@ export function Scoreboard({
   return (
     <section className="scoreboard" aria-label="Scoreboard">
       <h2>
-        {view.gameMode === 'tdm'
-          ? 'Ice vs Water'
-          : view.gameMode === 'duel'
-            ? 'Duel'
-            : 'Free-for-all'}
+        Ice Ice Water
       </h2>
       <table>
         <thead>
@@ -34,7 +30,7 @@ export function Scoreboard({
               <td>
                 {p.displayName}
                 {p.playerId === localPlayerId ? ' (you)' : ''}
-                {view.gameMode === 'tdm' ? ` · ${p.team}` : ''}
+                {` · ${p.team}`}
                 {!p.isConnected ? ' · Away' : ''}
               </td>
               <td>{p.kills}</td>

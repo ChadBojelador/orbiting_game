@@ -286,6 +286,8 @@ export function advanceVerticalMotion(
   mapId: MapId = 'frostline',
   height: number = GAMEPLAY.playerHeight,
   wantsDive = false,
+  gravityFactor = 1,
+  initialVerticalVelocity?: number,
 ): VerticalMotion {
   if (isSwimming({ ...position, y: previous.y }, mapId)) {
     const surfaceY = waterSurfaceYForMap(mapId);
@@ -310,14 +312,14 @@ export function advanceVerticalMotion(
     };
   }
   const floor = supportHeightAt(position, previous.y + 0.32, mapId);
-  let velocity = previous.verticalVelocity;
+  let velocity = initialVerticalVelocity ?? previous.verticalVelocity;
   if (wantsJump && previous.isGrounded) velocity = GAMEPLAY.jumpSpeed;
   let y = previous.y;
   if (previous.isGrounded && !wantsJump && Math.abs(y - floor) <= 0.32)
     return { y: floor, verticalVelocity: 0, isGrounded: true };
   if (!previous.isGrounded || velocity > 0 || y > floor + 0.06) {
-    y += velocity * seconds - 0.5 * GAMEPLAY.gravity * seconds * seconds;
-    velocity -= GAMEPLAY.gravity * seconds;
+    y += velocity * seconds - 0.5 * GAMEPLAY.gravity * gravityFactor * seconds * seconds;
+    velocity -= GAMEPLAY.gravity * gravityFactor * seconds;
   }
   if ((mapId === 'island' || mapId === 'original') && y > previous.y) {
     const ceilingAt = mapId === 'original' ? originalCeilingAt : islandCeilingAt;
@@ -330,6 +332,37 @@ export function advanceVerticalMotion(
   if (y <= floor) return { y: floor, verticalVelocity: 0, isGrounded: true };
   return { y, verticalVelocity: velocity, isGrounded: false };
 }
+interface WallContact {
+  normalX: number;
+  normalZ: number;
+}
+function wallContactAt(
+  position: Position,
+  y: number,
+  height: number,
+  halfExtent: number,
+  mapId: MapId,
+): WallContact | undefined {
+  const probe = GAMEPLAY.playerRadius + GAMEPLAY.wallRunProbeDistance;
+  const contacts: WallContact[] = [
+    { normalX: 1, normalZ: 0 },
+    { normalX: -1, normalZ: 0 },
+    { normalX: 0, normalZ: 1 },
+    { normalX: 0, normalZ: -1 },
+  ];
+  return contacts.find((contact) =>
+    !isWalkable(
+      {
+        x: position.x + contact.normalX * probe,
+        z: position.z + contact.normalZ * probe,
+      },
+      halfExtent,
+      y,
+      height,
+      mapId,
+    ),
+  );
+}
 export interface MovementState extends SpatialPosition, VerticalMotion {
   velocityX: number;
   velocityZ: number;
@@ -337,6 +370,7 @@ export interface MovementState extends SpatialPosition, VerticalMotion {
   isCrouching: boolean;
   slideUntil: number;
   slideReadyAt: number;
+  isWallRunning: boolean;
 }
 export function simulateMovement(
   p: MovementState,
@@ -345,6 +379,7 @@ export function simulateMovement(
   seconds = GAMEPLAY.tickMs / 1000,
   speedMultiplier = 1,
   mapId: MapId = 'frostline',
+  steeringFactor = 1,
 ): MovementState {
   const halfExtent = arenaHalfExtentForMap(mapId);
   const next: MovementState = {
@@ -359,6 +394,7 @@ export function simulateMovement(
     isCrouching: p.isCrouching,
     slideUntil: p.slideUntil,
     slideReadyAt: p.slideReadyAt,
+    isWallRunning: false,
   };
   const length = Math.max(1, Math.hypot(input.x, input.z));
   const x = input.x / length,
@@ -409,13 +445,13 @@ export function simulateMovement(
           ? GAMEPLAY.sprintMultiplier
           : 1) *
       (surface === 'water' ? GAMEPLAY.waterSpeedPenalty : 1);
-    const alpha = swimming
+    const alpha = (swimming
       ? GAMEPLAY.waterControlFactor
       : p.isGrounded
         ? surface === 'ice'
           ? 0.08
           : 0.82
-        : GAMEPLAY.airControlFactor;
+        : GAMEPLAY.airControlFactor) * steeringFactor;
     next.velocityX += (x * speed - next.velocityX) * alpha;
     next.velocityZ += (z * speed - next.velocityZ) * alpha;
   }
@@ -435,10 +471,39 @@ export function simulateMovement(
   );
   if (Math.abs(moved.x - p.x) < 0.00001) next.velocityX = 0;
   if (Math.abs(moved.z - p.z) < 0.00001) next.velocityZ = 0;
+  const previousWall = p.isWallRunning
+    ? wallContactAt(p, p.y, bodyHeight(next), halfExtent, mapId)
+    : undefined;
+  const wall =
+    !p.isGrounded && !swimming
+      ? wallContactAt(moved, p.y, bodyHeight(next), halfExtent, mapId) ?? previousWall
+      : undefined;
+  const inputLength = Math.max(1, Math.hypot(input.x, input.z));
+  const kickWall = wall ?? { normalX: input.x / inputLength, normalZ: input.z / inputLength };
+  const wantsWall = wall && input.x * wall.normalX + input.z * wall.normalZ > 0.1;
+  next.isWallRunning = !!wantsWall;
+  let wallKicked = false;
+  if (p.isWallRunning && input.jump) {
+    next.isWallRunning = false;
+    wallKicked = true;
+    next.velocityX = -kickWall.normalX * GAMEPLAY.wallRunKickSpeed;
+    next.velocityZ = -kickWall.normalZ * GAMEPLAY.wallRunKickSpeed;
+    next.verticalVelocity = GAMEPLAY.wallRunJumpSpeed;
+  }
   Object.assign(
     next,
     moved,
-    advanceVerticalMotion(p, moved, seconds, !!input.jump, mapId, bodyHeight(next), !!input.crouch),
+    advanceVerticalMotion(
+      p,
+      moved,
+      seconds,
+      !!input.jump && !next.isWallRunning,
+      mapId,
+      bodyHeight(next),
+      !!input.crouch,
+      next.isWallRunning ? GAMEPLAY.wallRunGravityFactor : 1,
+      wallKicked ? next.verticalVelocity : undefined,
+    ),
   );
   return next;
 }

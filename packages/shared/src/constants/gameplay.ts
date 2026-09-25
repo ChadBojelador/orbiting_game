@@ -49,9 +49,6 @@ export const GAMEPLAY = {
   waterMaxSinkSpeed: 2,
   waterEntryHeight: 0.18,
 
-  // ── Health ──
-  maxHp: 100,
-  respawnDelayMs: 2500,
   spawnProtectionMs: 1500,
 
   // ── Network ──
@@ -61,19 +58,28 @@ export const GAMEPLAY = {
 
   // ── Match timing ──
   countdownMs: 3000,
-  ffaTimeLimitMs: 300_000, // 5 minutes
-  ffaScoreLimit: 30,
   tdmTimeLimitMs: 300_000,
   tdmScoreLimit: 50,
-  duelTimeLimitMs: 180_000, // 3 minutes
-  duelScoreLimit: 10,
   intermissionMs: 8_000,
   warmupMs: 10_000,
 
-  // ── Damage ──
-  headshotMultiplier: 2.0,
-  headHitboxRatio: 0.25, // top 25% of player height
-
   // ── Interaction ──
-  interactionHeight: 0.9,
+  interactionRange: 2,
+  freezeProtectionMs: 2000,
+  freezeKnockbackSpeed: 13,
+  freezeKnockbackVerticalSpeed: 5.5,
+  freezeKnockbackMs: 250,
+
+  // ── Ice lunge ──
+  lungeDurationMs: 600,
+  lungeCooldownMs: 3000,
+  lungeSpeedMultiplier: 2,
+  lungeSteeringFactor: 1,
+  lungeVerticalSpeed: 7.5,
+
+  // ── Wall run ──
+  wallRunGravityFactor: 0.18,
+  wallRunJumpSpeed: 7.5,
+  wallRunKickSpeed: 6,
+  wallRunProbeDistance: 0.12,
 } as const;

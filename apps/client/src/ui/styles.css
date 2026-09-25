@@ -663,25 +663,6 @@ form .primary {
 .join-form button {
   white-space: nowrap;
 }
-.loadout {
-  margin-top: 18px;
-  padding-top: 15px;
-  border-top: 1px solid rgba(119, 230, 245, 0.11);
-}
-.loadout h3 {
-  color: #eafcff;
-  font-family: 'Bahnschrift Condensed', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.loadout label {
-  margin-top: 8px;
-}
-.loadout p {
-  font-size: 11px;
-  margin: 9px 0;
-  color: #8eabb5;
-}
 .invite-block {
   position: relative;
   margin: 15px 0 14px;
@@ -838,7 +819,6 @@ form .primary {
   margin-top: 13px;
   font-size: 11px;
 }
-.weapon-stats,
 .profile-facts {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -846,20 +826,17 @@ form .primary {
   border-top: 1px solid rgba(119, 230, 245, 0.12);
   border-left: 1px solid rgba(119, 230, 245, 0.12);
 }
-.weapon-stats div,
 .profile-facts div {
   padding: 11px;
   border-right: 1px solid rgba(119, 230, 245, 0.12);
   border-bottom: 1px solid rgba(119, 230, 245, 0.12);
 }
-.weapon-stats dt,
 .profile-facts dt {
   color: #6f929f;
   font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
-.weapon-stats dd,
 .profile-facts dd {
   margin: 4px 0 0;
   color: #eafcff;
@@ -1229,6 +1206,33 @@ form .primary {
 .match-clock span {
   font-size: 12px;
 }
+.frozen-status {
+  position: absolute;
+  top: 28%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 230px;
+  padding: 16px 24px;
+  border: 2px solid #bdefff;
+  background: #18334bcc;
+  color: #bdefff;
+  text-align: center;
+  box-shadow: 0 0 24px #72e8ff66;
+}
+.frozen-status strong {
+  font-size: 28px;
+  letter-spacing: 0.12em;
+}
+.frozen-status span {
+  font-size: 12px;
+}
+.frozen-status meter {
+  width: 180px;
+}
 .crosshair,
 .hit-marker {
   position: absolute;
@@ -1254,8 +1258,7 @@ form .primary {
   color: #f67561;
   font-size: 25px;
 }
-.health-display,
-.ammo-display {
+.health-display {
   position: absolute;
   bottom: 70px;
   display: flex;
@@ -1268,25 +1271,17 @@ form .primary {
   left: 22px;
   border-left: 4px solid #74d9ec;
 }
-.ammo-display {
-  right: 22px;
-  text-align: right;
-  border-right: 4px solid #f3b747;
-}
-.health-display strong,
-.ammo-display strong {
+.health-display strong {
   font-size: 40px;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
-.health-display small,
-.ammo-display small {
+.health-display small {
   display: inline;
   font-size: 14px;
   color: #d3e8f1;
 }
-.health-display span,
-.ammo-display span {
+.health-display span {
   font-size: 13px;
 }
 .health-display meter {
@@ -1533,11 +1528,6 @@ form .primary {
   user-select: none;
   font-size: 12px;
 }
-.touch-actions .touch-fire {
-  background: #f3b747df;
-  color: #18334b;
-}
-
 @media (max-width: 1100px) {
   .main-navigation {
     left: 20px;
@@ -1761,8 +1751,7 @@ form .primary {
   .desktop-controls {
     display: none;
   }
-  .health-display,
-  .ammo-display {
+  .health-display {
     bottom: 24px;
   }
   .kill-feed {
@@ -1786,8 +1775,7 @@ form .primary {
     right: 10px;
     max-width: 230px;
   }
-  .health-display,
-  .ammo-display {
+  .health-display {
     min-width: 110px;
     bottom: 25px;
     padding: 10px;
@@ -1795,11 +1783,7 @@ form .primary {
   .health-display {
     left: 12px;
   }
-  .ammo-display {
-    right: 12px;
-  }
-  .health-display strong,
-  .ammo-display strong {
+  .health-display strong {
     font-size: 30px;
   }
   .health-display meter {
@@ -1841,8 +1825,7 @@ form .primary {
   .match-clock {
     top: 8px;
   }
-  .health-display,
-  .ammo-display {
+  .health-display {
     bottom: 12px;
   }
   .touch-stick {
@@ -1876,16 +1859,14 @@ form .primary {
 .is-touch .desktop-controls {
   display: none;
 }
-.is-touch .health-display,
-.is-touch .ammo-display {
+.is-touch .health-display {
   bottom: 24px;
 }
 @media (max-height: 500px) {
   .is-touch .match-clock {
     top: 8px;
   }
-  .is-touch .health-display,
-  .is-touch .ammo-display {
+  .is-touch .health-display {
     bottom: 12px;
   }
   .is-touch .touch-stick {

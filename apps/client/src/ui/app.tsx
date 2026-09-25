@@ -7,8 +7,6 @@ import {
   type GameMode,
   type MapId,
   type SessionError,
-  type GameplayEvents,
-  type WeaponId,
 } from '@ice-water/shared';
 import {
   createGuest,
@@ -25,7 +23,7 @@ import { ServerClock } from '../network/server-clock.js';
 import type { GameScene } from '../game/game-scene.js';
 import { readSettings, saveSettings } from '../game/fps-settings.js';
 import { LobbyAudio } from '../audio/lobby-audio.js';
-import { GameHud, type KillEntry } from './game-hud.js';
+import { GameHud } from './game-hud.js';
 import { TouchControls } from './touch-controls.js';
 import { Scoreboard } from './scoreboard.js';
 import { DeathScreen } from './death-screen.js';
@@ -44,15 +42,11 @@ export function App() {
     [now, setNow] = useState(0),
     [settings, setSettings] = useState(readSettings);
   const [, refreshMapStatus] = useState(0);
-  const [isSettings, setIsSettings] = useState(false),
-    [feed, setFeed] = useState<KillEntry[]>([]);
-  const [hit, setHit] = useState({ until: 0, headshot: false }),
-    [damage, setDamage] = useState({ until: 0, angle: 0 });
+  const [isSettings, setIsSettings] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null),
     roomRef = useRef<LobbyRoom | null>(null),
     sceneRef = useRef<GameScene | null>(null);
   const clock = useRef(new ServerClock()),
-    feedKey = useRef(0),
     roomCleanup = useRef<(() => void)[]>([]);
   const lobbyAudio = useRef<LobbyAudio | null>(null);
   if (!lobbyAudio.current) lobbyAudio.current = new LobbyAudio(settings);
@@ -133,7 +127,6 @@ export function App() {
     roomRef.current = next;
     setRoom(next);
     setError('');
-    setFeed([]);
     setConnection('Connected');
     const update = () => {
       if (!next.state?.players) return;
@@ -153,30 +146,6 @@ export function App() {
     );
     roomCleanup.current.push(
       next.onMessage('player/respawned', () => {}),
-      next.onMessage('weapon/fired', () => {}),
-    );
-    roomCleanup.current.push(
-      next.onMessage<GameplayEvents['player/killed']>('player/killed', (message) =>
-        setFeed((old) => [...old.slice(-4), { ...message, key: ++feedKey.current }]),
-      ),
-    );
-    roomCleanup.current.push(
-      next.onMessage<GameplayEvents['player/hit']>('player/hit', (message) => {
-        const localId = readGuest()?.playerId;
-        if (message.attackerId === localId)
-          setHit({ until: message.serverTime + 200, headshot: message.isHeadshot });
-        if (message.victimId === localId) {
-          const players = [...next.state.players.values()],
-            attacker = players.find((player) => player.playerId === message.attackerId),
-            victim = players.find((player) => player.playerId === message.victimId);
-          const yaw = sceneRef.current?.getInput().cameraYaw ?? 0,
-            angle =
-              attacker && victim
-                ? Math.atan2(attacker.x - victim.x, -(attacker.z - victim.z)) + yaw
-                : 0;
-          setDamage({ until: message.serverTime + 450, angle });
-        }
-      }),
     );
     const drop = () => setConnection('Reconnecting…'),
       reconnect = () => {
@@ -223,14 +192,13 @@ export function App() {
     }
     void run(async () => setGuest(await createGuest(value)));
   }
-  async function create(mode: GameMode, mapId: MapId, primary: WeaponId) {
+  async function create(_mode: GameMode, mapId: MapId) {
     if (!guest) return;
     const next = await reserveRoom(guest);
     attach(next);
-    next.send('room/configure', { gameMode: mode, mapId });
-    next.send('player/loadout', { primaryWeapon: primary });
+    next.send('room/configure', { mapId });
   }
-  function join(code: string, primary: WeaponId) {
+  function join(code: string) {
     const invite = normalizeInviteCode(code);
     if (!invite) {
       setError('Enter the eight-character invite code from your host.');
@@ -240,7 +208,6 @@ export function App() {
       void run(async () => {
         const next = await reserveRoom(guest, invite);
         attach(next);
-        next.send('player/loadout', { primaryWeapon: primary });
       });
   }
   async function leave() {
@@ -253,12 +220,12 @@ export function App() {
     setError('');
   }
 
-  const local = view?.players.find((player) => player.playerId === guest?.playerId);
   const settingsPanel = isSettings && (
     <div className="modal-backdrop">
       <SettingsPanel value={settings} onChange={setSettings} onClose={() => setIsSettings(false)} />
     </div>
   );
+  const local = view?.players.find((player) => player.playerId === guest?.playerId);
   if (isInGame && view && guest) {
     const complete = view.phase === 'finished' || view.phase === 'intermission';
     return (
@@ -269,16 +236,11 @@ export function App() {
             view={view}
             localPlayerId={guest.playerId}
             serverNow={now}
-            feed={feed}
-            hitUntil={hit.until}
-            damageUntil={damage.until}
-            damageAngle={damage.angle}
-            headshot={hit.headshot}
             crosshair={settings.crosshair}
           />
         )}
         {scene?.isTouch && !complete && !isSettings && (
-          <TouchControls input={scene.getInput()} slot={local?.currentWeaponSlot ?? 0} />
+          <TouchControls input={scene.getInput()} />
         )}
         {!complete && local?.status === 'dead' && (
           <DeathScreen view={view} player={local} now={now} />
@@ -358,7 +320,7 @@ export function App() {
       settings={settings}
       onSettings={setSettings}
       onIdentify={identify}
-      onCreate={(mode, mapId, weapon) => void run(() => create(mode, mapId, weapon))}
+      onCreate={(mode, mapId) => void run(() => create(mode, mapId))}
       onJoin={join}
       onLeave={() => void run(leave)}
       onForgetGuest={() => {

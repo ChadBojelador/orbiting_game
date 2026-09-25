@@ -3,7 +3,7 @@ import { CanvasTexture, LinearFilter, Sprite, SpriteMaterial, SRGBColorSpace } f
 const NAMEPLATE_WIDTH = 256;
 const NAMEPLATE_HEIGHT = 64;
 
-export type NameplateTone = 'enemy' | 'friend' | 'protected';
+export type NameplateTone = 'enemy' | 'friend' | 'protected' | 'frozen';
 
 export function createPlayerNameplate(displayName: string): Sprite {
   const canvas = document.createElement('canvas');
@@ -63,7 +63,8 @@ export function createPlayerNameplate(displayName: string): Sprite {
 }
 
 export function setNameplateTone(nameplate: Sprite, tone: NameplateTone): void {
-  const color = tone === 'protected' ? 0xf3b747 : tone === 'friend' ? 0x74d9ec : 0xffffff;
+  const color =
+    tone === 'frozen' ? 0xbdefff : tone === 'protected' ? 0xf3b747 : tone === 'friend' ? 0x74d9ec : 0xffffff;
   (nameplate.material as SpriteMaterial).color.setHex(color);
 }
 

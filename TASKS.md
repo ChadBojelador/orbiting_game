@@ -7,7 +7,7 @@ Current product: private-room arena FPS with desktop/mobile support and Frostlin
 | ID | Work | Status |
 |---|---|---|
 | FPS-01 | Authoritative movement, camera, prediction, and touch input | Complete |
-| FPS-02 | Six weapons, ammo/reload validation, hitscan, damage, and death | Complete |
+| FPS-02 | Movement interactions, proximity freeze/rescue, and death | Complete |
 | FPS-03 | FFA/TDM/duel, solo practice, respawn, reconnect, results, and summaries | Complete |
 | FPS-04 | Frostline geometry and wooden-house scale/collision | Complete |
 | FPS-05 | Fort optimization and shared triangle collision | Complete |
@@ -27,12 +27,12 @@ Current product: private-room arena FPS with desktop/mobile support and Frostlin
 |---|---|---|
 | FPS-11 | P0 | Independent-process full-match load at 20/50/100/150 on all three maps; tune the cap from evidence |
 | FPS-12 | P0 | Physical Android/iOS portrait/landscape and desktop GPU checks at the target frame rate |
-| FPS-13 | P1 | Multiplayer route, spawn/camping, interior/ceiling, and weapon-balance playtest |
+| FPS-13 | P1 | Multiplayer route, spawn/camping, interior/ceiling, and proximity-balance playtest |
 | FPS-14 | P1 | Latency and fairness study before rewind or transport changes |
 | FPS-15 | P1 | Independent permission evidence for the supplied reuploaded Island asset and retained lobby assets |
 | FPS-16 | P1 | Accessibility and color-independent state review on real devices |
 | FPS-17 | P1 | Staging deployment with HTTPS/WSS, proxy isolation, telemetry, and limits |
-| FPS-18 | P2 | Add shooting bots only if practice testing demonstrates the need |
+| FPS-18 | P2 | Add interaction bots only if practice testing demonstrates the need |
 
 ## Evidence and limits
 

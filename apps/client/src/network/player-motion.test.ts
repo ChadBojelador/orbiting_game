@@ -1,11 +1,12 @@
 import { expect, it } from 'vitest';
-import { GAMEPLAY, isSwimming, simulateMovement, type PlayerView } from '@ice-water/shared';
+import { GAMEPLAY, isMoveInput, isSwimming, simulateMovement, type PlayerView } from '@ice-water/shared';
 import { LocalPrediction, RemoteInterpolation } from './player-motion.js';
 function player(): PlayerView {
   return {
     playerId: 'p',
     displayName: 'Player',
     team: 'none',
+    teamPreference: 'auto',
     isConnected: true,
     isBot: false,
     reconnectDeadline: 0,
@@ -25,21 +26,16 @@ function player(): PlayerView {
     isCrouching: false,
     slideUntil: 0,
     slideReadyAt: 0,
-    hp: 100,
     kills: 0,
     deaths: 0,
-    currentWeaponSlot: 0,
-    primaryWeapon: 'assault-rifle',
-    weaponId: 'assault-rifle',
-    ammo: 30,
-    reserveAmmo: 120,
-    reloadUntil: 0,
-    fireReadyAt: 0,
     respawnAt: 0,
     spawnGeneration: 1,
     lastKillerId: '',
-    lastDeathWeapon: 'assault-rifle',
     ping: 0,
+    rescueProgress: 0,
+    lungeUntil: 0,
+    lungeReadyAt: 0,
+    isWallRunning: false,
   };
 }
 it('replays pending inputs identically to the server and clears prediction on respawn', () => {
@@ -53,6 +49,16 @@ it('replays pending inputs identically to the server and clears prediction on re
   expect(prediction.motion).toEqual(simulateMovement(server, second, 100));
   prediction.reconcile({ ...p, spawnGeneration: 2 }, true);
   expect(prediction.motion.x).toBe(0);
+});
+it('keeps interaction-only fields out of movement payloads', () => {
+  const prediction = new LocalPrediction();
+  const move = prediction.predict(
+    { x: 1, z: 0, yaw: 0, pitch: 0, jump: false, slide: false, sprint: false, crouch: false },
+    true,
+    50,
+  );
+  expect(isMoveInput(move)).toBe(true);
+  expect('hasInteraction' in move).toBe(false);
 });
 it('predicts Frost Island buoyancy identically to authoritative movement', () => {
   const prediction = new LocalPrediction();

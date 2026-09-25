@@ -488,6 +488,7 @@ describe('restored Original World', () => {
         isCrouching: false,
         slideUntil: 0,
         slideReadyAt: 0,
+        isWallRunning: false,
       };
       const length = Math.hypot(spawn.x, spawn.z);
       for (let t = 50; t <= 300; t += 50)
@@ -546,6 +547,7 @@ describe('restored Original World', () => {
       isCrouching: false,
       slideUntil: 0,
       slideReadyAt: 0,
+      isWallRunning: false,
     };
     for (let t = 50; t <= 2000; t += 50)
       p = simulateMovement(p, { x: 0, z: 0, sequence: t }, t, 0.05, 1, 'original');
@@ -570,6 +572,7 @@ describe('restored Original World', () => {
       isCrouching: false,
       slideUntil: 0,
       slideReadyAt: 0,
+      isWallRunning: false,
     };
     expect(terrainHeightAt(p, 'original')).toBeCloseTo(originalTopology.WATER_BOTTOM);
     expect(worldRayDistance(p, { x: 0, y: -1, z: 0 }, 100, 'original')).toBeCloseTo(

@@ -15,8 +15,6 @@ export class GameInput {
   cameraPitch = 0;
   sensitivity = 0.002;
   touch: Position = { x: 0, z: 0 };
-  isFiring = false;
-  isAds = false;
   isScoreboard = false;
   isEnabled = false;
   isTouchCrouching = false;
@@ -24,9 +22,8 @@ export class GameInput {
   private keys = new Set<string>();
   private hasJump = false;
   private hasSlide = false;
-  private hasReload = false;
-  private hasShot = false;
-  private slot: number | undefined;
+  private hasInteraction = false;
+  private hasLunge = false;
   look(dx: number, dy: number): void {
     this.cameraYaw = Math.atan2(
       Math.sin(this.cameraYaw - dx * this.sensitivity),
@@ -43,15 +40,11 @@ export class GameInput {
   pressSlide(): void {
     this.hasSlide = true;
   }
-  pressReload(): void {
-    this.hasReload = true;
+  pressInteract(): void {
+    this.hasInteraction = true;
   }
-  pressFire(): void {
-    this.hasShot = true;
-    this.isFiring = true;
-  }
-  switchWeapon(slot: number): void {
-    this.slot = (slot + 3) % 3;
+  pressLunge(): void {
+    this.hasLunge = true;
   }
   sample() {
     const axes = cameraRelative(
@@ -73,35 +66,29 @@ export class GameInput {
       pitch: this.cameraPitch,
       jump: this.hasJump,
       slide: this.hasSlide,
-      crouch: this.keys.has('KeyC') || this.isTouchCrouching,
+      crouch:
+        this.keys.has('ControlLeft') || this.keys.has('ControlRight') || this.isTouchCrouching,
       sprint:
-        this.keys.has('ControlLeft') || this.keys.has('ControlRight') || this.isTouchSprinting,
-      hasShot: this.hasShot,
-      isFiring: this.isFiring,
-      isAds: this.isAds,
-      hasReload: this.hasReload,
-      slot: this.slot,
+        this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.isTouchSprinting,
+      hasInteraction: this.hasInteraction,
+      hasLunge: this.hasLunge,
     };
     this.hasJump = false;
     this.hasSlide = false;
-    this.hasReload = false;
-    this.hasShot = false;
-    this.slot = undefined;
+    this.hasInteraction = false;
+    this.hasLunge = false;
     return result;
   }
   reset(): void {
     this.keys.clear();
     this.touch = { x: 0, z: 0 };
-    this.isFiring = false;
-    this.isAds = false;
     this.isScoreboard = false;
     this.isTouchCrouching = false;
     this.isTouchSprinting = false;
     this.hasJump = false;
     this.hasSlide = false;
-    this.hasReload = false;
-    this.hasShot = false;
-    this.slot = undefined;
+    this.hasInteraction = false;
+    this.hasLunge = false;
   }
   bind(target: Window): () => void {
     const down = (event: KeyboardEvent) => {
@@ -127,11 +114,8 @@ export class GameInput {
         'ControlLeft',
         'ControlRight',
         'KeyC',
-        'KeyR',
+        'KeyQ',
         'Tab',
-        'Digit1',
-        'Digit2',
-        'Digit3',
       ];
       if (!codes.includes(event.code)) return;
       event.preventDefault();
@@ -139,9 +123,8 @@ export class GameInput {
       if (event.code === 'Tab') this.isScoreboard = true;
       if (event.repeat) return;
       if (event.code === 'Space') this.pressJump();
-      if (event.code.startsWith('Shift')) this.pressSlide();
-      if (event.code === 'KeyR') this.pressReload();
-      if (event.code.startsWith('Digit')) this.switchWeapon(Number(event.code.slice(-1)) - 1);
+      if (event.code.startsWith('Control')) this.pressSlide();
+      if (event.code === 'KeyQ') this.pressLunge();
     };
     const up = (event: KeyboardEvent) => {
       this.keys.delete(event.code);

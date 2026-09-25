@@ -1,27 +1,22 @@
 import {
   GAMEPLAY,
-  WEAPONS,
   simulateMovement,
   terrainHeightAt,
   islandSupportHeightAt,
   isMoveInput,
-  isShootIntent,
-  isReloadIntent,
-  isWeaponSwitchIntent,
+  isInteractionIntent,
+  distanceSquared3d,
   type GameplayEvent,
   type GameplayMessages,
   type MoveInput,
 } from '@ice-water/shared';
 import type { LobbyState, PlayerState } from '../rooms/lobby-state.js';
-import { WeaponController } from './weapon-controller.js';
-import { fireHitscan } from './damage-system.js';
 import { selectSpawn } from './spawn-manager.js';
 interface PendingInput {
   input: MoveInput;
   receivedAt: number;
 }
 export class GameplayController {
-  readonly weapons = new WeaponController();
   private readonly inputs = new Map<string, PendingInput[]>();
   private readonly sequences = new Map<string, number>();
   private readonly budgets = new Map<
@@ -79,23 +74,23 @@ export class GameplayController {
     }
     this.advance(now);
     if (player.status !== 'alive') return 'Player is not alive';
-    if (type === 'action/shoot') {
-      if (!isShootIntent(payload)) return 'Invalid shot intent';
-      const error = this.weapons.fire(player, now);
-      if (error) return error;
-      player.yaw = payload.yaw;
-      player.pitch = payload.pitch;
-      fireHitscan(this.state, player, payload, now, (event) => {
-        if (event.type === 'player/killed') this.inputs.delete(event.payload.victimId);
-        this.emit(event);
-      });
+    if (type === 'action/lunge') {
+      if (!isInteractionIntent(payload)) return 'Invalid lunge request';
+      if (player.team !== 'ice' && player.team !== 'water') return null;
+      if (player.lungeUntil > now || player.lungeReadyAt > now) return null;
+      player.lungeUntil = now + GAMEPLAY.lungeDurationMs;
+      player.lungeReadyAt = now + GAMEPLAY.lungeCooldownMs;
+      player.isGrounded = false;
+      player.isSliding = false;
+      player.isCrouching = false;
+      player.verticalVelocity = GAMEPLAY.lungeVerticalSpeed;
+      player.velocityX = -Math.sin(player.yaw) * GAMEPLAY.moveSpeed * GAMEPLAY.sprintMultiplier * GAMEPLAY.lungeSpeedMultiplier;
+      player.velocityZ = -Math.cos(player.yaw) * GAMEPLAY.moveSpeed * GAMEPLAY.sprintMultiplier * GAMEPLAY.lungeSpeedMultiplier;
       return null;
     }
-    if (type === 'action/reload')
-      return isReloadIntent(payload) ? this.weapons.reload(player, now) : 'Invalid reload request';
-    if (type === 'action/switch-weapon') {
-      if (!isWeaponSwitchIntent(payload)) return 'Invalid weapon slot';
-      this.weapons.switch(player, payload.slot);
+    if (type === 'action/interact') {
+      if (!isInteractionIntent(payload)) return 'Invalid interaction';
+      this.interact(player, now);
       return null;
     }
     return 'Unknown gameplay request';
@@ -116,8 +111,11 @@ export class GameplayController {
     if (!this.canPlay(now)) return;
     for (const p of this.state.players.values()) {
       if (p.status === 'dead' && p.isConnected && now >= p.respawnAt) this.respawn(p, now, true);
+      if (p.status === 'frozen') {
+        this.advanceFrozen(p, now);
+        continue;
+      }
       if (p.status !== 'alive') continue;
-      this.weapons.tick(p, now);
       const queue = this.inputs.get(p.playerId);
       let pending = queue?.[0];
       while (pending && now - pending.receivedAt > GAMEPLAY.inputExpiryMs) {
@@ -132,18 +130,95 @@ export class GameplayController {
         p.yaw = input.yaw ?? p.yaw;
         p.pitch = input.pitch ?? p.pitch;
       }
+      let lungeEnded = false;
+      if (p.lungeUntil && now >= p.lungeUntil) {
+        p.lungeUntil = 0;
+        p.velocityX = 0;
+        p.velocityZ = 0;
+        p.verticalVelocity = 0;
+        lungeEnded = true;
+      }
+      if (lungeEnded) continue;
+      const isLunging = p.lungeUntil > now;
+      const movementInput = isLunging
+        ? {
+            ...input,
+            x: -Math.sin(p.yaw),
+            z: -Math.cos(p.yaw),
+            jump: false,
+            slide: false,
+            sprint: false,
+            crouch: false,
+          }
+        : input;
       Object.assign(
         p,
         simulateMovement(
           p,
-          input,
+          movementInput,
           now,
           GAMEPLAY.tickMs / 1000,
-          WEAPONS[p.weaponId].moveSpeedMultiplier,
+          isLunging ? GAMEPLAY.sprintMultiplier * GAMEPLAY.lungeSpeedMultiplier : 1,
           this.state.mapId,
+          isLunging ? GAMEPLAY.lungeSteeringFactor : 1,
         ),
       );
     }
+  }
+  private advanceFrozen(target: PlayerState, now: number): void {
+    Object.assign(
+      target,
+      simulateMovement(
+        target,
+        { x: 0, z: 0, sequence: target.inputSequence },
+        now,
+        GAMEPLAY.tickMs / 1000,
+        1,
+        this.state.mapId,
+      ),
+    );
+  }
+  private interact(player: PlayerState, now: number): void {
+    const target = [...this.state.players.values()]
+      .filter((candidate) => candidate.playerId !== player.playerId)
+      .filter((candidate) =>
+        player.team === 'ice'
+          ? candidate.team === 'water' && candidate.status === 'alive'
+          : player.team === 'water' && candidate.team === 'water' && candidate.status === 'frozen',
+      )
+      .filter((candidate) => distanceSquared3d(player, candidate) <= GAMEPLAY.interactionRange ** 2)
+      .sort((a, b) => distanceSquared3d(player, a) - distanceSquared3d(player, b))[0];
+    if (!target) return;
+    if (player.team === 'ice' && target.team === 'water' && target.status === 'alive') {
+      target.status = 'frozen';
+      target.rescueProgress = 0;
+      this.applyFreezeKnockback(target, player);
+      this.emit({
+        type: 'player/frozen',
+        payload: { playerId: target.playerId, attackerId: player.playerId, serverTime: now },
+      });
+    } else if (player.team === 'water' && target.team === 'water' && target.status === 'frozen') {
+      target.status = 'alive';
+      target.protectedUntil = now + GAMEPLAY.freezeProtectionMs;
+      target.rescueProgress = 0;
+      this.applyFreezeKnockback(target, player);
+      this.emit({
+        type: 'player/rescued',
+        payload: { playerId: target.playerId, rescuerIds: [player.playerId], serverTime: now },
+      });
+    }
+  }
+  private applyFreezeKnockback(target: PlayerState, source: PlayerState): void {
+    const distance = Math.hypot(target.x - source.x, target.z - source.z);
+    if (distance > 0) {
+      target.velocityX = ((target.x - source.x) / distance) * GAMEPLAY.freezeKnockbackSpeed;
+      target.velocityZ = ((target.z - source.z) / distance) * GAMEPLAY.freezeKnockbackSpeed;
+    } else {
+      target.velocityX = 0;
+      target.velocityZ = -GAMEPLAY.freezeKnockbackSpeed;
+    }
+    target.verticalVelocity = GAMEPLAY.freezeKnockbackVerticalSpeed;
+    target.isGrounded = false;
   }
   private respawn(p: PlayerState, now: number, isDeath: boolean): void {
     const spawn = selectSpawn(this.state, p, isDeath ? p : undefined);
@@ -167,15 +242,17 @@ export class GameplayController {
       isCrouching: false,
       slideUntil: 0,
       slideReadyAt: 0,
+      rescueProgress: 0,
+      lungeUntil: 0,
+      lungeReadyAt: 0,
+      isWallRunning: false,
     });
     p.status = 'alive';
-    p.hp = GAMEPLAY.maxHp;
     p.respawnAt = 0;
     p.protectedUntil = now + GAMEPLAY.spawnProtectionMs;
     p.spawnGeneration++;
     p.yaw = Math.atan2(spawn.x, spawn.z);
     p.pitch = 0;
-    this.weapons.reset(p);
     this.emit({
       type: 'player/respawned',
       payload: { playerId: p.playerId, x: p.x, y: p.y, z: p.z, serverTime: now },

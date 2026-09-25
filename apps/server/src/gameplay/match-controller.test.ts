@@ -18,9 +18,9 @@ function fixture() {
   return { state, controller, onResult, onResultExpired, start };
 }
 describe('FPS match deadlines and scores', () => {
-  it('ends FFA at thirty kills and persists/disposes once through intermission', () => {
+  it('persists and disposes once through intermission after the score limit', () => {
     const { state, controller, onResult, onResultExpired, start } = fixture();
-    state.players.get('a')!.kills = 30;
+    state.iceScore = GAMEPLAY.tdmScoreLimit;
     controller.tick(1100);
     expect(state.phase).toBe('finished');
     expect(state.matchWinner).toBe('a');
@@ -41,16 +41,27 @@ describe('FPS match deadlines and scores', () => {
     expect(state.matchWinner).toBe('draw');
     expect(onResult.mock.calls[0]?.[2]).toBe(deadline);
   });
-  it('ends TDM by team score and duel by its configured score', () => {
-    const tdm = fixture();
-    tdm.state.gameMode = 'tdm';
-    tdm.state.iceScore = 50;
-    tdm.controller.tick(2000);
-    expect(tdm.state.matchWinner).toBe('ice');
-    const duel = fixture();
-    duel.state.gameMode = 'duel';
-    duel.state.players.get('b')!.kills = 10;
-    duel.controller.tick(2000);
-    expect(duel.state.matchWinner).toBe('b');
+  it('ends Ice Ice Water when a team reaches the score limit', () => {
+    const match = fixture();
+    match.state.iceScore = GAMEPLAY.tdmScoreLimit;
+    match.controller.tick(2000);
+    expect(match.state.matchWinner).toBe('ice');
+  });
+  it('ends immediately when Ice freezes every Water player', () => {
+    const { state, controller, onResult } = fixture();
+    state.players.get('a')!.team = 'ice';
+    state.players.get('b')!.team = 'water';
+    state.players.get('b')!.status = 'frozen';
+
+    controller.tick(2_000);
+
+    expect(state.phase).toBe('finished');
+    expect(state.matchWinner).toBe('ice');
+    expect(state.resultReason).toBe('all-frozen');
+    expect(onResult).toHaveBeenCalledWith(
+      { winner: 'ice', reason: 'all-frozen', gameMode: 'tdm' },
+      1_000,
+      2_000,
+    );
   });
 });

@@ -5,18 +5,19 @@ import type {
   GameMode,
   MapId,
 } from './gameplay.js';
-import type { WeaponId } from '../constants/weapons.js';
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 150;
 export const ROOM_NAME = 'private-game';
 export const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const INVITE_LENGTH = 8;
 export type Team = 'unassigned' | 'none' | 'ice' | 'water';
+export type TeamPreference = 'auto' | 'ice' | 'water';
 export type MatchPhase = 'lobby' | 'countdown' | 'playing' | 'finished' | 'intermission';
 export interface PlayerView {
   playerId: string;
   displayName: string;
   team: Team;
+  teamPreference: TeamPreference;
   isConnected: boolean;
   isBot: boolean;
   reconnectDeadline: number;
@@ -36,21 +37,16 @@ export interface PlayerView {
   isCrouching: boolean;
   slideUntil: number;
   slideReadyAt: number;
-  hp: number;
   kills: number;
   deaths: number;
-  currentWeaponSlot: number;
-  primaryWeapon: WeaponId;
-  weaponId: WeaponId;
-  ammo: number;
-  reserveAmmo: number;
-  reloadUntil: number;
-  fireReadyAt: number;
   respawnAt: number;
   spawnGeneration: number;
   lastKillerId: string;
-  lastDeathWeapon: WeaponId;
   ping: number;
+  rescueProgress: number;
+  lungeUntil: number;
+  lungeReadyAt: number;
+  isWallRunning: boolean;
 }
 export interface LobbyView {
   inviteCode: string;
@@ -92,13 +88,13 @@ export interface SessionError {
 }
 export interface MatchResult {
   winner: string;
-  reason: 'score-limit' | 'time-limit';
+  reason: 'score-limit' | 'time-limit' | 'all-frozen';
   gameMode: GameMode;
 }
 export interface ClientMessages extends GameplayMessages {
   'room/start': Record<string, never>;
-  'room/configure': { gameMode?: GameMode; mapId?: MapId };
-  'player/loadout': { primaryWeapon: WeaponId };
+  'room/configure': { mapId?: MapId };
+  'player/team': { team: TeamPreference };
   'session/ping': { sentAt: number };
 }
 export interface ServerMessages extends GameplayEvents {

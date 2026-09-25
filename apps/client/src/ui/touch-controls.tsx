@@ -1,7 +1,7 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import type { GameInput } from '../input/game-input.js';
 import { touchAxes } from '../input/game-input.js';
-export function TouchControls({ input, slot }: { input: GameInput; slot: number }) {
+export function TouchControls({ input }: { input: GameInput }) {
   const move = useRef<{ id: number; x: number; y: number } | null>(null),
     look = useRef<{ id: number; x: number; y: number } | null>(null);
   const capture = (e: ReactPointerEvent) => {
@@ -52,24 +52,24 @@ export function TouchControls({ input, slot }: { input: GameInput; slot: number 
       </div>
       <div className="touch-actions">
         <button
-          className="touch-fire"
+          className="touch-interact"
           onPointerDown={(e) => {
             capture(e);
-            input.pressFire();
+            input.pressInteract();
           }}
-          onPointerUp={() => (input.isFiring = false)}
-          onPointerCancel={() => (input.isFiring = false)}
-          onLostPointerCapture={() => (input.isFiring = false)}
+          onPointerUp={() => undefined}
+          onPointerCancel={() => undefined}
+          onLostPointerCapture={() => undefined}
         >
-          Fire
+          Tag / Rescue
         </button>
         <button
           onPointerDown={(e) => {
             capture(e);
-            input.isAds = !input.isAds;
+            input.pressLunge();
           }}
         >
-          Aim
+          Lunge
         </button>
         <button
           onPointerDown={(e) => {
@@ -86,22 +86,6 @@ export function TouchControls({ input, slot }: { input: GameInput; slot: number 
           }}
         >
           Slide
-        </button>
-        <button
-          onPointerDown={(e) => {
-            capture(e);
-            input.pressReload();
-          }}
-        >
-          Reload
-        </button>
-        <button
-          onPointerDown={(e) => {
-            capture(e);
-            input.switchWeapon(slot + 1);
-          }}
-        >
-          Weapon
         </button>
         <button
           onPointerDown={(e) => {
