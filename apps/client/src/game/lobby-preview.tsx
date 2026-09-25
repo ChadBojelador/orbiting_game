@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import {
   loadLobbyCharacterFactories,
   type CharacterInstance,
-  type FrozenIceInstance,
 } from './character-model.js';
 
 export type LobbySection =
@@ -91,7 +90,6 @@ class LobbyScene {
   });
   private readonly cleanup: Array<() => void> = [];
   private readonly characters: CharacterInstance[] = [];
-  private frozenWater?: FrozenIceInstance;
   private placeholder?: THREE.Group;
   private snow?: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
   private frame = 0;
@@ -384,23 +382,24 @@ class LobbyScene {
 
   private async loadCharacter(): Promise<void> {
     try {
-      const { water, frozenIce } = await loadLobbyCharacterFactories();
-      if (!water) return;
+      const { ice, water } = await loadLobbyCharacterFactories();
+      if (!ice || !water) return;
       if (this.isDestroyed) return;
-      const frozenWater = water.instantiate('#43c6d6', 'Frozen');
-      const actor = new THREE.Group();
-      actor.position.set(-0.15, 0.02, -0.25);
-      actor.rotation.y = -0.48;
-      frozenWater.root.scale.setScalar(0.26);
-      actor.add(frozenWater.root);
-      if (frozenIce) {
-        this.frozenWater = frozenIce.instantiate();
-        this.frozenWater.root.scale.setScalar(0.26);
-        actor.add(this.frozenWater.root);
-        this.frozenWater.playFreeze();
+      const lobbyCharacters = [
+        { name: 'lobby-ice-character', factory: ice, color: '#bdefff', x: -0.95, rotation: -0.3 },
+        { name: 'lobby-water-character', factory: water, color: '#43c6d6', x: 0.95, rotation: 0.3 },
+      ];
+      for (const definition of lobbyCharacters) {
+        const character = definition.factory.instantiate(definition.color, 'Idle');
+        const actor = new THREE.Group();
+        actor.name = definition.name;
+        actor.position.set(definition.x, 0.02, -0.25);
+        actor.rotation.y = definition.rotation;
+        character.root.scale.setScalar(0.26);
+        actor.add(character.root);
+        this.stage.add(actor);
+        this.characters.push(character);
       }
-      this.stage.add(actor);
-      this.characters.push(frozenWater);
       if (this.placeholder) {
         this.placeholder.removeFromParent();
         this.disposeObject(this.placeholder);
@@ -483,7 +482,6 @@ class LobbyScene {
 
   private update(now: number, delta: number): void {
     this.characters.forEach((character) => character.update(delta));
-    this.frozenWater?.update(delta);
     const pose = CAMERA_POSES[this.section],
       ease = 1 - Math.exp(-4.8 * delta),
       pointerScale = this.isReduced ? 0 : 1;

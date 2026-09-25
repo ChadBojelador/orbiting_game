@@ -73,9 +73,10 @@ describe('authoritative proximity interactions', () => {
     );
   });
 
-  it('uses forward facing direction when lunge starts without movement input and clears momentum at expiry', () => {
+  it('uses forward facing direction when lunge starts without movement input and transfers momentum at expiry', () => {
     const { ice, water, controller } = fixture();
-    ice.yaw = 0;
+    Object.assign(ice, { x: -50, y: 0, z: -30, yaw: 0 });
+    Object.assign(water, { x: -50, y: 0, z: -30.29 });
 
     expect(controller.handle(ice.playerId, 'action/lunge', {}, 2_000)).toBeNull();
     expect(ice.lungeUntil).toBe(2_000 + GAMEPLAY.lungeDurationMs);
@@ -86,11 +87,18 @@ describe('authoritative proximity interactions', () => {
     expect(water.status).toBe('frozen');
     expect(controller.handle(ice.playerId, 'action/lunge', {}, 2_100)).toBeNull();
 
+    controller.advance(2_550);
+    const lungeVelocityX = ice.velocityX;
+    const lungeVelocityZ = ice.velocityZ;
+    const lungeVerticalVelocity = ice.verticalVelocity;
     controller.advance(2_600);
     expect(ice.lungeUntil).toBe(0);
-    expect(ice.velocityX).toBe(0);
-    expect(ice.velocityZ).toBe(0);
-    expect(ice.verticalVelocity).toBe(0);
+    expect(Math.hypot(ice.velocityX, ice.velocityZ)).toBeGreaterThan(0);
+    expect(Math.hypot(ice.velocityX, ice.velocityZ)).toBeLessThan(
+      Math.hypot(lungeVelocityX, lungeVelocityZ),
+    );
+    expect(ice.verticalVelocity).not.toBe(lungeVerticalVelocity);
+    controller.advance(2_650);
     expect(controller.handle(ice.playerId, 'action/lunge', {}, 2_600)).toBeNull();
   });
 

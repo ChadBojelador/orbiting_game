@@ -172,21 +172,20 @@ export async function loadGameplayCharacterFactories(): Promise<GameplayCharacte
   };
 }
 
-/** Loads the single Water actor used by the lightweight lobby presentation. */
 export type LobbyCharacterFactories = {
+  ice?: CharacterModelFactory;
   water?: CharacterModelFactory;
-  frozenIce?: FrozenIceFactory;
 };
 
-/** Loads only the Water actor and its ice overlay for the lobby presentation. */
+/** Loads the two supplied team actors used by the lobby presentation. */
 export async function loadLobbyCharacterFactories(): Promise<LobbyCharacterFactories> {
-  const [water, frozen] = await Promise.all([
+  const [ice, water] = await Promise.all([
+    loadOptional('/ice_model.glb'),
     loadOptional('/water_model.glb'),
-    loadOptional('/frozen_ice.glb'),
   ]);
   return {
+    ice: ice ? new CharacterModelFactory(ice.scene, ice.animations) : undefined,
     water: water ? new CharacterModelFactory(water.scene, water.animations) : undefined,
-    frozenIce: frozen ? new FrozenIceFactory(frozen.scene, frozen.animations) : undefined,
   };
 }
 

@@ -142,15 +142,9 @@ export class GameplayController {
         p.yaw = input.yaw ?? p.yaw;
         p.pitch = input.pitch ?? p.pitch;
       }
-      let lungeEnded = false;
       if (p.lungeUntil && now >= p.lungeUntil) {
         p.lungeUntil = 0;
-        p.velocityX = 0;
-        p.velocityZ = 0;
-        p.verticalVelocity = 0;
-        lungeEnded = true;
       }
-      if (lungeEnded) continue;
       const isLunging = p.lungeUntil > now;
       const movementInput = isLunging
         ? {
