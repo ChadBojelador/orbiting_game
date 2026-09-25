@@ -81,10 +81,10 @@ export class FirstPersonHands {
   private readonly cuffMaterial = this.material(0x17374a);
   private readonly handMaterial = this.material(0xc8f4ff);
   private readonly geometries = [
-    new CylinderGeometry(0.085, 0.057, 0.36, 8),
-    new CylinderGeometry(0.062, 0.068, 0.06, 8),
-    new CapsuleGeometry(0.06, 0.082, 4, 8),
-    new CapsuleGeometry(0.013, 0.064, 3, 6),
+    new CapsuleGeometry(0.061, 0.255, 4, 8),
+    new CylinderGeometry(0.072, 0.08, 0.064, 8),
+    new CapsuleGeometry(0.054, 0.076, 4, 8),
+    new CapsuleGeometry(0.013, 0.055, 3, 6),
     new CapsuleGeometry(0.015, 0.045, 3, 6),
   ] as const;
   private readonly targetObject = new Object3D();
@@ -171,7 +171,7 @@ export class FirstPersonHands {
     forearm.position.set(-side * 0.018, 0.025, -0.155);
     forearm.rotation.x = Math.PI / 2.35;
     forearm.rotation.z = side * 0.08;
-    forearm.scale.set(1, 1.05, 0.92);
+    forearm.scale.set(1, 1.08, 0.92);
     this.preparePart(forearm, 0);
 
     const cuff = new Mesh(this.geometries[1], this.cuffMaterial);
@@ -184,16 +184,16 @@ export class FirstPersonHands {
     const palm = new Mesh(this.geometries[2], this.handMaterial);
     palm.name = side === LEFT ? 'left-hand' : 'right-hand';
     palm.position.set(-side * 0.04, 0.088, -0.375);
-    palm.rotation.set(1.32, 0, -side * 0.04);
-    palm.scale.set(1.12, 1.03, 0.68);
+    palm.rotation.set(Math.PI / 2, 0, -side * 0.04);
+    palm.scale.set(1.12, 1.05, 0.72);
     this.preparePart(palm, 2);
 
     const fingerOffsets = [-0.039, -0.013, 0.013, 0.039];
     for (const [index, offset] of fingerOffsets.entries()) {
       const finger = new Mesh(this.geometries[3], this.handMaterial);
       finger.name = `${side === LEFT ? 'left' : 'right'}-finger-${index + 1}`;
-      finger.position.set(-side * 0.04 + offset, 0.075 - Math.abs(offset) * 0.16, -0.458);
-      finger.rotation.set(1.4, 0, side * offset * 0.8);
+      finger.position.set(-side * 0.04 + offset, 0.083 - Math.abs(offset) * 0.16, -0.456);
+      finger.rotation.set(Math.PI / 2 + 0.08, 0, side * offset * 0.8);
       this.preparePart(finger, 3);
       pivot.add(finger);
     }
@@ -238,9 +238,9 @@ export class FirstPersonHands {
         animation.amplitude *
         motionScale;
       position.x += side * step * 0.008 * intensity;
-      position.y += (Math.abs(stride) * 0.014 + step * 0.004) * intensity;
-      position.z += stride * 0.03 * intensity;
-      rotation.x += stride * (animation.state === 'run' ? 0.26 : 0.14) * intensity;
+      position.y += (Math.abs(stride) * 0.021 + step * 0.006) * intensity;
+      position.z += stride * 0.042 * intensity;
+      rotation.x += stride * 0.34 * intensity;
       rotation.y += -side * stride * 0.055 * intensity;
       rotation.z += side * (0.035 + step * 0.045) * intensity;
       if (animation.state === 'run') {
@@ -248,16 +248,16 @@ export class FirstPersonHands {
         position.x += side * 0.012 * motionScale;
       }
     } else if (animation.state === 'slide') {
-      position.x -= side * 0.035;
-      position.y += side === LEFT ? 0.055 : 0.075;
-      position.z += side === LEFT ? -0.025 : 0.018;
-      rotation.set(-0.12, side * 0.1, -side * 0.28);
+      position.x -= side * 0.042;
+      position.y += 0.085;
+      position.z -= 0.105;
+      rotation.set(-0.38, side * 0.12, -side * 0.17);
     } else if (animation.state === 'jump') {
       const lift = MathUtils.clamp(motion.verticalVelocity / GAMEPLAY.jumpSpeed, 0, 1);
       position.x += side * 0.018 * motionScale;
-      position.y += (0.025 + lift * 0.015) * motionScale;
+      position.y += (0.035 + lift * 0.025) * motionScale;
       position.z -= 0.026 * motionScale;
-      rotation.set(-0.06 - lift * 0.05, side * 0.04, -side * 0.055);
+      rotation.set(-0.11 - lift * 0.09, side * 0.04, -side * 0.055);
     } else if (animation.state === 'fall') {
       const fall = MathUtils.clamp(-motion.verticalVelocity / GAMEPLAY.jumpSpeed, 0, 1);
       position.x += side * 0.025 * fall * motionScale;

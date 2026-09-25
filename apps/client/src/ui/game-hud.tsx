@@ -1,4 +1,5 @@
 import type { LobbyView } from '@ice-water/shared';
+import { isTwoMinuteWarningVisible } from '../game/match-night.js';
 export type KillEntry = never;
 export function GameHud({
   view,
@@ -13,20 +14,23 @@ export function GameHud({
 }) {
   const p = view.players.find((p) => p.playerId === localPlayerId);
   if (!p) return null;
-  const time = Math.max(0, Math.ceil((view.phaseDeadline - serverNow) / 1000));
+  const remainingMs = view.phaseDeadline - serverNow;
+  const time = Math.max(0, Math.ceil(remainingMs / 1000));
+  const isTwoMinuteWarning = view.phase === 'playing' && isTwoMinuteWarningVisible(remainingMs);
   return (
     <div className="game-hud">
       <div className="match-clock">
-        <span>
-          Ice Ice Water
-        </span>
+        <span>Ice Ice Water</span>
         <strong>
           {Math.floor(time / 60)}:{String(time % 60).padStart(2, '0')}
         </strong>
-        <span>
-          {`Ice ${view.iceScore} : ${view.waterScore} Water`}
-        </span>
+        <span>{`Ice ${view.iceScore} : ${view.waterScore} Water`}</span>
       </div>
+      {isTwoMinuteWarning && (
+        <div className="two-minute-warning" role="alert" aria-live="assertive">
+          Only 2 minutes left
+        </div>
+      )}
       {p.status === 'frozen' && (
         <div className="frozen-status" role="status">
           <strong>FROZEN</strong>

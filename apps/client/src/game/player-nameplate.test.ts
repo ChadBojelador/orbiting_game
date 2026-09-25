@@ -29,12 +29,14 @@ describe('player nameplate', () => {
 
     const nameplate = createPlayerNameplate('Frost Runner');
 
-    expect(context.font).toContain('500 21px');
+    expect(context.font).toContain('300 16px');
+    expect(context.lineWidth).toBe(2);
     expect(context.fillRect).not.toHaveBeenCalled();
     expect(context.roundRect).not.toHaveBeenCalled();
     expect(context.strokeRect).not.toHaveBeenCalled();
     expect(context.strokeText).toHaveBeenCalledWith('Frost Runner', 128, 32);
     expect(context.fillText).toHaveBeenCalledWith('Frost Runner', 128, 32);
+    expect(nameplate.material.opacity).toBe(0.72);
 
     disposePlayerNameplate(nameplate);
   });

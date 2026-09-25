@@ -66,4 +66,23 @@ describe('CloudSky', () => {
     expect(materialDispose).toHaveBeenCalledOnce();
     expect(textureDispose).toHaveBeenCalledOnce();
   });
+
+  it('blends day clouds and their source light into the two-minute night state', () => {
+    const light = new DirectionalLight(0xffffff, 2);
+    const sky = new CloudSky(new Scene(), 'frostline', [light]);
+    try {
+      const batch = sky.group.children[0] as InstancedMesh;
+      const material = batch.material as import('three').MeshBasicMaterial;
+      const dayColor = material.color.getHex();
+      const dayOpacity = material.opacity;
+
+      sky.update(0, new Vector3(), 'low', 1);
+
+      expect(material.color.getHex()).not.toBe(dayColor);
+      expect(material.opacity).toBeLessThan(dayOpacity);
+      expect(light.intensity).toBeLessThan(1);
+    } finally {
+      sky.destroy();
+    }
+  });
 });

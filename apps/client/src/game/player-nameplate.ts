@@ -15,19 +15,19 @@ export function createPlayerNameplate(displayName: string): Sprite {
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   const fontFamily = 'Bahnschrift, "Segoe UI", sans-serif';
-  let fontSize = 21;
-  context.font = `500 ${fontSize}px ${fontFamily}`;
+  let fontSize = 16;
+  context.font = `300 ${fontSize}px ${fontFamily}`;
   const maxTextWidth = NAMEPLATE_WIDTH - 36;
   const initialTextWidth = context.measureText(displayName).width;
   if (initialTextWidth > maxTextWidth) {
     fontSize *= maxTextWidth / initialTextWidth;
-    context.font = `500 ${fontSize}px ${fontFamily}`;
+    context.font = `300 ${fontSize}px ${fontFamily}`;
   }
 
   // A compact dark keyline keeps the floating text legible over snow, water, and terrain.
   context.lineJoin = 'round';
   context.strokeStyle = '#10283b';
-  context.lineWidth = 4;
+  context.lineWidth = 2;
   context.strokeText(displayName, NAMEPLATE_WIDTH / 2, NAMEPLATE_HEIGHT / 2);
   context.fillStyle = '#ffffff';
   context.fillText(displayName, NAMEPLATE_WIDTH / 2, NAMEPLATE_HEIGHT / 2);
@@ -41,6 +41,7 @@ export function createPlayerNameplate(displayName: string): Sprite {
   const material = new SpriteMaterial({
     map: texture,
     transparent: true,
+    opacity: 0.72,
     alphaTest: 0.08,
     depthWrite: false,
     sizeAttenuation: false,

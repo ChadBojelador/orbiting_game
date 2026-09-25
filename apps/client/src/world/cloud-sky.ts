@@ -1,5 +1,6 @@
 import type { MapId } from '@ice-water/shared';
 import {
+  Color,
   DataTexture,
   DoubleSide,
   DynamicDrawUsage,
@@ -261,9 +262,13 @@ export class CloudSky {
   private readonly batches: readonly InstancedMesh[];
   private readonly lightLevels: readonly LightLevel[];
   private readonly theme: CloudTheme;
+  private readonly isPermanentNight: boolean;
+  private readonly dayCloudColors = DAY_THEME.colors.map((color) => new Color(color));
+  private readonly nightCloudColors = NIGHT_THEME.colors.map((color) => new Color(color));
   private readonly transform = new Object3D();
 
   constructor(scene: Scene, mapId: MapId, lights: readonly Light[] = []) {
+    this.isPermanentNight = mapId === 'original';
     this.theme = mapId === 'original' ? NIGHT_THEME : DAY_THEME;
     this.lightLevels = lights.map((light) => ({ light, intensity: light.intensity }));
     this.group.name = 'PROCEDURAL_CLOUD_SKY';
@@ -277,27 +282,34 @@ export class CloudSky {
     this.group.visible = !isUnderwater;
   }
 
-  update(elapsedSeconds: number, cameraPosition: Vector3, quality: CloudQuality): void {
+  update(
+    elapsedSeconds: number,
+    cameraPosition: Vector3,
+    quality: CloudQuality,
+    nightProgress = 0,
+  ): void {
+    const transition = this.isPermanentNight ? 1 : clamp01(nightProgress);
+    const radius = mix(DAY_THEME.radius, NIGHT_THEME.radius, transition);
+    const altitudeScale = mix(DAY_THEME.altitudeScale, NIGHT_THEME.altitudeScale, transition);
     const motionScale = quality === 'low' ? 0.22 : quality === 'medium' ? 0.72 : 1;
     for (let shape = 0; shape < this.batches.length; shape++) {
       const mesh = this.batches[shape]!;
+      const material = mesh.material as MeshBasicMaterial;
+      material.color.lerpColors(
+        this.dayCloudColors[shape]!,
+        this.nightCloudColors[shape]!,
+        transition,
+      );
+      material.opacity = mix(DAY_THEME.opacity, NIGHT_THEME.opacity, transition);
       const specs = CLOUD_BATCH_SPECS[shape]!;
       const qualityScale = quality === 'low' ? 0.4 : quality === 'medium' ? 0.7 : 1;
       mesh.count = Math.max(2, Math.ceil(specs.length * qualityScale));
       for (let index = 0; index < mesh.count; index++) {
         const spec = specs[index]!;
         const travel = elapsedSeconds * spec.speed * motionScale;
-        const x = wrapAround(
-          spec.x + Math.cos(spec.windAngle) * travel,
-          cameraPosition.x,
-          this.theme.radius,
-        );
-        const z = wrapAround(
-          spec.z + Math.sin(spec.windAngle) * travel,
-          cameraPosition.z,
-          this.theme.radius,
-        );
-        this.transform.position.set(x, spec.y * this.theme.altitudeScale, z);
+        const x = wrapAround(spec.x + Math.cos(spec.windAngle) * travel, cameraPosition.x, radius);
+        const z = wrapAround(spec.z + Math.sin(spec.windAngle) * travel, cameraPosition.z, radius);
+        this.transform.position.set(x, spec.y * altitudeScale, z);
         this.transform.scale.set(spec.width, spec.depth, 1);
         this.transform.lookAt(cameraPosition);
         this.transform.rotateZ(spec.rotation);
@@ -311,10 +323,12 @@ export class CloudSky {
       elapsedSeconds,
       cameraPosition.x,
       cameraPosition.z,
-      this.theme.maxLightAttenuation,
+      mix(DAY_THEME.maxLightAttenuation, NIGHT_THEME.maxLightAttenuation, transition),
       quality !== 'low',
     );
-    for (const level of this.lightLevels) level.light.intensity = level.intensity * lightFactor;
+    const nightLightScale = this.isPermanentNight ? 1 : mix(1, 0.46, transition);
+    for (const level of this.lightLevels)
+      level.light.intensity = level.intensity * lightFactor * nightLightScale;
   }
 
   destroy(): void {
@@ -373,6 +387,14 @@ export function cloudLightingFactor(
 function wrapAround(value: number, center: number, radius: number): number {
   const width = radius * 2;
   return center - radius + ((((value - center + radius) % width) + width) % width);
+}
+
+function mix(from: number, to: number, progress: number): number {
+  return from + (to - from) * progress;
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }
 
 function createCloudTexture(shape: number): DataTexture {

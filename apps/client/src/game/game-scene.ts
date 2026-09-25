@@ -38,12 +38,20 @@ import { HitEffects } from './hit-effects.js';
 import { AudioManager, landingIntensity } from '../audio/audio-manager.js';
 import { readSettings, type FpsSettings } from './fps-settings.js';
 import { renderPixelRatio } from './render-performance.js';
-import { waterEnvironmentFor } from './water-presentation.js';
+import { matchEnvironmentFor, matchNightProgress } from './match-night.js';
 import {
   createPlayerNameplate,
   disposePlayerNameplate,
   setNameplateTone,
 } from './player-nameplate.js';
+
+const DAY_SKY_LIGHT = new Color(0xedfaff);
+const NIGHT_SKY_LIGHT = new Color(0x748cc7);
+const DAY_GROUND_LIGHT = new Color(0x41617b);
+const NIGHT_GROUND_LIGHT = new Color(0x101c31);
+const DAY_KEY_LIGHT = new Color(0xfff0d0);
+const NIGHT_KEY_LIGHT = new Color(0xa9c8ff);
+
 export class GameScene {
   readonly session: GameSession;
   settings: FpsSettings = readSettings();
@@ -71,6 +79,8 @@ export class GameScene {
   private originalLighting?: OriginalWorldLighting;
   private island?: IslandMap;
   private cloudSky: CloudSky;
+  private skyLight?: HemisphereLight;
+  private keyLight?: DirectionalLight;
   private cameraMotion = new FirstPersonCamera();
   private hands: FirstPersonHands;
   private presentation = new LocalPresentation();
@@ -104,6 +114,7 @@ export class GameScene {
   private wasSwimming = false;
   private wasSliding = false;
   private wasUnderwater = false;
+  private nightProgress = 0;
   constructor(
     private readonly canvas: HTMLCanvasElement,
     room: LobbyRoom,
@@ -111,6 +122,11 @@ export class GameScene {
     private readonly onMapStatusChange?: () => void,
   ) {
     this.session = new GameSession(room, playerId);
+    this.nightProgress = matchNightProgress(
+      this.session.view.mapId,
+      this.session.view.phaseDeadline - this.session.serverNow(),
+      this.settings.reducedEffects,
+    );
     this.renderer = new WebGLRenderer({
       canvas,
       antialias: !this.isTouch,
@@ -129,12 +145,15 @@ export class GameScene {
       this.renderer.toneMapping = ACESFilmicToneMapping;
       this.renderer.toneMappingExposure = 1.05;
     } else {
-      const skyLight = new HemisphereLight(0xedfaff, 0x41617b, 2.5);
-      const keyLight = new DirectionalLight(0xfff0d0, 2);
-      keyLight.name = 'sunlight';
-      keyLight.position.set(-30, 60, -35);
-      this.scene.add(skyLight, keyLight);
-      this.cloudSky = new CloudSky(this.scene, this.session.view.mapId, [skyLight, keyLight]);
+      this.skyLight = new HemisphereLight(DAY_SKY_LIGHT, DAY_GROUND_LIGHT, 2.5);
+      this.keyLight = new DirectionalLight(DAY_KEY_LIGHT, 2);
+      this.keyLight.name = 'sunlight';
+      this.keyLight.position.set(-30, 60, -35);
+      this.scene.add(this.skyLight, this.keyLight);
+      this.cloudSky = new CloudSky(this.scene, this.session.view.mapId, [
+        this.skyLight,
+        this.keyLight,
+      ]);
     }
     if (this.session.view.mapId === 'island') {
       this.island = new IslandMap(this.scene);
@@ -325,13 +344,29 @@ export class GameScene {
     return material;
   }
   private applyWaterEnvironment(isCameraUnderwater: boolean): void {
-    const environment = waterEnvironmentFor(this.session.view.mapId, isCameraUnderwater);
-    this.scene.background = new Color(environment.background);
-    this.scene.fog =
-      this.session.view.mapId === 'original' && !isCameraUnderwater
-        ? new FogExp2(environment.fogColor, 0.0032)
-        : new Fog(environment.fogColor, environment.fogNear, environment.fogFar);
+    const environment = matchEnvironmentFor(
+      this.session.view.mapId,
+      isCameraUnderwater,
+      this.nightProgress,
+    );
+    const background = this.scene.background instanceof Color ? this.scene.background : new Color();
+    background.setHex(environment.background);
+    this.scene.background = background;
+    if (this.session.view.mapId === 'original' && !isCameraUnderwater) {
+      if (this.scene.fog instanceof FogExp2) this.scene.fog.color.setHex(environment.fogColor);
+      else this.scene.fog = new FogExp2(environment.fogColor, 0.0032);
+    } else if (this.scene.fog instanceof Fog) {
+      this.scene.fog.color.setHex(environment.fogColor);
+      this.scene.fog.near = environment.fogNear;
+      this.scene.fog.far = environment.fogFar;
+    } else this.scene.fog = new Fog(environment.fogColor, environment.fogNear, environment.fogFar);
     this.cloudSky?.setUnderwater(isCameraUnderwater);
+  }
+  private applyMatchLighting(): void {
+    if (!this.skyLight || !this.keyLight) return;
+    this.skyLight.color.copy(DAY_SKY_LIGHT).lerp(NIGHT_SKY_LIGHT, this.nightProgress);
+    this.skyLight.groundColor.copy(DAY_GROUND_LIGHT).lerp(NIGHT_GROUND_LIGHT, this.nightProgress);
+    this.keyLight.color.copy(DAY_KEY_LIGHT).lerp(NIGHT_KEY_LIGHT, this.nightProgress);
   }
   private loop(now: number): void {
     if (this.destroyed) return;
@@ -341,6 +376,12 @@ export class GameScene {
       p = session.local(),
       serverNow = session.serverNow(),
       input = session.input;
+    if (session.view.phase === 'playing')
+      this.nightProgress = matchNightProgress(
+        session.view.mapId,
+        session.view.phaseDeadline - serverNow,
+        this.settings.reducedEffects,
+      );
     input.isEnabled = !this.isPaused;
     input.sensitivity = this.settings.sensitivity * 0.002;
     this.audio.volume = this.settings.isMuted
@@ -364,7 +405,6 @@ export class GameScene {
       const cameraIsUnderwater = isUnderwater(eye, session.view.mapId);
       if (cameraIsUnderwater !== this.wasUnderwater) {
         this.wasUnderwater = cameraIsUnderwater;
-        this.applyWaterEnvironment(cameraIsUnderwater);
         this.audio.setUnderwater(cameraIsUnderwater);
       }
       const fov = this.settings.fov;
@@ -373,8 +413,7 @@ export class GameScene {
       this.audio.listener(eye, input.cameraYaw);
       if (p.status === 'alive') {
         const isLunging = p.lungeUntil > serverNow;
-        if (isLunging && p.lungeUntil !== this.previousLocalLungeUntil)
-          this.audio.play('lunge');
+        if (isLunging && p.lungeUntil !== this.previousLocalLungeUntil) this.audio.play('lunge');
         if (
           Math.hypot(predicted.velocityX, predicted.velocityZ) > 1 &&
           (predicted.isGrounded || swimming) &&
@@ -533,16 +572,12 @@ export class GameScene {
       const target = session.view.players.find(
         (candidate) => candidate.playerId === event.payload.playerId,
       );
-      const isNearby =
-        !!p && !!target && Math.hypot(target.x - p.x, target.z - p.z) < 35;
+      const isNearby = !!p && !!target && Math.hypot(target.x - p.x, target.z - p.z) < 35;
       if (event.type === 'player/frozen') {
         if (event.payload.attackerId === local || event.payload.playerId === local)
           this.audio.play('tag');
         else if (target && isNearby) this.audio.play('tag', target);
-      } else if (
-        event.payload.playerId === local ||
-        event.payload.rescuerIds.includes(local)
-      )
+      } else if (event.payload.playerId === local || event.payload.rescuerIds.includes(local))
         this.audio.play('untag');
       else if (target && isNearby) this.audio.play('untag', target);
     }
@@ -556,7 +591,9 @@ export class GameScene {
       this.originalLighting?.update(this.camera.position, quality);
       this.world.update(now / 1000, this.camera.position, quality);
     }
-    this.cloudSky.update(now / 1000, this.camera.position, quality);
+    this.applyWaterEnvironment(this.wasUnderwater);
+    this.applyMatchLighting();
+    this.cloudSky.update(now / 1000, this.camera.position, quality, this.nightProgress);
     this.effects.update(now);
     this.renderer.render(this.scene, this.camera);
     this.frame = requestAnimationFrame((t) => this.loop(t));
