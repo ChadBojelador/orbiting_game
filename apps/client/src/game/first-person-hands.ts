@@ -1,7 +1,6 @@
 import { GAMEPLAY } from '@ice-water/shared';
 import {
-  CapsuleGeometry,
-  CylinderGeometry,
+  BoxGeometry,
   Euler,
   Group,
   MathUtils,
@@ -81,11 +80,9 @@ export class FirstPersonHands {
   private readonly cuffMaterial = this.material(0x17374a);
   private readonly handMaterial = this.material(0xc8f4ff);
   private readonly geometries = [
-    new CapsuleGeometry(0.061, 0.255, 4, 8),
-    new CylinderGeometry(0.072, 0.08, 0.064, 8),
-    new CapsuleGeometry(0.054, 0.076, 4, 8),
-    new CapsuleGeometry(0.013, 0.055, 3, 6),
-    new CapsuleGeometry(0.015, 0.045, 3, 6),
+    new BoxGeometry(0.15, 0.34, 0.15),
+    new BoxGeometry(0.17, 0.065, 0.17),
+    new BoxGeometry(0.155, 0.135, 0.17),
   ] as const;
   private readonly targetObject = new Object3D();
   private readonly targetQuaternion = new Quaternion();
@@ -163,7 +160,7 @@ export class FirstPersonHands {
     const pivot = new Group();
     pivot.name = side === LEFT ? 'first-person-left-arm' : 'first-person-right-arm';
     pivot.frustumCulled = false;
-    const restPosition = new Vector3(side * 0.285, -0.315, -0.255);
+    const restPosition = new Vector3(side * 0.35, -0.315, -0.255);
     pivot.position.copy(restPosition);
 
     const forearm = new Mesh(this.geometries[0], this.sleeveMaterial);
@@ -171,7 +168,6 @@ export class FirstPersonHands {
     forearm.position.set(-side * 0.018, 0.025, -0.155);
     forearm.rotation.x = Math.PI / 2.35;
     forearm.rotation.z = side * 0.08;
-    forearm.scale.set(1, 1.08, 0.92);
     this.preparePart(forearm, 0);
 
     const cuff = new Mesh(this.geometries[1], this.cuffMaterial);
@@ -183,28 +179,11 @@ export class FirstPersonHands {
 
     const palm = new Mesh(this.geometries[2], this.handMaterial);
     palm.name = side === LEFT ? 'left-hand' : 'right-hand';
-    palm.position.set(-side * 0.04, 0.088, -0.375);
-    palm.rotation.set(Math.PI / 2, 0, -side * 0.04);
-    palm.scale.set(1.12, 1.05, 0.72);
+    palm.position.set(-side * 0.04, 0.076, -0.405);
+    palm.rotation.z = -side * 0.04;
     this.preparePart(palm, 2);
 
-    const fingerOffsets = [-0.039, -0.013, 0.013, 0.039];
-    for (const [index, offset] of fingerOffsets.entries()) {
-      const finger = new Mesh(this.geometries[3], this.handMaterial);
-      finger.name = `${side === LEFT ? 'left' : 'right'}-finger-${index + 1}`;
-      finger.position.set(-side * 0.04 + offset, 0.083 - Math.abs(offset) * 0.16, -0.456);
-      finger.rotation.set(Math.PI / 2 + 0.08, 0, side * offset * 0.8);
-      this.preparePart(finger, 3);
-      pivot.add(finger);
-    }
-
-    const thumb = new Mesh(this.geometries[4], this.handMaterial);
-    thumb.name = side === LEFT ? 'left-thumb' : 'right-thumb';
-    thumb.position.set(-side * 0.105, 0.073, -0.397);
-    thumb.rotation.set(Math.PI / 2, 0, side * 0.78);
-    this.preparePart(thumb, 4);
-
-    pivot.add(forearm, cuff, palm, thumb);
+    pivot.add(forearm, cuff, palm);
     return { pivot, restPosition };
   }
 
