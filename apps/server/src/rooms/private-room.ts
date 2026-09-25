@@ -124,21 +124,6 @@ export function createPrivateRoom({ config, sessions, directory, database }: Roo
           this.state.arenaHalfExtent = arenaHalfExtentForMap(payload.mapId);
         }
       });
-      this.onMessage('player/team', (client: GuestClient, payload: unknown) => {
-        if (!client.auth || client.auth.expiresAt <= Date.now())
-          return this.fail(client, 'unauthorized', 'Guest session expired');
-        if (!this.actions.take(client.sessionId))
-          return this.fail(client, 'rate-limit', 'Slow down and try again');
-        if (
-          this.state.phase !== 'lobby' ||
-          !isRecord(payload) ||
-          Object.keys(payload).length !== 1 ||
-          !['auto', 'ice', 'water'].includes(String(payload.team))
-        )
-          return this.fail(client, 'invalid-message', 'Choose Ice, Water, or Auto before the match');
-        const player = this.state.players.get(client.auth.playerId);
-        if (player) player.teamPreference = payload.team as 'auto' | 'ice' | 'water';
-      });
       this.onMessage('session/ping', (client: GuestClient, payload: unknown) => {
         if (
           !client.auth ||

@@ -3,7 +3,7 @@ import { LobbyState, PlayerState } from '../rooms/lobby-state.js';
 import { GameplayController } from './gameplay-controller.js';
 import { MatchController } from './match-controller.js';
 import { advanceAuthoritativeTick } from './authoritative-tick.js';
-it('applies only pre-deadline steps and locks gameplay before time-limit resolution', () => {
+it('applies only pre-deadline steps and locks gameplay before survival-threshold resolution', () => {
   const state = new LobbyState(),
     p = new PlayerState();
   p.playerId = 'p';

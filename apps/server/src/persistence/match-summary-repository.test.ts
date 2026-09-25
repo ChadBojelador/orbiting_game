@@ -8,7 +8,7 @@ function summary(matchId = randomUUID()): MatchSummary {
   return {
     matchId,
     winner: 'water',
-    resultReason: 'time-limit',
+    resultReason: 'water-survived',
     gameMode: 'tdm',
     mapId: 'island',
     startedAt: new Date('2026-09-13T00:00:00.000Z'),

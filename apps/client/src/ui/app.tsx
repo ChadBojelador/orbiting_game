@@ -282,7 +282,7 @@ export function App() {
             localPlayerId={guest.playerId}
             result={{
               winner: view.matchWinner,
-              reason: view.resultReason || 'time-limit',
+              reason: view.resultReason || 'water-survived',
               gameMode: view.gameMode,
             }}
             onLeave={() => void run(leave)}

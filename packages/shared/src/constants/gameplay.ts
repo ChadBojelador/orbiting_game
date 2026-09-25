@@ -59,7 +59,6 @@ export const GAMEPLAY = {
   // ── Match timing ──
   countdownMs: 3000,
   tdmTimeLimitMs: 300_000,
-  tdmScoreLimit: 50,
   intermissionMs: 8_000,
   warmupMs: 10_000,
 
@@ -74,7 +73,6 @@ export const GAMEPLAY = {
   lungeDurationMs: 600,
   lungeCooldownMs: 3000,
   lungeSpeedMultiplier: 2,
-  lungeSteeringFactor: 1,
   lungeVerticalSpeed: 7.5,
 
   // ── Wall run ──

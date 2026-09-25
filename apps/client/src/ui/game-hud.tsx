@@ -23,9 +23,7 @@ export function GameHud({
         <strong>
           {Math.floor(time / 60)}:{String(time % 60).padStart(2, '0')}
         </strong>
-        <span>
-          {`Ice ${view.iceScore} : ${view.waterScore} Water`}
-        </span>
+        <span>{`Water unfrozen: ${view.waterUnfrozenCount} / ${view.waterStartedCount}`}</span>
       </div>
       {p.status === 'frozen' && (
         <div className="frozen-status" role="status">

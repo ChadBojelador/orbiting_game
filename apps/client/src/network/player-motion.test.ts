@@ -6,7 +6,6 @@ function player(): PlayerView {
     playerId: 'p',
     displayName: 'Player',
     team: 'none',
-    teamPreference: 'auto',
     isConnected: true,
     isBot: false,
     reconnectDeadline: 0,
@@ -35,6 +34,8 @@ function player(): PlayerView {
     rescueProgress: 0,
     lungeUntil: 0,
     lungeReadyAt: 0,
+    lungeDirectionX: 0,
+    lungeDirectionZ: 0,
     isWallRunning: false,
   };
 }

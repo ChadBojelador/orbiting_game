@@ -54,7 +54,6 @@ export function LobbyScreen(props: LobbyScreenProps) {
     [isSocialOpen, setSocialOpen] = useState(false);
   const previousGuest = useRef(guest?.playerId),
     previousRoom = useRef(room);
-  const local = view?.players.find((player) => player.playerId === guest?.playerId);
 
   useEffect(() => {
     if (guest && !previousGuest.current) setSection('play');
@@ -478,8 +477,7 @@ interface RoomAwareProps {
 function RoomAwarePanel(props: RoomAwareProps) {
   const { section, view, guest, room } = props,
     isHost = view.hostPlayerId === guest.playerId,
-    count = view.players.filter((player) => player.isConnected).length,
-    local = view.players.find((player) => player.playerId === guest.playerId);
+    count = view.players.filter((player) => player.isConnected).length;
   if (section === 'modes')
     return (
       <GameModePanel
@@ -540,20 +538,6 @@ function RoomAwarePanel(props: RoomAwareProps) {
         </select>
       </div>
       <div className="field-row">
-        <label htmlFor="room-team">Team preference</label>
-        <select
-          id="room-team"
-          value={local?.teamPreference ?? 'auto'}
-          disabled={view.phase !== 'lobby'}
-          onChange={(event) => room.send('player/team', { team: event.target.value as 'auto' | 'ice' | 'water' })}
-        >
-          <option value="auto">Auto balance</option>
-          <option value="ice">Ice</option>
-          <option value="water">Water</option>
-        </select>
-        <small>Choose Water to test rescuing frozen teammates.</small>
-      </div>
-      <div className="field-row">
         <label htmlFor="room-map">Map</label>
         <select
           id="room-map"
@@ -579,13 +563,7 @@ function RoomAwarePanel(props: RoomAwareProps) {
                 : player.isBot
                   ? 'Practice bot'
                   : player.isConnected
-                    ? view.gameMode === 'tdm'
-                      ? player.teamPreference === 'auto'
-                        ? 'Auto balance'
-                        : player.teamPreference === 'ice'
-                          ? 'Ice selected'
-                          : 'Water selected'
-                      : 'Ready'
+                    ? 'Automatic team assignment at match start'
                     : 'Away'}
             </small>
           </li>

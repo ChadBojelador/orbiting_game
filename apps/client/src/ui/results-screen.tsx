@@ -22,7 +22,13 @@ export function ResultsScreen({
         {winner}
         {result.winner === 'draw' ? '' : ' wins'}
       </h1>
-      <p>{result.reason === 'score-limit' ? 'Score limit reached' : 'Time is up'}</p>
+      <p>
+        {result.reason === 'all-frozen'
+          ? 'All Water frozen'
+          : result.reason === 'water-survived'
+            ? '60% of Water survived'
+            : 'Fewer than 60% of Water remained unfrozen'}
+      </p>
       <Scoreboard view={view} localPlayerId={localPlayerId} />
       <button className="primary" onClick={onLeave}>
         Back to lobby

@@ -23,6 +23,8 @@ export class MatchController {
     this.startedAt = now;
     this.state.phase = 'playing';
     this.state.phaseDeadline = now + GAMEPLAY.tdmTimeLimitMs;
+    this.state.waterStartedCount = this.waterPlayers().length;
+    this.syncWaterUnfrozenCount();
     this.onStart(now);
     this.changed(now);
   }
@@ -42,7 +44,8 @@ export class MatchController {
       return false;
     }
     if (this.state.phase !== 'playing') return false;
-    const waterPlayers = [...this.state.players.values()].filter((p) => p.team === 'water');
+    const waterPlayers = this.waterPlayers();
+    this.syncWaterUnfrozenCount();
     if (waterPlayers.length > 0 && waterPlayers.every((p) => p.status === 'frozen')) {
       const result: MatchResult = {
         winner: 'ice',
@@ -58,24 +61,17 @@ export class MatchController {
       this.lifecycle.onResult?.(result, this.startedAt, now);
       return true;
     }
-    const limit = GAMEPLAY.tdmScoreLimit;
-    const scores = [
-      { id: 'ice', score: this.state.iceScore },
-      { id: 'water', score: this.state.waterScore },
-    ];
-    scores.sort((a, b) => b.score - a.score);
-    const leader = scores[0];
-    const hasScoreLimit = (leader?.score ?? 0) >= limit;
-    if (!hasScoreLimit && now < this.state.phaseDeadline) return false;
-    const winner = !leader || leader.score === scores[1]?.score ? 'draw' : leader.id;
+    if (now < this.state.phaseDeadline) return false;
+    const requiredUnfrozen = Math.ceil(this.state.waterStartedCount * 0.6);
+    const waterSurvived = this.state.waterUnfrozenCount >= requiredUnfrozen;
     const result: MatchResult = {
-      winner,
-      reason: hasScoreLimit ? 'score-limit' : 'time-limit',
+      winner: waterSurvived ? 'water' : 'ice',
+      reason: waterSurvived ? 'water-survived' : 'water-below-threshold',
       gameMode: this.state.gameMode,
     };
-    const completedAt = hasScoreLimit ? now : this.state.phaseDeadline;
+    const completedAt = this.state.phaseDeadline;
     this.state.phase = 'finished';
-    this.state.matchWinner = winner;
+    this.state.matchWinner = result.winner;
     this.state.resultReason = result.reason;
     this.state.phaseDeadline = completedAt + GAMEPLAY.intermissionMs;
     this.emit({ type: 'match/result', payload: result });
@@ -92,5 +88,13 @@ export class MatchController {
         serverTime: now,
       },
     });
+  }
+  private waterPlayers() {
+    return [...this.state.players.values()].filter((player) => player.team === 'water');
+  }
+  private syncWaterUnfrozenCount(): void {
+    this.state.waterUnfrozenCount = this.waterPlayers().filter(
+      (player) => player.status === 'alive',
+    ).length;
   }
 }

@@ -30,22 +30,10 @@ export class LobbyController {
       const j = this.pick(i + 1);
       [players[i], players[j]] = [players[j]!, players[i]!];
     }
-    const auto = players.filter((player) => player.teamPreference === 'auto');
-    let iceCount = players.filter((player) => player.teamPreference === 'ice').length;
-    let waterCount = players.filter((player) => player.teamPreference === 'water').length;
-    for (const player of auto) {
-      if (iceCount <= waterCount) {
-        player.team = 'ice';
-        iceCount++;
-      } else {
-        player.team = 'water';
-        waterCount++;
-      }
-    }
-    for (const player of players) {
-      if (player.teamPreference === 'ice') player.team = 'ice';
-      if (player.teamPreference === 'water') player.team = 'water';
-    }
+    // One Ice player for every four Water players, rounded to the nearest
+    // whole Ice player. Solo practice retains one Ice player.
+    const iceCount = Math.max(1, Math.round(players.length / 5));
+    for (const [index, player] of players.entries()) player.team = index < iceCount ? 'ice' : 'water';
     this.state.phase = 'playing';
     this.state.phaseDeadline = 0;
     return true;

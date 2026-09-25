@@ -18,6 +18,7 @@ interface PendingInput {
 }
 export class GameplayController {
   private readonly inputs = new Map<string, PendingInput[]>();
+  private readonly latestInputs = new Map<string, MoveInput>();
   private readonly sequences = new Map<string, number>();
   private readonly budgets = new Map<
     string,
@@ -33,6 +34,7 @@ export class GameplayController {
     this.hasStarted = true;
     this.lastTick = now;
     this.inputs.clear();
+    this.latestInputs.clear();
     for (const p of this.state.players.values()) p.status = 'spectator';
     for (const p of this.state.players.values())
       if (p.isConnected && p.team !== 'unassigned') this.respawn(p, now, false);
@@ -62,6 +64,7 @@ export class GameplayController {
       if (payload.sequence <= previous || payload.sequence > previous + 128)
         return 'Stale or invalid input sequence';
       this.sequences.set(id, payload.sequence);
+      this.latestInputs.set(id, payload);
       if (player.status !== 'alive') {
         player.inputSequence = payload.sequence;
         return null;
@@ -83,9 +86,17 @@ export class GameplayController {
       player.isGrounded = false;
       player.isSliding = false;
       player.isCrouching = false;
+      const input = this.latestInputs.get(id);
+      const yaw = input?.yaw ?? player.yaw;
+      if (input?.yaw !== undefined) player.yaw = input.yaw;
+      const length = Math.hypot(input?.x ?? 0, input?.z ?? 0);
+      player.lungeDirectionX = length > 0 ? (input?.x ?? 0) / length : -Math.sin(yaw);
+      player.lungeDirectionZ = length > 0 ? (input?.z ?? 0) / length : -Math.cos(yaw);
       player.verticalVelocity = GAMEPLAY.lungeVerticalSpeed;
-      player.velocityX = -Math.sin(player.yaw) * GAMEPLAY.moveSpeed * GAMEPLAY.sprintMultiplier * GAMEPLAY.lungeSpeedMultiplier;
-      player.velocityZ = -Math.cos(player.yaw) * GAMEPLAY.moveSpeed * GAMEPLAY.sprintMultiplier * GAMEPLAY.lungeSpeedMultiplier;
+      player.velocityX =
+        player.lungeDirectionX * GAMEPLAY.moveSpeed * GAMEPLAY.sprintMultiplier * GAMEPLAY.lungeSpeedMultiplier;
+      player.velocityZ =
+        player.lungeDirectionZ * GAMEPLAY.moveSpeed * GAMEPLAY.sprintMultiplier * GAMEPLAY.lungeSpeedMultiplier;
       return null;
     }
     if (type === 'action/interact') {
@@ -97,6 +108,7 @@ export class GameplayController {
   }
   disconnect(id: string): void {
     this.inputs.delete(id);
+    this.latestInputs.delete(id);
     const p = this.state.players.get(id);
     if (p) {
       p.velocityX = 0;
@@ -143,8 +155,8 @@ export class GameplayController {
       const movementInput = isLunging
         ? {
             ...input,
-            x: -Math.sin(p.yaw),
-            z: -Math.cos(p.yaw),
+            x: p.lungeDirectionX,
+            z: p.lungeDirectionZ,
             jump: false,
             slide: false,
             sprint: false,
@@ -160,7 +172,7 @@ export class GameplayController {
           GAMEPLAY.tickMs / 1000,
           isLunging ? GAMEPLAY.sprintMultiplier * GAMEPLAY.lungeSpeedMultiplier : 1,
           this.state.mapId,
-          isLunging ? GAMEPLAY.lungeSteeringFactor : 1,
+          1,
         ),
       );
     }
@@ -245,6 +257,8 @@ export class GameplayController {
       rescueProgress: 0,
       lungeUntil: 0,
       lungeReadyAt: 0,
+      lungeDirectionX: 0,
+      lungeDirectionZ: 0,
       isWallRunning: false,
     });
     p.status = 'alive';

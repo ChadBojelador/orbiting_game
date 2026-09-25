@@ -200,7 +200,8 @@ describe('HTTP and real WebSocket room flow', () => {
     room.send('room/start', {});
     await waitFor(() => room.state.phase === 'countdown');
     await waitFor(() => room.state.phase === 'playing');
-    expect([...room.state.players.values()].every((p) => p.team === 'none')).toBe(true);
+    expect([...room.state.players.values()].filter((p) => p.team === 'ice')).toHaveLength(1);
+    expect([...room.state.players.values()].filter((p) => p.team === 'water')).toHaveLength(5);
     expect((await post('/api/rooms/join', { inviteCode: code }, intruder.token)).status).toBe(409);
     await Promise.all([room, ...others].map((client) => client.leave()));
   });
@@ -394,7 +395,8 @@ describe('HTTP and real WebSocket room flow', () => {
     serverRoom.setTimestep(() => {}, 60_000);
     const reconnectToken = observer.room.reconnectionToken;
     const writesBefore = saveMatchSummary.mock.calls.length;
-    (serverRoom.state as TestState).iceScore = GAMEPLAY.tdmScoreLimit;
+    for (const player of serverRoom.state.players.values())
+      if (player.team === 'water') player.status = 'frozen';
     const completedAt = Date.now();
     advanceRoom(serverRoom, completedAt);
     await waitFor(() => ['finished', 'intermission'].includes(observer.room.state.phase));

@@ -11,13 +11,11 @@ export const ROOM_NAME = 'private-game';
 export const INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const INVITE_LENGTH = 8;
 export type Team = 'unassigned' | 'none' | 'ice' | 'water';
-export type TeamPreference = 'auto' | 'ice' | 'water';
 export type MatchPhase = 'lobby' | 'countdown' | 'playing' | 'finished' | 'intermission';
 export interface PlayerView {
   playerId: string;
   displayName: string;
   team: Team;
-  teamPreference: TeamPreference;
   isConnected: boolean;
   isBot: boolean;
   reconnectDeadline: number;
@@ -46,6 +44,8 @@ export interface PlayerView {
   rescueProgress: number;
   lungeUntil: number;
   lungeReadyAt: number;
+  lungeDirectionX: number;
+  lungeDirectionZ: number;
   isWallRunning: boolean;
 }
 export interface LobbyView {
@@ -61,6 +61,8 @@ export interface LobbyView {
   mapId: MapId;
   iceScore: number;
   waterScore: number;
+  waterStartedCount: number;
+  waterUnfrozenCount: number;
   matchWinner: string;
   resultReason: MatchResult['reason'] | '';
   players: PlayerView[];
@@ -88,13 +90,12 @@ export interface SessionError {
 }
 export interface MatchResult {
   winner: string;
-  reason: 'score-limit' | 'time-limit' | 'all-frozen';
+  reason: 'all-frozen' | 'water-survived' | 'water-below-threshold';
   gameMode: GameMode;
 }
 export interface ClientMessages extends GameplayMessages {
   'room/start': Record<string, never>;
   'room/configure': { mapId?: MapId };
-  'player/team': { team: TeamPreference };
   'session/ping': { sentAt: number };
 }
 export interface ServerMessages extends GameplayEvents {

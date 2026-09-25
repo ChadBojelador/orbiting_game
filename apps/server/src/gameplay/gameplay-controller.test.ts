@@ -73,7 +73,7 @@ describe('authoritative proximity interactions', () => {
     );
   });
 
-  it('lets Ice lunge forward with reduced steering and clears momentum at expiry', () => {
+  it('uses forward facing direction when lunge starts without movement input and clears momentum at expiry', () => {
     const { ice, water, controller } = fixture();
     ice.yaw = 0;
 
@@ -100,5 +100,34 @@ describe('authoritative proximity interactions', () => {
     expect(controller.handle(water.playerId, 'action/lunge', {}, 2_000)).toBeNull();
     expect(water.lungeUntil).toBe(2_000 + GAMEPLAY.lungeDurationMs);
     expect(controller.handle(water.playerId, 'action/lunge', {}, 2_100)).toBeNull();
+  });
+
+  it.each([
+    ['D', 'ice', 1, 0],
+    ['A', 'ice', -1, 0],
+    ['W', 'water', 0, -1],
+    ['S', 'water', 0, 1],
+    ['W + D', 'ice', Math.SQRT1_2, -Math.SQRT1_2],
+    ['W + A', 'water', -Math.SQRT1_2, -Math.SQRT1_2],
+    ['S + D', 'ice', Math.SQRT1_2, Math.SQRT1_2],
+    ['S + A', 'water', -Math.SQRT1_2, Math.SQRT1_2],
+  ])('captures %s movement for a %s directional lunge', (_keys, team, x, z) => {
+    const { ice, water, controller } = fixture();
+    const player = team === 'ice' ? ice : water;
+    expect(controller.handle(player.playerId, 'input/move', { x, z, sequence: 1 }, 2_000)).toBeNull();
+    expect(controller.handle(player.playerId, 'action/lunge', {}, 2_000)).toBeNull();
+    expect(player.lungeDirectionX).toBeCloseTo(x);
+    expect(player.lungeDirectionZ).toBeCloseTo(z);
+    expect(Math.hypot(player.lungeDirectionX, player.lungeDirectionZ)).toBeCloseTo(1);
+  });
+
+  it('keeps the captured lunge direction when later movement input changes', () => {
+    const { ice, controller } = fixture();
+    controller.handle(ice.playerId, 'input/move', { x: 1, z: 0, sequence: 1 }, 2_000);
+    controller.handle(ice.playerId, 'action/lunge', {}, 2_000);
+    controller.handle(ice.playerId, 'input/move', { x: 0, z: -1, sequence: 2 }, 2_050);
+    controller.advance(2_050);
+    expect(ice.lungeDirectionX).toBe(1);
+    expect(ice.lungeDirectionZ).toBe(0);
   });
 });
