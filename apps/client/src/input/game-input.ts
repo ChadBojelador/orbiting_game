@@ -66,10 +66,9 @@ export class GameInput {
       pitch: this.cameraPitch,
       jump: this.hasJump,
       slide: this.hasSlide,
-      crouch:
-        this.keys.has('ControlLeft') || this.keys.has('ControlRight') || this.isTouchCrouching,
+      crouch: this.keys.has('KeyC') || this.isTouchCrouching,
       sprint:
-        this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.isTouchSprinting,
+        this.keys.has('ControlLeft') || this.keys.has('ControlRight') || this.isTouchSprinting,
       hasInteraction: this.hasInteraction,
       hasLunge: this.hasLunge,
     };
@@ -123,7 +122,7 @@ export class GameInput {
       if (event.code === 'Tab') this.isScoreboard = true;
       if (event.repeat) return;
       if (event.code === 'Space') this.pressJump();
-      if (event.code.startsWith('Control')) this.pressSlide();
+      if (event.code.startsWith('Shift')) this.pressSlide();
       if (event.code === 'KeyQ') this.pressLunge();
     };
     const up = (event: KeyboardEvent) => {

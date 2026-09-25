@@ -47,7 +47,7 @@ export function GameHud({
         </div>
       )}
       <div className="desktop-controls">
-        WASD move · Mouse aim · Space jump/swim · Shift sprint · Ctrl slide/crouch
+        WASD move · Mouse aim · Space jump/swim · Shift slide · C crouch/dive · Ctrl sprint
         <br />
         Click tag / rescue at close range · Q lunge · Tab scores · Esc pause
       </div>

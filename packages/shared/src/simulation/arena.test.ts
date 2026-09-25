@@ -100,6 +100,22 @@ describe('Frostline movement and collision', () => {
       simulateMovement(metal, { x: 0, z: 0, sequence: 1 }, 50).velocityZ,
     );
   });
+  it('uses the same base movement response as Original World on ordinary ground', () => {
+    const point = { x: -51, z: -34 };
+    const frostline = motion(point.x, point.z);
+    const original = {
+      ...motion(point.x, point.z),
+      y: terrainHeightAt(point, 'original'),
+    };
+    expect(surfaceAt(point, 'frostline')).toBe('metal');
+    expect(surfaceAt(point, 'original')).toBe('metal');
+
+    const input = { x: 0, z: 1, sequence: 1, sprint: true };
+    const frostlineResult = simulateMovement(frostline, input, 50, 0.05, 1, 'frostline');
+    const originalResult = simulateMovement(original, input, 50, 0.05, 1, 'original');
+    expect(frostlineResult.velocityX).toBeCloseTo(originalResult.velocityX);
+    expect(frostlineResult.velocityZ).toBeCloseTo(originalResult.velocityZ);
+  });
   it('allows ramp traversal to the catwalk but rejects climbing its sides', () => {
     let p = motion(-43.5, -24);
     for (let t = 50; t <= 1300; t += 50) p = simulateMovement(p, { x: 0, z: 1, sequence: t }, t);
