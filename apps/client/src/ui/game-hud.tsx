@@ -1,5 +1,11 @@
 import type { LobbyView } from '@ice-water/shared';
+import { isTwoMinuteWarningVisible } from '../game/match-night.js';
+import {
+  isSnowstormWarningVisible,
+  isSnowstormBegunVisible,
+} from '../game/snowstorm.js';
 export type KillEntry = never;
+
 export function GameHud({
   view,
   localPlayerId,
@@ -13,18 +19,36 @@ export function GameHud({
 }) {
   const p = view.players.find((p) => p.playerId === localPlayerId);
   if (!p) return null;
-  const time = Math.max(0, Math.ceil((view.phaseDeadline - serverNow) / 1000));
+  const remainingMs = view.phaseDeadline - serverNow;
+  const time = Math.max(0, Math.ceil(remainingMs / 1000));
+  const isTwoMinuteWarning = view.phase === 'playing' && isTwoMinuteWarningVisible(remainingMs);
+  const isPlaying = view.phase === 'playing';
+  const showSnowstormWarning = isPlaying && isSnowstormWarningVisible(remainingMs, view.mapId);
+  const showSnowstormBegun = isPlaying && isSnowstormBegunVisible(remainingMs, view.mapId);
   return (
     <div className="game-hud">
       <div className="match-clock">
-        <span>
-          Ice Ice Water
-        </span>
+        <span>Ice Ice Water</span>
         <strong>
           {Math.floor(time / 60)}:{String(time % 60).padStart(2, '0')}
         </strong>
         <span>{`Water unfrozen: ${view.waterUnfrozenCount} / ${view.waterStartedCount}`}</span>
       </div>
+      {isTwoMinuteWarning && (
+        <div className="two-minute-warning" role="alert" aria-live="assertive">
+          Only 2 minutes left
+        </div>
+      )}
+      {showSnowstormWarning && (
+        <div className="snowstorm-warning" role="alert" aria-live="assertive">
+          ❄ SNOWSTORM INCOMING! ❄
+        </div>
+      )}
+      {showSnowstormBegun && (
+        <div className="snowstorm-begun" role="status" aria-live="polite">
+          The snowstorm has begun!
+        </div>
+      )}
       {p.status === 'frozen' && (
         <div className="frozen-status" role="status">
           <strong>FROZEN</strong>
@@ -45,7 +69,7 @@ export function GameHud({
         </div>
       )}
       <div className="desktop-controls">
-        WASD move · Mouse aim · Space jump/swim · Shift sprint · Ctrl slide/crouch
+        WASD move · Mouse aim · Space jump/swim · Shift slide · C crouch/dive · Ctrl sprint
         <br />
         Click tag / rescue at close range · Q lunge · Tab scores · Esc pause
       </div>

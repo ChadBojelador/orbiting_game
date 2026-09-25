@@ -7,7 +7,7 @@ The original seven-phase plan is archived at `docs/archive/approved-fps-implemen
 - Replace freeze-tag gameplay with an arena FPS; retain superseded tests and specifications only as archived references.
 - Keep desktop and mobile touch support, including simultaneous movement, look, and firing.
 - Allow one player to start solo practice. FFA, TDM, and duel remain private-room modes; duel is capped at two players.
-- Integrate the supplied Island and wooden-house GLBs after normalizing scale and deriving shared render/collision geometry. Asset provenance and the unresolved rightsholder-permission question remain release gates.
+- Integrate the supplied Island GLB after normalizing scale and deriving shared render/collision geometry. Retain the supplied wooden-house source and provenance, but do not load it or include its former collider in Frostline. The unresolved Island rightsholder-permission question remains a release gate.
 - Keep the expanded 120 metre Frostline layout and the existing lobby character/music assets.
 
 ## Executed phases

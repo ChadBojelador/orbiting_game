@@ -16,14 +16,15 @@ The user confirmed permission to reuse this supplied file. Its reupload metadata
 does not independently establish the original rightsholder's permission. See
 assets/asset-provenance.md for the current verification status.
 
-Wooden-house landmark
+Historical wooden-house source (not used at runtime)
 Low poly Wooden house rusty 3d model free, by iGauravRajput
 https://sketchfab.com/iGauravRajput
 https://sketchfab.com/3d-models/low-poly-wooden-house-rusty-3d-model-free-abc884c3fea04b9aa4991a3691aa9a36
 Embedded license: Creative Commons Attribution 4.0
 https://creativecommons.org/licenses/by/4.0/
-Changes: uniform eight-metre normalization, centering/grounding and shared outer
-box collider. User confirmed permission for the supplied file.
+Previous changes: uniform eight-metre normalization, centering/grounding and a
+shared outer-box collider. The model and collider were removed from Frostline on
+2026-09-25. User confirmed permission for the supplied file.
 
 Frostline facility, weapons, combat-player geometry, effects and synthesized
 combat audio: original repository-authored assets.

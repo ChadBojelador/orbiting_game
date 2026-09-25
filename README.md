@@ -85,7 +85,7 @@ Routes remain `/health`, `/ready`, `POST /api/guest-session`, `POST /api/rooms`,
 
 [PRD](PRD.md), [architecture](ARCHITECTURE.md), [map specification](MAP_SPEC.md), [art direction](ART_DIRECTION.md), [implementation status](implementation_plan.md), [tasks and verification](TASKS.md), [agent rules](AGENTS.md), [contributing](CONTRIBUTING.md).
 
-`apps/client` renders and captures input; `apps/server` owns outcomes; `packages/shared` holds safe types/constants/pure simulation; `tests` holds browser/load scenarios. Original procedural weapons/facility/combat audio and Frost Island archipelago geometry ship alongside the authorized Fort derivative and wooden house. Lobby character/music are retained project assets. Embedded source/license metadata and outstanding permission evidence are recorded; see [asset provenance](assets/asset-provenance.md).
+`apps/client` renders and captures input; `apps/server` owns outcomes; `packages/shared` holds safe types/constants/pure simulation; `tests` holds browser/load scenarios. Original procedural weapons/facility/combat audio and Frost Island archipelago geometry ship alongside the authorized Fort derivative. The supplied wooden-house source is retained for provenance but is not used at runtime. Lobby character/music are retained project assets. Embedded source/license metadata and outstanding permission evidence are recorded; see [asset provenance](assets/asset-provenance.md).
 
 Contributors: Chad Bojelador and Franco Perez.
 
