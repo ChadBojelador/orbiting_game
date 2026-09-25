@@ -1,6 +1,11 @@
 import type { LobbyView } from '@ice-water/shared';
 import { isTwoMinuteWarningVisible } from '../game/match-night.js';
+import {
+  isSnowstormWarningVisible,
+  isSnowstormBegunVisible,
+} from '../game/snowstorm.js';
 export type KillEntry = never;
+
 export function GameHud({
   view,
   localPlayerId,
@@ -17,6 +22,9 @@ export function GameHud({
   const remainingMs = view.phaseDeadline - serverNow;
   const time = Math.max(0, Math.ceil(remainingMs / 1000));
   const isTwoMinuteWarning = view.phase === 'playing' && isTwoMinuteWarningVisible(remainingMs);
+  const isPlaying = view.phase === 'playing';
+  const showSnowstormWarning = isPlaying && isSnowstormWarningVisible(remainingMs, view.mapId);
+  const showSnowstormBegun = isPlaying && isSnowstormBegunVisible(remainingMs, view.mapId);
   return (
     <div className="game-hud">
       <div className="match-clock">
@@ -29,6 +37,16 @@ export function GameHud({
       {isTwoMinuteWarning && (
         <div className="two-minute-warning" role="alert" aria-live="assertive">
           Only 2 minutes left
+        </div>
+      )}
+      {showSnowstormWarning && (
+        <div className="snowstorm-warning" role="alert" aria-live="assertive">
+          ❄ SNOWSTORM INCOMING! ❄
+        </div>
+      )}
+      {showSnowstormBegun && (
+        <div className="snowstorm-begun" role="status" aria-live="polite">
+          The snowstorm has begun!
         </div>
       )}
       {p.status === 'frozen' && (

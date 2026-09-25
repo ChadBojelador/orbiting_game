@@ -43,17 +43,29 @@ describe('first-person hands', () => {
     );
   });
 
-  it('builds two empty articulated hands with no weapon or held item', () => {
+  it('builds gun-era-style block arms without fingers, weapons, or held items', () => {
     const camera = new PerspectiveCamera();
     const hands = new FirstPersonHands(camera);
     const root = camera.getObjectByName('first-person-hands');
     expect(root).toBeDefined();
-    expect(root?.getObjectByName('left-hand')).toBeDefined();
-    expect(root?.getObjectByName('right-hand')).toBeDefined();
-    expect(root?.getObjectByName('left-finger-4')).toBeDefined();
-    expect(root?.getObjectByName('right-thumb')).toBeDefined();
+    expect(root?.getObjectByName('left-forearm')).toMatchObject({
+      geometry: { type: 'BoxGeometry' },
+    });
+    expect(root?.getObjectByName('right-forearm')).toMatchObject({
+      geometry: { type: 'BoxGeometry' },
+    });
+    expect(root?.getObjectByName('left-hand')).toMatchObject({
+      geometry: { type: 'BoxGeometry' },
+    });
+    expect(root?.getObjectByName('right-hand')).toMatchObject({
+      geometry: { type: 'BoxGeometry' },
+    });
+    const leftArm = root?.getObjectByName('first-person-left-arm');
+    const rightArm = root?.getObjectByName('first-person-right-arm');
+    expect(rightArm!.position.x - leftArm!.position.x).toBeCloseTo(0.7);
     const partNames: string[] = [];
     root?.traverse((part) => partNames.push(part.name));
+    expect(partNames.some((name) => /finger|thumb/i.test(name))).toBe(false);
     expect(partNames.some((name) => /weapon|gun|item|barrel|grip/i.test(name))).toBe(false);
     hands.destroy();
     expect(camera.getObjectByName('first-person-hands')).toBeUndefined();

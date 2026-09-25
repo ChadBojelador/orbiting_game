@@ -1243,7 +1243,69 @@ form .primary {
     filter: blur(2px);
   }
 }
+/* ── Snowstorm warnings ── */
+.snowstorm-warning {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(94vw, 980px);
+  transform: translate(-50%, -50%);
+  color: #c8f0ff;
+  font-size: clamp(38px, 7vw, 96px);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow:
+    0 2px 0 #1e5a8a,
+    0 0 30px #6adcf0dd,
+    0 0 80px #3fc8e899,
+    0 8px 36px #020b18e6;
+  animation: snowstorm-fade 3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  pointer-events: none;
+}
+.snowstorm-begun {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(94vw, 800px);
+  transform: translate(-50%, -50%);
+  color: #d4eeff;
+  font-size: clamp(28px, 5vw, 64px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow:
+    0 1px 0 #2a6898,
+    0 0 18px #74d9ecbb,
+    0 0 50px #3fc8e866,
+    0 6px 28px #020b18cc;
+  animation: snowstorm-fade 3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  pointer-events: none;
+}
+@keyframes snowstorm-fade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -44%) scale(1.06);
+    filter: blur(6px);
+  }
+  15%,
+  65% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -56%) scale(0.97);
+    filter: blur(3px);
+  }
+}
 .frozen-status {
+
   position: absolute;
   top: 28%;
   left: 50%;
